@@ -1,0 +1,63 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Tenant {
+  id           String    @id
+  name         String
+  businessType String
+  taxRate      Float
+  currency     String
+  createdAt    DateTime  @default(now())
+  active       Boolean   @default(true)
+  products     Product[]
+  orders       Order[]
+}
+
+model Product {
+  id          String   @id
+  tenantId    String
+  name        String
+  category    String
+  sku         String
+  price       Float
+  stock       Int
+  description String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+}
+
+model Order {
+  id             String      @id
+  tenantId       String
+  status         String      // "COMPLETED" | "PENDING_SYNC" | "FAILED"
+  subtotal       Float
+  tax            Float
+  total          Float
+  paymentMethod  String      // "CASH" | "CARD" | "MOBILE_WALLET"
+  isOffline      Boolean     @default(false)
+  date           DateTime    @default(now())
+  syncedAt       DateTime?
+  cashierName    String?
+  customerName   String?
+  discountAmount Float?
+  discountPercent Float?
+  cashReceived   Float?
+  changeDue      Float?
+  tenant         Tenant      @relation(fields: [tenantId], references: [id])
+  items          OrderItem[]
+}
+
+model OrderItem {
+  id        String @id
+  orderId   String
+  productId String
+  name      String
+  price     Float
+  quantity  Int
+  order     Order  @relation(fields: [orderId], references: [id])
+}

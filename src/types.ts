@@ -1,0 +1,81 @@
+/**
+ * NxtGen PoS System Types
+ */
+
+export interface Tenant {
+  id: string;
+  name: string;
+  businessType: string;
+  taxRate: number; // e.g. 0.12 for 12%
+  currency: string; // e.g. "USD", "EUR", "PHP"
+  createdAt: string;
+  active: boolean;
+}
+
+export interface Product {
+  id: string;
+  tenantId: string;
+  name: string;
+  category: string;
+  sku: string;
+  price: number;
+  stock: number;
+  description: string;
+}
+
+export type PaymentMethod = "CASH" | "CARD" | "MOBILE_WALLET";
+
+export interface Order {
+  id: string;
+  tenantId: string;
+  status: "COMPLETED" | "PENDING_SYNC" | "FAILED";
+  subtotal: number;
+  tax: number;
+  total: number;
+  paymentMethod: PaymentMethod;
+  isOffline: boolean;
+  date: string;
+  syncedAt?: string;
+  cashierName?: string;
+  customerName?: string;
+  discountAmount?: number;
+  discountPercent?: number;
+  cashReceived?: number;
+  changeDue?: number;
+}
+
+export interface Customer {
+  id: string;
+  name: string;
+  phone: string;
+  loyaltyPoints: number;
+  email: string;
+}
+
+export interface HeldCart {
+  id: string;
+  tenantId: string;
+  items: {
+    product: Product;
+    quantity: number;
+  }[];
+  date: string;
+  label: string;
+}
+
+export interface OrderItem {
+  id: string;
+  orderId: string;
+  productId: string;
+  name: string;
+  price: number;
+  quantity: number;
+}
+
+export interface SyncQueueItem {
+  id: string;
+  tenantId: string;
+  order: Order;
+  items: OrderItem[];
+  timestamp: string;
+}
