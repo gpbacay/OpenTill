@@ -1,5 +1,7 @@
+"use client";
+
 import React, { useState } from "react";
-import { Tenant } from "../types";
+import { Tenant } from "@/lib/types";
 import { Store, Plus, AlertCircle, Building2, Check, ArrowRight } from "lucide-react";
 
 interface TenantOnboardingProps {

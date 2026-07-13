@@ -1,9 +1,11 @@
-import { Controller, Get, Post, Body } from "@nestjs/common";
+import { Controller, Get, Post, Body, Inject } from "@nestjs/common";
 import { TenantsService, Tenant } from "./tenants.service";
 
 @Controller("api/tenants")
 export class TenantsController {
-  constructor(private readonly tenantsService: TenantsService) {}
+  constructor(
+    @Inject(TenantsService) private readonly tenantsService: TenantsService
+  ) {}
 
   @Get()
   async getTenants(): Promise<Tenant[]> {

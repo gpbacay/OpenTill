@@ -1,5 +1,7 @@
+"use client";
+
 import React, { useState, useMemo } from "react";
-import { Product, Tenant } from "../types";
+import { Product, Tenant } from "@/lib/types";
 import { Search, Plus, Tag, AlertCircle, ShoppingBag, QrCode, Keyboard, CheckCircle } from "lucide-react";
 
 interface RegisterCatalogProps {

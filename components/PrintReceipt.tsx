@@ -1,5 +1,7 @@
+"use client";
+
 import React, { useMemo } from "react";
-import { Order, OrderItem, Tenant } from "../types";
+import { Order, OrderItem, Tenant } from "@/lib/types";
 import { 
   Printer, 
   Scissors, 

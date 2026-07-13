@@ -1,5 +1,7 @@
+"use client";
+
 import React, { useState, useMemo } from "react";
-import { Product, Tenant } from "../types";
+import { Product, Tenant } from "@/lib/types";
 import { Plus, Trash2, Edit, AlertCircle, RefreshCw, BarChart2, Check, Package } from "lucide-react";
 
 interface ProductsManagerProps {

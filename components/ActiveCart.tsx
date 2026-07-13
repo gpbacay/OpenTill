@@ -1,5 +1,7 @@
+"use client";
+
 import React, { useState, useMemo } from "react";
-import { Product, Tenant, Order, OrderItem, PaymentMethod, HeldCart, Customer } from "../types";
+import { Product, Tenant, Order, OrderItem, PaymentMethod, HeldCart, Customer } from "@/lib/types";
 import { Trash2, Plus, Minus, CreditCard, Wallet, Coins, AlertCircle, Sparkles, FileCheck, RefreshCw, User, Tag, Download, Printer, Bookmark, Calendar } from "lucide-react";
 import { PrintReceipt } from "./PrintReceipt";
 

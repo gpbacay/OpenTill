@@ -1,4 +1,4 @@
-import { Tenant, Product, Order, OrderItem } from "./types";
+import { Tenant, Product, Order, OrderItem } from "@/lib/types";
 
 export const INITIAL_TENANTS: Tenant[] = [
   {

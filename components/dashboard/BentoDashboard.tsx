@@ -1,5 +1,7 @@
+"use client";
+
 import React, { useState, useEffect, useMemo } from "react";
-import { Product, Tenant, Order } from "../../types";
+import { Product, Tenant, Order } from "@/lib/types";
 import { motion } from "motion/react";
 import { 
   Clock, 
@@ -149,15 +151,17 @@ function DashboardStats({ products, orders, activeTenant }: DashboardStatsProps)
   }, [activeTenantOrders]);
 
   const totalSalesCount = useMemo(() => {
-    const savedOrders = localStorage.getItem("nxtgen_orders");
-    let count = 0;
+    let count = activeTenantOrders.length * 2;
     try {
-      if (savedOrders) {
-        count = activeTenantOrders.length * 3 + Math.floor(Math.random() * activeTenantOrders.length);
-      } else {
-        count = activeTenantOrders.length * 2;
+      if (typeof window !== "undefined") {
+        const savedOrders = localStorage.getItem("nxtgen_orders");
+        if (savedOrders) {
+          count =
+            activeTenantOrders.length * 3 +
+            Math.floor(Math.random() * Math.max(1, activeTenantOrders.length));
+        }
       }
-    } catch(e) {
+    } catch {
       count = activeTenantOrders.length * 2;
     }
     return Math.max(activeTenantOrders.length, count || 0);

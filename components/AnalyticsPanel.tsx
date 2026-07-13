@@ -1,5 +1,7 @@
+"use client";
+
 import React, { useMemo } from "react";
-import { Order, Tenant } from "../types";
+import { Order, Tenant } from "@/lib/types";
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, PieChart, Pie, Cell, Legend } from "recharts";
 import { TrendingUp, Award, Coins, Sparkles, PieChart as PieIcon, BarChart2 } from "lucide-react";
 
