@@ -15,18 +15,19 @@ A multi-tenant, offline-first Point of Sale system for retail operations — reg
 | Layer | Technologies |
 | --- | --- |
 | **Language** | TypeScript |
-| **Frontend** | React 19, Vite, Tailwind CSS 4, Lucide React, Motion, Recharts |
+| **Frontend** | React 19, Next.js 15 (App Router), Tailwind CSS 4, Lucide React, Motion, Recharts |
 | **Backend** | NestJS (modular monolith), Express (`@nestjs/platform-express`) |
 | **Data store** | [Neon](https://neon.tech) (serverless PostgreSQL) via HTTP driver adapter |
 | **ORM** | Prisma (`@prisma/adapter-neon`) |
-| **Runtime / tooling** | Node.js, tsx (dev), esbuild (server bundle), dotenv |
+| **Runtime / tooling** | Node.js, Next.js, tsx (API dev), esbuild (Nest prod bundle), dotenv |
 
 ### Architecture notes
 
-- The NestJS API and Vite frontend run together from `server.ts` (Nest bootstraps Express, then mounts Vite in development or serves the built SPA in production).
+- Locally, Next.js (`:3000`) and the NestJS API (`:3001`) run together via `npm run dev`. Next rewrites `/api/*` to Nest.
+- On [Vercel](https://vercel.com), the project is configured as **Next.js** (`vercel.json` → `framework: "nextjs"`). Point `API_URL` at your Nest/API host for production rewrites.
 - Domain APIs live under `server/` as Nest modules: **tenants**, **products**, **orders**, plus a shared **database** module that connects to Neon through Prisma (`DATABASE_URL`) using the Neon HTTP adapter (works when TCP port 5432 is blocked).
 - Schema models live in `prisma/schema.prisma` (Tenant, Product, Order, OrderItem).
-- The UI lives under `src/` and talks to those APIs; offline queue and local persistence use the browser (`localStorage`) until sync reaches Neon.
+- The UI lives under `app/` and `components/` and talks to those APIs; offline queue and local persistence use the browser (`localStorage`) until sync reaches Neon.
 
 ## Run Locally
 
