@@ -1,4 +1,4 @@
-import { Injectable, OnModuleInit } from "@nestjs/common";
+import { Inject, Injectable, OnModuleInit } from "@nestjs/common";
 import { DatabaseService } from "../database/database.service";
 import { ProductsService } from "../products/products.service";
 
@@ -95,53 +95,56 @@ export class OrdersService implements OnModuleInit {
   ];
 
   constructor(
-    private dbService: DatabaseService,
-    private productsService: ProductsService
+    @Inject(DatabaseService) private readonly dbService: DatabaseService,
+    @Inject(ProductsService) private readonly productsService: ProductsService
   ) {}
 
   async onModuleInit() {
-    setTimeout(async () => {
-      if (this.dbService.client) {
-        try {
-          const count = await this.dbService.client.order.count();
-          if (count === 0) {
-            console.log("🌱 [OrdersModule] Seeding orders into database...");
-            for (const o of this.memoryOrders) {
-              await this.dbService.client.order.create({
-                data: {
-                  id: o.id,
-                  tenantId: o.tenantId,
-                  status: o.status,
-                  subtotal: o.subtotal,
-                  tax: o.tax,
-                  total: o.total,
-                  paymentMethod: o.paymentMethod,
-                  isOffline: o.isOffline,
-                  date: new Date(o.date),
-                  syncedAt: o.syncedAt ? new Date(o.syncedAt) : null,
-                }
-              });
-            }
+    await this.seedIfNeeded();
+  }
 
-            for (const item of this.memoryOrderItems) {
-              await this.dbService.client.orderItem.create({
-                data: {
-                  id: item.id,
-                  orderId: item.orderId,
-                  productId: item.productId,
-                  name: item.name,
-                  price: item.price,
-                  quantity: item.quantity
-                }
-              });
-            }
-            console.log("✅ [OrdersModule] Order seeding complete.");
-          }
-        } catch (err: any) {
-          console.warn("⚠️ [OrdersModule] Seeding check failed:", err.message);
-        }
+  private async seedIfNeeded() {
+    const client = this.dbService?.client;
+    if (!client) return;
+
+    try {
+      const count = await client.order.count();
+      if (count > 0) return;
+
+      console.log("🌱 [OrdersModule] Seeding orders into database...");
+      for (const o of this.memoryOrders) {
+        await client.order.create({
+          data: {
+            id: o.id,
+            tenantId: o.tenantId,
+            status: o.status,
+            subtotal: o.subtotal,
+            tax: o.tax,
+            total: o.total,
+            paymentMethod: o.paymentMethod,
+            isOffline: o.isOffline,
+            date: new Date(o.date),
+            syncedAt: o.syncedAt ? new Date(o.syncedAt) : null,
+          },
+        });
       }
-    }, 1000);
+
+      for (const item of this.memoryOrderItems) {
+        await client.orderItem.create({
+          data: {
+            id: item.id,
+            orderId: item.orderId,
+            productId: item.productId,
+            name: item.name,
+            price: item.price,
+            quantity: item.quantity,
+          },
+        });
+      }
+      console.log("✅ [OrdersModule] Order seeding complete.");
+    } catch (err: any) {
+      console.warn("⚠️ [OrdersModule] Seeding check failed:", err.message);
+    }
   }
 
   async findAll(): Promise<any[]> {

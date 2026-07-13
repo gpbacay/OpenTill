@@ -1,4 +1,4 @@
-import { Injectable, OnModuleInit } from "@nestjs/common";
+import { Inject, Injectable, OnModuleInit } from "@nestjs/common";
 import { DatabaseService } from "../database/database.service";
 
 export interface Product {
@@ -107,36 +107,39 @@ export class ProductsService implements OnModuleInit {
     }
   ];
 
-  constructor(private dbService: DatabaseService) {}
+  constructor(@Inject(DatabaseService) private readonly dbService: DatabaseService) {}
 
   async onModuleInit() {
-    setTimeout(async () => {
-      if (this.dbService.client) {
-        try {
-          const count = await this.dbService.client.product.count();
-          if (count === 0) {
-            console.log("🌱 [ProductsModule] Seeding products into database...");
-            for (const p of this.memoryProducts) {
-              await this.dbService.client.product.create({
-                data: {
-                  id: p.id,
-                  tenantId: p.tenantId,
-                  name: p.name,
-                  category: p.category,
-                  sku: p.sku,
-                  price: p.price,
-                  stock: p.stock,
-                  description: p.description
-                }
-              });
-            }
-            console.log("✅ [ProductsModule] Product seeding complete.");
-          }
-        } catch (err: any) {
-          console.warn("⚠️ [ProductsModule] Seeding check failed:", err.message);
-        }
+    await this.seedIfNeeded();
+  }
+
+  private async seedIfNeeded() {
+    const client = this.dbService?.client;
+    if (!client) return;
+
+    try {
+      const count = await client.product.count();
+      if (count > 0) return;
+
+      console.log("🌱 [ProductsModule] Seeding products into database...");
+      for (const p of this.memoryProducts) {
+        await client.product.create({
+          data: {
+            id: p.id,
+            tenantId: p.tenantId,
+            name: p.name,
+            category: p.category,
+            sku: p.sku,
+            price: p.price,
+            stock: p.stock,
+            description: p.description,
+          },
+        });
       }
-    }, 1000);
+      console.log("✅ [ProductsModule] Product seeding complete.");
+    } catch (err: any) {
+      console.warn("⚠️ [ProductsModule] Seeding check failed:", err.message);
+    }
   }
 
   async findAll(): Promise<Product[]> {
