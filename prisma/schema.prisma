@@ -1,10 +1,12 @@
+// Neon (serverless PostgreSQL) via Prisma — set DATABASE_URL to your Neon connection string
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
 }
 
 model Tenant {

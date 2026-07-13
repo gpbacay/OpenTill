@@ -6,8 +6,9 @@ import dotenv from "dotenv";
 import { createServer as createViteServer } from "vite";
 import { AppModule } from "./server/app.module";
 
-// Load environment variables
+// Load environment variables (.env for Prisma; .env.local overrides for local app config)
 dotenv.config();
+dotenv.config({ path: ".env.local", override: true });
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
