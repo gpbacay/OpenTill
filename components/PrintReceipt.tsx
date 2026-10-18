@@ -272,7 +272,7 @@ export function PrintReceipt({ order, items, tenant }: PrintReceiptProps) {
         {/* Footer Greetings */}
         <div className="text-center text-[8px] text-slate-400 space-y-1 border-t border-dashed border-slate-200 pt-3">
           <p className="font-bold text-slate-600">THANK YOU FOR YOUR PATRONAGE!</p>
-          <p>POWERED BY NXTGEN POS SYSTEMS</p>
+          <p>POWERED BY OPENTILL</p>
           <p className="text-[7px]">Please retain this copy for exchanges.</p>
         </div>
 

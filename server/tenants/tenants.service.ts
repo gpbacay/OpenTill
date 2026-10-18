@@ -25,7 +25,7 @@ export class TenantsService implements OnModuleInit {
     },
     {
       id: "tenant-2",
-      name: "NxtGen Tech Hub",
+      name: "Apex Tech Hub",
       businessType: "Electronics Retail",
       taxRate: 0.08,
       currency: "USD",

@@ -1,4 +1,4 @@
-# NxtGen POS
+# OpenTill
 
 A multi-tenant, offline-first Point of Sale system for retail operations — register sales, manage inventory, onboard store tenants, and track performance from one interface.
 

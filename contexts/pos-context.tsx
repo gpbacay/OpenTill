@@ -65,7 +65,9 @@ const PosContext = createContext<PosContextValue | null>(null);
 
 function readStorage<T>(key: string, fallback: T): T {
   try {
-    const saved = localStorage.getItem(key);
+    const saved =
+      localStorage.getItem(key) ??
+      localStorage.getItem(key.replace(/^opentill_/, "nxtgen_"));
     if (saved === null) return fallback;
     return JSON.parse(saved) as T;
   } catch {
@@ -95,19 +97,19 @@ export function PosProvider({ children }: { children: ReactNode }) {
 
   // Load persisted state after mount (SSR-safe)
   useEffect(() => {
-    setTenants(readStorage("nxtgen_tenants", INITIAL_TENANTS));
-    setActiveTenantId(readStorage("nxtgen_active_tenant_id", INITIAL_TENANTS[0].id));
-    setProducts(readStorage("nxtgen_products", INITIAL_PRODUCTS));
-    setSyncedOrders(readStorage("nxtgen_orders", INITIAL_ORDERS));
-    setOfflineQueue(readStorage("nxtgen_offline_queue", []));
-    setHeldCarts(readStorage("nxtgen_held_carts", []));
-    setIsDarkMode(readStorage("nxtgen_theme_dark", true));
+    setTenants(readStorage("opentill_tenants", INITIAL_TENANTS));
+    setActiveTenantId(readStorage("opentill_active_tenant_id", INITIAL_TENANTS[0].id));
+    setProducts(readStorage("opentill_products", INITIAL_PRODUCTS));
+    setSyncedOrders(readStorage("opentill_orders", INITIAL_ORDERS));
+    setOfflineQueue(readStorage("opentill_offline_queue", []));
+    setHeldCarts(readStorage("opentill_held_carts", []));
+    setIsDarkMode(readStorage("opentill_theme_dark", true));
     setHydrated(true);
   }, []);
 
   useEffect(() => {
     if (!hydrated) return;
-    localStorage.setItem("nxtgen_theme_dark", JSON.stringify(isDarkMode));
+    localStorage.setItem("opentill_theme_dark", JSON.stringify(isDarkMode));
     if (isDarkMode) {
       document.documentElement.classList.remove("light-theme");
       document.body.classList.remove("light-theme");
@@ -123,33 +125,33 @@ export function PosProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!hydrated) return;
-    localStorage.setItem("nxtgen_tenants", JSON.stringify(tenants));
+    localStorage.setItem("opentill_tenants", JSON.stringify(tenants));
   }, [tenants, hydrated]);
 
   useEffect(() => {
     if (!hydrated) return;
-    localStorage.setItem("nxtgen_active_tenant_id", activeTenantId);
+    localStorage.setItem("opentill_active_tenant_id", activeTenantId);
     setCart([]);
   }, [activeTenantId, hydrated]);
 
   useEffect(() => {
     if (!hydrated) return;
-    localStorage.setItem("nxtgen_products", JSON.stringify(products));
+    localStorage.setItem("opentill_products", JSON.stringify(products));
   }, [products, hydrated]);
 
   useEffect(() => {
     if (!hydrated) return;
-    localStorage.setItem("nxtgen_orders", JSON.stringify(syncedOrders));
+    localStorage.setItem("opentill_orders", JSON.stringify(syncedOrders));
   }, [syncedOrders, hydrated]);
 
   useEffect(() => {
     if (!hydrated) return;
-    localStorage.setItem("nxtgen_offline_queue", JSON.stringify(offlineQueue));
+    localStorage.setItem("opentill_offline_queue", JSON.stringify(offlineQueue));
   }, [offlineQueue, hydrated]);
 
   useEffect(() => {
     if (!hydrated) return;
-    localStorage.setItem("nxtgen_held_carts", JSON.stringify(heldCarts));
+    localStorage.setItem("opentill_held_carts", JSON.stringify(heldCarts));
   }, [heldCarts, hydrated]);
 
   useEffect(() => {

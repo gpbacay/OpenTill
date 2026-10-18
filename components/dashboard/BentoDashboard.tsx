@@ -154,7 +154,7 @@ function DashboardStats({ products, orders, activeTenant }: DashboardStatsProps)
     let count = activeTenantOrders.length * 2;
     try {
       if (typeof window !== "undefined") {
-        const savedOrders = localStorage.getItem("nxtgen_orders");
+        const savedOrders = localStorage.getItem("opentill_orders");
         if (savedOrders) {
           count =
             activeTenantOrders.length * 3 +

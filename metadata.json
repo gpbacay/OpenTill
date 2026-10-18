@@ -1,5 +1,5 @@
 {
-  "name": "NxtGen PoS System",
+  "name": "OpenTill",
   "description": "A multi-tenant, offline-first Point of Sale (POS) system designed with deep teal, mint and dark navy theme, supporting offline register transactions, tenant onboarding, and automated cloud sync.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]

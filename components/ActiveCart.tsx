@@ -225,7 +225,7 @@ export function ActiveCart({
     
     invoice += border;
     invoice += "     THANK YOU FOR YOUR PATRONAGE!     \n";
-    invoice += "         NxtGen PoS Enterprise         \n";
+    invoice += "                OpenTill                \n";
     invoice += "========================================\n";
     return invoice;
   };
@@ -399,7 +399,7 @@ export function ActiveCart({
                 )}
                 <div className="flex justify-between text-[8px] pt-2 text-slate-500">
                   <span>Method: {receiptOrder.paymentMethod}</span>
-                  <span>Operator ID: NxtGen-POS</span>
+                  <span>Operator ID: OpenTill</span>
                 </div>
               </div>
 

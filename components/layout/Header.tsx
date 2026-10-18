@@ -83,7 +83,7 @@ export default function Header({
 
   const getBreadcrumb = () => {
     const items = [
-      { label: "NxtGen POS", icon: <TriangleAlert className="w-3.5 h-3.5" /> },
+      { label: "OpenTill", icon: <TriangleAlert className="w-3.5 h-3.5" /> },
     ];
 
     switch (activeSection) {

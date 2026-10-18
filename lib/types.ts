@@ -1,5 +1,5 @@
 /**
- * NxtGen PoS System Types
+ * OpenTill types
  */
 
 export interface Tenant {

@@ -12,7 +12,7 @@ export const INITIAL_TENANTS: Tenant[] = [
   },
   {
     id: "tenant-2",
-    name: "NxtGen Tech Hub",
+    name: "Apex Tech Hub",
     businessType: "Electronics Retail",
     taxRate: 0.08, // 8%
     currency: "USD",
@@ -73,7 +73,7 @@ export const INITIAL_PRODUCTS: Product[] = [
     description: "Organic acai puree topped with strawberries, blueberries, hemp seeds, and honey.",
   },
 
-  // Tenant 2: NxtGen Tech Hub
+  // Tenant 2: Apex Tech Hub
   {
     id: "prod-201",
     tenantId: "tenant-2",

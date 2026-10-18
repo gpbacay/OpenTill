@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "NxtGen PoS System",
+  title: "OpenTill",
   description: "Offline-first point of sale system",
 };
 
