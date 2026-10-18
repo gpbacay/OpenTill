@@ -189,7 +189,7 @@ export function ActiveCart({
     invoice += border;
     invoice += `        ${activeTenant.name.toUpperCase()}        \n`;
     invoice += `        ${activeTenant.businessType.toUpperCase()}        \n`;
-    invoice += `          STATION #nxt-gen-pos          \n`;
+    invoice += `           STATION #opentill            \n`;
     invoice += border;
     invoice += `Date   : ${new Date(receiptOrder.date).toLocaleString()}\n`;
     invoice += `Receipt: ${receiptOrder.id.substring(4).toUpperCase()}\n`;

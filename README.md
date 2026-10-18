@@ -1,14 +1,14 @@
 # OpenTill
 
-A multi-tenant, offline-first Point of Sale system for retail operations — register sales, manage inventory, onboard store tenants, and track performance from one interface.
+A multi-tenant, offline-first Point of Sale system for retail operations: register sales, manage inventory, onboard store tenants, and track performance from one interface.
 
 ## Features
 
-- **Register** — Ring up sales from a product catalog with an active cart, held carts, and receipt printing
-- **Offline-first** — Keep selling without a connection; queued orders sync automatically when back online
-- **Multi-tenant** — Onboard and switch between store tenants from a shared workspace
-- **Products** — Create and manage catalog items per tenant
-- **Analytics & dashboard** — Sales trends, inventory signals, and operational overview in a bento-style dashboard
+- **Register:** Ring up sales from a product catalog with an active cart, held carts, and receipt printing
+- **Offline-first:** Keep selling without a connection; queued orders sync automatically when back online
+- **Multi-tenant:** Onboard and switch between store tenants from a shared workspace
+- **Products:** Create and manage catalog items per tenant
+- **Analytics & dashboard:** Sales trends, inventory signals, and operational overview in a bento-style dashboard
 
 ## Tech Stack
 
@@ -37,7 +37,7 @@ A multi-tenant, offline-first Point of Sale system for retail operations — reg
    `npm install`
 2. Copy `.env.example` to `.env` and set `DATABASE_URL` to your Neon connection string  
    (use role `neondb_owner`; Prisma reads `.env`)
-3. Generate the Prisma client and apply the schema (HTTP — preferred when `prisma db push` fails with P1001):
+3. Generate the Prisma client and apply the schema (HTTP, preferred when `prisma db push` fails with P1001):
    `npx prisma generate`
    `npm run db:push`
 4. Start the app:

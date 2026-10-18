@@ -65,9 +65,7 @@ const PosContext = createContext<PosContextValue | null>(null);
 
 function readStorage<T>(key: string, fallback: T): T {
   try {
-    const saved =
-      localStorage.getItem(key) ??
-      localStorage.getItem(key.replace(/^opentill_/, "nxtgen_"));
+    const saved = localStorage.getItem(key);
     if (saved === null) return fallback;
     return JSON.parse(saved) as T;
   } catch {
