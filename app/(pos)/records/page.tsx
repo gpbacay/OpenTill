@@ -58,7 +58,7 @@ export default function RecordsPage() {
                 Synced sales ledger
               </h4>
               <p className="text-[9px] text-slate-400">
-                Row counts synced with Cloud Postgres (Neon Database).
+                Sales saved on this device. Queued rows sync to the local database when the register is reachable.
               </p>
             </div>
             <div className="bg-[#208C8C]/15 border border-[#208C8C]/30 px-2 py-0.5 rounded text-[9px] font-mono text-[#89D9C2]">
@@ -155,9 +155,9 @@ export default function RecordsPage() {
                       </div>
 
                       <div className="flex items-center gap-1.5 text-[8px] font-mono bg-[#0D0D0D] px-2 py-1 rounded border border-[#024959]/50 text-slate-300 shadow-inner">
-                        <CheckCircle className="w-3 h-3 text-[#89D9C2]" />
-                        <span className="text-[#89D9C2] font-semibold">
-                          POSTGRES_SYNCED
+                        <CheckCircle className={`w-3 h-3 ${o.status === "PENDING_SYNC" ? "text-amber-400" : "text-[#89D9C2]"}`} />
+                        <span className={`font-semibold ${o.status === "PENDING_SYNC" ? "text-amber-300" : "text-[#89D9C2]"}`}>
+                          {o.status === "PENDING_SYNC" ? "QUEUED" : "SAVED"}
                         </span>
                       </div>
                     </div>

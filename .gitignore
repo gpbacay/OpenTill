@@ -5,5 +5,7 @@ dist/
 coverage/
 .DS_Store
 *.log
+data/*.db
+data/*.db-journal
 # .env*
 # !.env.local

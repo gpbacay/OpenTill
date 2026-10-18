@@ -154,7 +154,7 @@ export default function Header({
                   >
                     {crumb.icon}
                   </span>
-                  <span className="hidden xs:inline">{crumb.label}</span>
+                  <span className={isLast ? "inline" : "hidden sm:inline"}>{crumb.label}</span>
                 </div>
               </React.Fragment>
             );
@@ -191,7 +191,7 @@ export default function Header({
                 ? "bg-slate-800/50 border-slate-700 text-slate-500 cursor-not-allowed"
                 : "bg-amber-500 text-[#010326] border-amber-400 hover:bg-amber-400 font-bold"
             }`}
-            title="Flush local buffered queue to Postgres database"
+            title="Save queued sales to the local database"
           >
             <RefreshCw
               className={`w-3.5 h-3.5 ${isSyncing ? "animate-spin" : ""}`}

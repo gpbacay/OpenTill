@@ -6,6 +6,7 @@ import React, {
   useState,
   useEffect,
   useMemo,
+  useRef,
   type ReactNode,
 } from "react";
 import { useRouter } from "next/navigation";
@@ -63,6 +64,18 @@ interface PosContextValue {
 
 const PosContext = createContext<PosContextValue | null>(null);
 
+type Outbox = {
+  productUpserts: string[];
+  productDeletes: string[];
+  tenantUpserts: string[];
+};
+
+const EMPTY_OUTBOX: Outbox = {
+  productUpserts: [],
+  productDeletes: [],
+  tenantUpserts: [],
+};
+
 function readStorage<T>(key: string, fallback: T): T {
   try {
     const saved = localStorage.getItem(key);
@@ -71,6 +84,10 @@ function readStorage<T>(key: string, fallback: T): T {
   } catch {
     return fallback;
   }
+}
+
+function writeOutbox(outbox: Outbox) {
+  localStorage.setItem("opentill_outbox", JSON.stringify(outbox));
 }
 
 export function PosProvider({ children }: { children: ReactNode }) {
@@ -83,7 +100,9 @@ export function PosProvider({ children }: { children: ReactNode }) {
   const [syncedOrders, setSyncedOrders] = useState<Order[]>(INITIAL_ORDERS);
   const [offlineQueue, setOfflineQueue] = useState<{ order: Order; items: OrderItem[] }[]>([]);
   const [heldCarts, setHeldCarts] = useState<HeldCart[]>([]);
-  const [isOnline, setIsOnline] = useState(true);
+  const [browserOnline, setBrowserOnline] = useState(true);
+  const [forcedOffline, setForcedOffline] = useState(false);
+  const isOnline = browserOnline && !forcedOffline;
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncProgress, setSyncProgress] = useState(0);
   const [isDarkMode, setIsDarkMode] = useState(true);
@@ -92,6 +111,15 @@ export function PosProvider({ children }: { children: ReactNode }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchHistory, setSearchHistory] = useState("");
   const [cart, setCart] = useState<CartItem[]>([]);
+  const offlineQueueRef = useRef(offlineQueue);
+  offlineQueueRef.current = offlineQueue;
+  const productsRef = useRef(products);
+  productsRef.current = products;
+  const tenantsRef = useRef(tenants);
+  tenantsRef.current = tenants;
+  const outboxRef = useRef<Outbox>(EMPTY_OUTBOX);
+  const syncingRef = useRef(false);
+  const flushRef = useRef<() => Promise<void>>(async () => {});
 
   // Load persisted state after mount (SSR-safe)
   useEffect(() => {
@@ -102,7 +130,19 @@ export function PosProvider({ children }: { children: ReactNode }) {
     setOfflineQueue(readStorage("opentill_offline_queue", []));
     setHeldCarts(readStorage("opentill_held_carts", []));
     setIsDarkMode(readStorage("opentill_theme_dark", true));
+    outboxRef.current = readStorage("opentill_outbox", EMPTY_OUTBOX);
+    setBrowserOnline(navigator.onLine);
     setHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    const apply = () => setBrowserOnline(navigator.onLine);
+    window.addEventListener("online", apply);
+    window.addEventListener("offline", apply);
+    return () => {
+      window.removeEventListener("online", apply);
+      window.removeEventListener("offline", apply);
+    };
   }, []);
 
   useEffect(() => {
@@ -152,129 +192,202 @@ export function PosProvider({ children }: { children: ReactNode }) {
     localStorage.setItem("opentill_held_carts", JSON.stringify(heldCarts));
   }, [heldCarts, hydrated]);
 
-  useEffect(() => {
-    if (!isOnline) return;
+  const remember = (kind: keyof Outbox, id: string, add: boolean) => {
+    const box = outboxRef.current;
+    const next = box[kind].filter((item) => item !== id);
+    box[kind] = add ? [...next, id] : next;
+    writeOutbox(box);
+  };
 
-    const fetchBackendData = async () => {
-      try {
-        const [tenantsRes, productsRes, ordersRes] = await Promise.all([
-          fetch("/api/tenants"),
-          fetch("/api/products"),
-          fetch("/api/orders"),
-        ]);
-
-        if (tenantsRes.ok) {
-          const tenantsData = await tenantsRes.json();
-          if (tenantsData && tenantsData.length > 0) {
-            setTenants(tenantsData);
-          }
-        }
-        if (productsRes.ok) {
-          const productsData = await productsRes.json();
-          if (productsData && productsData.length > 0) {
-            setProducts(productsData);
-          }
-        }
-        if (ordersRes.ok) {
-          const ordersData = await ordersRes.json();
-          if (ordersData) {
-            const mappedOrders = ordersData.map((o: Order) => ({
-              id: o.id,
-              tenantId: o.tenantId,
-              status: o.status,
-              subtotal: o.subtotal,
-              tax: o.tax,
-              total: o.total,
-              paymentMethod: o.paymentMethod,
-              isOffline: o.isOffline,
-              date: o.date,
-              syncedAt: o.syncedAt,
-              cashierName: o.cashierName,
-              customerName: o.customerName,
-              discountAmount: o.discountAmount,
-              discountPercent: o.discountPercent,
-              cashReceived: o.cashReceived,
-              changeDue: o.changeDue,
-            }));
-            setSyncedOrders(mappedOrders);
-          }
-        }
-      } catch (err) {
-        console.warn(
-          "Could not fetch data from NestJS backend. Operating in local-first mode.",
-          err
-        );
-      }
-    };
-
-    fetchBackendData();
-  }, [isOnline]);
-
-  const triggerOfflineSync = async () => {
-    if (offlineQueue.length === 0) return;
-    setIsSyncing(true);
-    setSyncProgress(10);
-
-    const ordersBatch = offlineQueue.map((item) => item.order);
-    const itemsBatch: OrderItem[] = [];
-    offlineQueue.forEach((item) => {
-      itemsBatch.push(...item.items);
-    });
+  flushRef.current = async () => {
+    if (!navigator.onLine || forcedOffline || syncingRef.current) return;
+    const box = outboxRef.current;
+    const hasWork =
+      offlineQueueRef.current.length > 0 ||
+      box.productUpserts.length > 0 ||
+      box.productDeletes.length > 0 ||
+      box.tenantUpserts.length > 0;
+    syncingRef.current = true;
+    if (hasWork) {
+      setIsSyncing(true);
+      setSyncProgress(15);
+    }
 
     try {
-      if (isOnline) {
-        setSyncProgress(35);
+      for (const id of [...box.productDeletes]) {
+        const res = await fetch(`/api/products/${id}`, { method: "DELETE" });
+        if (res.ok || res.status === 404) remember("productDeletes", id, false);
+      }
+
+      for (const id of [...box.productUpserts]) {
+        const product = productsRef.current.find((p) => p.id === id);
+        if (!product) {
+          remember("productUpserts", id, false);
+          continue;
+        }
+        const put = await fetch(`/api/products/${id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(product),
+        });
+        const putBody = await put.json().catch(() => null);
+        let saved = put.ok && !putBody?.error;
+        if (!saved) {
+          const post = await fetch("/api/products", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(product),
+          });
+          saved = post.ok;
+        }
+        if (saved) remember("productUpserts", id, false);
+      }
+
+      for (const id of [...box.tenantUpserts]) {
+        const tenant = tenantsRef.current.find((t) => t.id === id);
+        if (!tenant) {
+          remember("tenantUpserts", id, false);
+          continue;
+        }
+        const res = await fetch("/api/tenants", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(tenant),
+        });
+        if (res.ok) remember("tenantUpserts", id, false);
+      }
+
+      const queue = offlineQueueRef.current;
+      if (queue.length > 0) {
+        setSyncProgress(50);
         const res = await fetch("/api/orders/sync", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ orders: ordersBatch, items: itemsBatch }),
+          body: JSON.stringify({
+            orders: queue.map((item) => item.order),
+            items: queue.flatMap((item) => item.items),
+          }),
         });
-        if (!res.ok) {
-          throw new Error("NestJS backend sync failed");
-        }
-        setSyncProgress(75);
+        if (!res.ok) throw new Error("local database sync failed");
+        const ids = new Set(queue.map((item) => item.order.id));
+        const syncedAt = new Date().toISOString();
+        setSyncedOrders((prev) =>
+          prev.map((order) =>
+            ids.has(order.id)
+              ? { ...order, status: "COMPLETED", isOffline: false, syncedAt }
+              : order
+          )
+        );
+        setOfflineQueue([]);
+        offlineQueueRef.current = [];
       }
-    } catch (err) {
-      console.error("Failed to sync offline queue with NestJS backend:", err);
-    }
 
-    setSyncProgress(100);
-    setTimeout(() => {
-      setProducts((prevProducts) => {
-        const updatedProducts = [...prevProducts];
-        offlineQueue.forEach(({ items }) => {
-          items.forEach((item) => {
-            const pIdx = updatedProducts.findIndex((p) => p.id === item.productId);
-            if (pIdx !== -1) {
-              updatedProducts[pIdx] = {
-                ...updatedProducts[pIdx],
-                stock: Math.max(0, updatedProducts[pIdx].stock - item.quantity),
-              };
-            }
+      const [tenantsRes, productsRes, ordersRes] = await Promise.all([
+        fetch("/api/tenants"),
+        fetch("/api/products"),
+        fetch("/api/orders"),
+      ]);
+
+      if (tenantsRes.ok) {
+        const server = await tenantsRes.json();
+        if (Array.isArray(server) && server.length > 0) {
+          const dirty = new Set(outboxRef.current.tenantUpserts);
+          setTenants((local) => {
+            const byId = new Map(local.map((t) => [t.id, t]));
+            const merged = server.map((t: Tenant) =>
+              dirty.has(t.id) && byId.has(t.id) ? byId.get(t.id)! : t
+            );
+            const ids = new Set(server.map((t: Tenant) => t.id));
+            return [...merged, ...local.filter((t) => !ids.has(t.id))];
           });
-        });
-        return updatedProducts;
-      });
+        }
+      }
 
-      const syncedFromQueue = offlineQueue.map((item) => ({
-        ...item.order,
-        status: "COMPLETED" as const,
-        syncedAt: new Date().toISOString(),
-      }));
+      if (productsRes.ok) {
+        const server = await productsRes.json();
+        if (Array.isArray(server) && server.length > 0) {
+          const dirty = new Set(outboxRef.current.productUpserts);
+          const deleted = new Set(outboxRef.current.productDeletes);
+          const queuedIds = new Set(
+            offlineQueueRef.current.flatMap((entry) =>
+              entry.items.map((item) => item.productId)
+            )
+          );
+          setProducts((local) => {
+            const byId = new Map(local.map((p) => [p.id, p]));
+            const merged = server
+              .filter((p: Product) => !deleted.has(p.id))
+              .map((p: Product) => {
+                const localProduct = byId.get(p.id);
+                if (dirty.has(p.id) && localProduct) return localProduct;
+                if (queuedIds.has(p.id) && localProduct) {
+                  return { ...p, stock: localProduct.stock };
+                }
+                return p;
+              });
+            const ids = new Set(server.map((p: Product) => p.id));
+            return [
+              ...merged,
+              ...local.filter((p) => !ids.has(p.id) && !deleted.has(p.id)),
+            ];
+          });
+        }
+      }
 
-      setSyncedOrders((prevOrders) => [...syncedFromQueue, ...prevOrders]);
-      setOfflineQueue([]);
-      setIsSyncing(false);
-      setSyncProgress(0);
-    }, 600);
+      if (ordersRes.ok) {
+        const server = await ordersRes.json();
+        if (Array.isArray(server)) {
+          const mapped: Order[] = server.map((o: Order) => ({
+            id: o.id,
+            tenantId: o.tenantId,
+            status: o.status,
+            subtotal: o.subtotal,
+            tax: o.tax,
+            total: o.total,
+            paymentMethod: o.paymentMethod,
+            isOffline: o.isOffline,
+            date: o.date,
+            syncedAt: o.syncedAt,
+            cashierName: o.cashierName,
+            customerName: o.customerName,
+            discountAmount: o.discountAmount,
+            discountPercent: o.discountPercent,
+            cashReceived: o.cashReceived,
+            changeDue: o.changeDue,
+          }));
+          setSyncedOrders((local) => {
+            const ids = new Set(mapped.map((o) => o.id));
+            return [...local.filter((o) => !ids.has(o.id)), ...mapped];
+          });
+        }
+      }
+      if (hasWork) setSyncProgress(100);
+    } catch (err) {
+      console.warn(
+        "Local API unreachable. Register data stays on this device.",
+        err
+      );
+    } finally {
+      syncingRef.current = false;
+      setTimeout(() => {
+        setIsSyncing(false);
+        setSyncProgress(0);
+      }, 400);
+    }
+  };
+
+  useEffect(() => {
+    if (!hydrated || !isOnline) return;
+    void flushRef.current();
+  }, [hydrated, isOnline]);
+
+  const triggerOfflineSync = async () => {
+    await flushRef.current();
   };
 
   const handleNetworkToggle = () => {
-    const nextState = !isOnline;
-    setIsOnline(nextState);
-    if (nextState && offlineQueue.length > 0) {
-      void triggerOfflineSync();
-    }
+    if (!navigator.onLine) return;
+    setForcedOffline((current) => !current);
   };
 
   const handleAddToCart = (product: Product) => {
@@ -391,97 +504,151 @@ export function PosProvider({ children }: { children: ReactNode }) {
   }, [router]);
 
   const handleCheckout = async (order: Order, items: OrderItem[]) => {
-    if (isOnline) {
-      setProducts((prev) => {
-        const updated = [...prev];
-        items.forEach((item) => {
-          const idx = updated.findIndex((p) => p.id === item.productId);
-          if (idx !== -1) {
-            updated[idx] = {
-              ...updated[idx],
-              stock: Math.max(0, updated[idx].stock - item.quantity),
-            };
-          }
-        });
-        return updated;
+    setProducts((prev) => {
+      const updated = prev.map((product) => {
+        const sold = items.find((item) => item.productId === product.id);
+        if (!sold) return product;
+        return {
+          ...product,
+          stock: Math.max(0, product.stock - sold.quantity),
+        };
       });
+      productsRef.current = updated;
+      return updated;
+    });
 
-      setSyncedOrders((prev) => [order, ...prev]);
+    const saved: Order = isOnline
+      ? order
+      : { ...order, status: "PENDING_SYNC", isOffline: true, syncedAt: undefined };
+    setSyncedOrders((prev) => [saved, ...prev]);
 
-      try {
-        await fetch("/api/orders/sync", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ orders: [order], items }),
-        });
-      } catch (err) {
-        console.warn(
-          "Could not save order on NestJS server. Retained in client state.",
-          err
-        );
-      }
-    } else {
-      setOfflineQueue((prev) => [...prev, { order, items }]);
+    const queueIt = () => {
+      const queued: Order = {
+        ...saved,
+        status: "PENDING_SYNC",
+        isOffline: true,
+        syncedAt: undefined,
+      };
+      setSyncedOrders((prev) =>
+        prev.map((existing) => (existing.id === queued.id ? queued : existing))
+      );
+      setOfflineQueue((prev) => {
+        const next = [
+          ...prev.filter((entry) => entry.order.id !== queued.id),
+          { order: queued, items },
+        ];
+        offlineQueueRef.current = next;
+        return next;
+      });
+    };
+
+    if (!isOnline) {
+      queueIt();
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/orders/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orders: [order], items }),
+      });
+      if (!res.ok) throw new Error("save failed");
+    } catch (err) {
+      console.warn(
+        "Sale kept on this device until the local database is reachable.",
+        err
+      );
+      queueIt();
     }
   };
 
   const handleAddProduct = async (newProduct: Product) => {
-    setProducts((prev) => [newProduct, ...prev]);
-    if (isOnline) {
-      try {
-        await fetch("/api/products", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(newProduct),
-        });
-      } catch (err) {
-        console.error("Failed to add product to backend", err);
-      }
+    setProducts((prev) => {
+      const next = [newProduct, ...prev];
+      productsRef.current = next;
+      return next;
+    });
+    if (!isOnline) {
+      remember("productUpserts", newProduct.id, true);
+      return;
+    }
+    try {
+      const res = await fetch("/api/products", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newProduct),
+      });
+      if (!res.ok) throw new Error("save failed");
+    } catch (err) {
+      console.warn("Product kept on this device.", err);
+      remember("productUpserts", newProduct.id, true);
     }
   };
 
   const handleUpdateProduct = async (updatedProduct: Product) => {
-    setProducts((prev) =>
-      prev.map((p) => (p.id === updatedProduct.id ? updatedProduct : p))
-    );
-    if (isOnline) {
-      try {
-        await fetch(`/api/products/${updatedProduct.id}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(updatedProduct),
-        });
-      } catch (err) {
-        console.error("Failed to update product on backend", err);
-      }
+    setProducts((prev) => {
+      const next = prev.map((p) =>
+        p.id === updatedProduct.id ? updatedProduct : p
+      );
+      productsRef.current = next;
+      return next;
+    });
+    if (!isOnline) {
+      remember("productUpserts", updatedProduct.id, true);
+      return;
+    }
+    try {
+      const res = await fetch(`/api/products/${updatedProduct.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updatedProduct),
+      });
+      if (!res.ok) throw new Error("save failed");
+    } catch (err) {
+      console.warn("Product edit kept on this device.", err);
+      remember("productUpserts", updatedProduct.id, true);
     }
   };
 
   const handleDeleteProduct = async (productId: string) => {
-    setProducts((prev) => prev.filter((p) => p.id !== productId));
-    if (isOnline) {
-      try {
-        await fetch(`/api/products/${productId}`, {
-          method: "DELETE",
-        });
-      } catch (err) {
-        console.error("Failed to delete product on backend", err);
-      }
+    setProducts((prev) => {
+      const next = prev.filter((p) => p.id !== productId);
+      productsRef.current = next;
+      return next;
+    });
+    remember("productUpserts", productId, false);
+    remember("productDeletes", productId, true);
+    if (!isOnline) return;
+    try {
+      const res = await fetch(`/api/products/${productId}`, { method: "DELETE" });
+      if (!res.ok && res.status !== 404) throw new Error("delete failed");
+      remember("productDeletes", productId, false);
+    } catch (err) {
+      console.warn("Product removal kept on this device.", err);
     }
   };
 
   const handleAddTenant = async (newTenant: Tenant) => {
-    setTenants((prev) => [...prev, newTenant]);
-    if (isOnline) {
-      try {
-        await fetch("/api/tenants", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(newTenant),
-        });
-      } catch (err) {
-        console.error("Failed to add tenant to backend", err);
-      }
+    setTenants((prev) => {
+      const next = [...prev, newTenant];
+      tenantsRef.current = next;
+      return next;
+    });
+    if (!isOnline) {
+      remember("tenantUpserts", newTenant.id, true);
+      return;
+    }
+    try {
+      const res = await fetch("/api/tenants", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newTenant),
+      });
+      if (!res.ok) throw new Error("save failed");
+    } catch (err) {
+      console.warn("Store kept on this device.", err);
+      remember("tenantUpserts", newTenant.id, true);
     }
   };
 

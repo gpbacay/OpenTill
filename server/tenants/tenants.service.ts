@@ -91,7 +91,7 @@ export class TenantsService implements OnModuleInit {
           active: r.active
         }));
       } catch (err: any) {
-        console.error("Failed to query tenants from PostgreSQL, falling back:", err.message);
+        console.error("Failed to query tenants from the local database, falling back:", err.message);
       }
     }
     return this.memoryTenants;
@@ -132,7 +132,7 @@ export class TenantsService implements OnModuleInit {
           active: created.active
         };
       } catch (err: any) {
-        console.error("Failed to insert tenant to PostgreSQL, fallback to memory:", err.message);
+        console.error("Failed to insert tenant to the local database, fallback to memory:", err.message);
       }
     }
 

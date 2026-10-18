@@ -218,7 +218,7 @@ export default function BentoDashboard({ products, orders, activeTenant }: Bento
   return (
     <div className="w-full flex flex-col gap-3.5 h-full overflow-y-auto pr-0.5">
       {/* Top Banner section */}
-      <div className="bg-gradient-to-r from-[#0D0D0D]/80 to-[#024959]/20 border border-[#024959] rounded-xl p-4 shadow-md flex justify-between items-center relative overflow-hidden">
+      <div className="bg-gradient-to-r from-[#0D0D0D]/80 to-[#024959]/20 border border-[#024959] rounded-xl p-4 shadow-md flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center relative overflow-hidden">
         <div className="absolute top-0 right-0 p-1 opacity-10">
           <Boxes className="w-44 h-44 text-[#89D9C2]" />
         </div>
@@ -231,7 +231,7 @@ export default function BentoDashboard({ products, orders, activeTenant }: Bento
             Real-time Point of Sale status, transaction counters, and active inventory metrics.
           </p>
         </div>
-        <div className="bg-[#208C8C]/10 border border-[#208C8C]/30 px-3 py-1.5 rounded-lg text-right hidden md:block">
+        <div className="bg-[#208C8C]/10 border border-[#208C8C]/30 px-3 py-1.5 rounded-lg sm:text-right">
           <span className="block text-[8px] text-slate-500 font-mono">STORE ID</span>
           <span className="text-[#89D9C2] font-mono text-xs font-bold uppercase tracking-wider">{activeTenant.id.substring(7, 15)}</span>
         </div>

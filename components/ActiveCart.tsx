@@ -722,13 +722,13 @@ export function ActiveCart({
                 <span className="text-[8.5px] font-mono text-[#89D9C2] font-bold">-{discountPercent}% APPLIED</span>
               )}
             </div>
-            <div className="grid grid-cols-5 gap-1 font-mono text-[9px]">
+            <div className="grid grid-cols-5 gap-1.5 font-mono text-xs">
               {[0, 5, 10, 15, 20].map((pct) => (
                 <button
                   type="button"
                   key={pct}
                   onClick={() => setDiscountPercent(pct)}
-                  className={`py-0.5 rounded border text-[8px] font-bold transition-all ${
+                  className={`min-h-11 rounded border text-xs font-bold transition-all ${
                     discountPercent === pct
                       ? "bg-amber-500/20 border-amber-500 text-amber-300"
                       : "bg-[#0D0D0D] border-[#024959] text-slate-400 hover:text-white"
@@ -783,7 +783,7 @@ export function ActiveCart({
               <button
                 type="button"
                 onClick={() => setPaymentMethod("CASH")}
-                className={`py-1 rounded-md border text-[8px] font-mono font-bold transition-all flex flex-col items-center gap-0.5 ${
+                className={`min-h-12 rounded-md border text-[11px] font-mono font-bold transition-all flex flex-col items-center justify-center gap-0.5 ${
                   paymentMethod === "CASH"
                     ? "bg-[#208C8C]/25 border-[#89D9C2]/50 text-white"
                     : "bg-[#0D0D0D] border-[#024959] text-slate-400 hover:text-white"
@@ -795,7 +795,7 @@ export function ActiveCart({
               <button
                 type="button"
                 onClick={() => setPaymentMethod("CARD")}
-                className={`py-1 rounded-md border text-[8px] font-mono font-bold transition-all flex flex-col items-center gap-0.5 ${
+                className={`min-h-12 rounded-md border text-[11px] font-mono font-bold transition-all flex flex-col items-center justify-center gap-0.5 ${
                   paymentMethod === "CARD"
                     ? "bg-[#208C8C]/25 border-[#89D9C2]/50 text-white"
                     : "bg-[#0D0D0D] border-[#024959] text-slate-400 hover:text-white"
@@ -807,7 +807,7 @@ export function ActiveCart({
               <button
                 type="button"
                 onClick={() => setPaymentMethod("MOBILE_WALLET")}
-                className={`py-1 rounded-md border text-[8px] font-mono font-bold transition-all flex flex-col items-center gap-0.5 ${
+                className={`min-h-12 rounded-md border text-[11px] font-mono font-bold transition-all flex flex-col items-center justify-center gap-0.5 ${
                   paymentMethod === "MOBILE_WALLET"
                     ? "bg-[#208C8C]/25 border-[#89D9C2]/50 text-white"
                     : "bg-[#0D0D0D] border-[#024959] text-slate-400 hover:text-white"
@@ -836,7 +836,8 @@ export function ActiveCart({
                   placeholder="0.00"
                   value={cashReceived}
                   onChange={(e) => setCashReceived(e.target.value)}
-                  className="w-full bg-[#0D0D0D] border border-[#024959] rounded-lg py-1 pl-5 pr-2 text-[9px] text-white placeholder-slate-600 focus:outline-none focus:border-[#208C8C] font-mono"
+                  inputMode="decimal"
+                  className="w-full bg-[#0D0D0D] border border-[#024959] rounded-lg min-h-11 pl-5 pr-2 text-base text-white placeholder-slate-600 focus:outline-none focus:border-[#208C8C] font-mono"
                 />
               </div>
 
@@ -847,7 +848,7 @@ export function ActiveCart({
                     type="button"
                     key={val}
                     onClick={() => setCashReceived(val.toFixed(2))}
-                    className="px-2 py-0.5 bg-[#0D0D0D] hover:bg-[#024959]/30 border border-[#024959] rounded text-[8px] font-mono text-slate-300 whitespace-nowrap"
+                    className="min-h-11 px-3 bg-[#0D0D0D] hover:bg-[#024959]/30 border border-[#024959] rounded-lg text-xs font-mono text-slate-300 whitespace-nowrap"
                   >
                     {val === total ? "Exact" : `${getCurrencySymbol()}${val.toFixed(2)}`}
                   </button>
@@ -859,7 +860,7 @@ export function ActiveCart({
           {/* Checkout Process Button */}
           <button
             type="submit"
-            className={`w-full py-1.5 rounded-lg text-[10px] font-mono font-bold tracking-widest uppercase transition-all flex items-center justify-center gap-1 mt-1 shadow-md ${
+            className={`w-full min-h-12 rounded-lg text-xs font-mono font-bold tracking-widest uppercase transition-all flex items-center justify-center gap-1 mt-1 shadow-md ${
               isOnline
                 ? "bg-[#208C8C] hover:bg-[#208C8C]/85 text-[#010326] shadow-[#208C8C]/15"
                 : "bg-amber-500 hover:bg-amber-400 text-[#010326] shadow-amber-500/10"

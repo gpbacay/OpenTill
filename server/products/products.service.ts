@@ -147,7 +147,7 @@ export class ProductsService implements OnModuleInit {
       try {
         return await this.dbService.client.product.findMany();
       } catch (err: any) {
-        console.error("Failed to query products from PostgreSQL, falling back:", err.message);
+        console.error("Failed to query products from the local database, falling back:", err.message);
       }
     }
     return this.memoryProducts;
@@ -181,7 +181,7 @@ export class ProductsService implements OnModuleInit {
           }
         });
       } catch (err: any) {
-        console.error("Failed to insert product to PostgreSQL, fallback to memory:", err.message);
+        console.error("Failed to insert product to the local database, fallback to memory:", err.message);
       }
     }
 
@@ -203,7 +203,7 @@ export class ProductsService implements OnModuleInit {
           }
         });
       } catch (err: any) {
-        console.error("Failed to update product in PostgreSQL, fallback to memory:", err.message);
+        console.error("Failed to update product in the local database, fallback to memory:", err.message);
       }
     }
 
@@ -230,7 +230,7 @@ export class ProductsService implements OnModuleInit {
         });
         return { success: true };
       } catch (err: any) {
-        console.error("Failed to delete product in PostgreSQL, fallback to memory:", err.message);
+        console.error("Failed to delete product in the local database, fallback to memory:", err.message);
       }
     }
 
@@ -255,7 +255,7 @@ export class ProductsService implements OnModuleInit {
         });
         return;
       } catch (err: any) {
-        console.warn(`Could not deduct stock in PostgreSQL for product ${productId}:`, err.message);
+        console.warn(`Could not deduct stock in the local database for product ${productId}:`, err.message);
       }
     }
 

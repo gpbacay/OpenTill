@@ -4,7 +4,7 @@ import express from "express";
 import dotenv from "dotenv";
 import { AppModule } from "./server/app.module";
 
-// Load .env.local first, then .env (Prisma/Neon DATABASE_URL lives in .env and wins)
+// Load .env.local first, then .env (DATABASE_URL in .env wins)
 dotenv.config({ path: ".env.local" });
 dotenv.config({ path: ".env", override: true });
 

@@ -154,7 +154,7 @@ export class OrdersService implements OnModuleInit {
           include: { items: true }
         });
       } catch (err: any) {
-        console.error("Failed to query orders from PostgreSQL, falling back:", err.message);
+        console.error("Failed to query orders from the local database, falling back:", err.message);
       }
     }
     return this.memoryOrders.map(o => ({

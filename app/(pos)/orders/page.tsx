@@ -90,7 +90,7 @@ export default function OrdersPage() {
       </div>
 
       {mobileRegisterTab === "catalog" && cart.length > 0 && (
-        <div className="lg:hidden absolute bottom-3 left-3 right-3 z-40 animate-slide-in-up">
+        <div className="lg:hidden absolute bottom-20 left-3 right-3 z-40 animate-slide-in-up">
           <button
             onClick={() => setMobileRegisterTab("cart")}
             className="w-full bg-[#208C8C] hover:bg-[#208C8C]/90 text-[#010326] font-mono text-[11px] font-extrabold py-3 px-4 rounded-xl shadow-lg border border-[#89D9C2]/30 flex justify-between items-center"

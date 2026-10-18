@@ -1,8 +1,10 @@
 "use client";
 
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { X, RefreshCw } from "lucide-react";
 import { PosProvider, usePos } from "@/contexts/pos-context";
-import Sidebar from "@/components/layout/Sidebar";
+import Sidebar, { MENU_ITEMS } from "@/components/layout/Sidebar";
 import Header from "@/components/layout/Header";
 
 function PosShell({ children }: { children: React.ReactNode }) {
@@ -19,6 +21,7 @@ function PosShell({ children }: { children: React.ReactNode }) {
     handleNetworkToggle,
     triggerOfflineSync,
   } = usePos();
+  const pathname = usePathname();
 
   return (
     <div className="min-h-screen bg-[#0D0D0D] text-slate-100 flex flex-row antialiased select-none">
@@ -72,7 +75,7 @@ function PosShell({ children }: { children: React.ReactNode }) {
               <div className="flex items-center gap-2 text-[10px] font-mono text-[#89D9C2]">
                 <RefreshCw className="w-3 h-3 animate-spin text-[#89D9C2]" />
                 <span>
-                  Restoring offline transactions to Cloud database (Postgres)...
+                  Saving queued sales to the local database...
                 </span>
               </div>
               <span className="text-[10px] font-bold text-white font-mono">
@@ -88,9 +91,33 @@ function PosShell({ children }: { children: React.ReactNode }) {
           </div>
         )}
 
-        <main className="flex-1 overflow-hidden p-3 md:p-5 flex flex-col">
+        <main className="flex-1 overflow-hidden p-3 pb-20 md:px-5 md:pt-5 lg:pb-5 flex flex-col">
           {children}
         </main>
+
+        <nav className="lg:hidden fixed bottom-0 inset-x-0 z-40 border-t border-[#024959] bg-[#0D0D0D]/95 backdrop-blur-md pb-[env(safe-area-inset-bottom)]">
+          <div className="grid grid-cols-5">
+            {MENU_ITEMS.map((item) => {
+              const active =
+                item.href === "/"
+                  ? pathname === "/"
+                  : pathname.startsWith(item.href);
+              const Icon = item.icon;
+              return (
+                <Link
+                  key={item.id}
+                  href={item.href}
+                  className={`flex flex-col items-center justify-center gap-0.5 min-h-14 text-[10px] font-mono ${
+                    active ? "text-[#89D9C2]" : "text-slate-400"
+                  }`}
+                >
+                  <Icon className="w-5 h-5" />
+                  {item.label}
+                </Link>
+              );
+            })}
+          </div>
+        </nav>
       </div>
     </div>
   );

@@ -21,7 +21,7 @@ interface SidebarProps {
   onNavigate?: () => void;
 }
 
-const MENU_ITEMS = [
+export const MENU_ITEMS = [
   { id: "home", href: "/", label: "Home", icon: LayoutDashboard },
   { id: "orders", href: "/orders", label: "Orders", icon: ShoppingCart },
   { id: "products", href: "/products", label: "Product", icon: Package },
