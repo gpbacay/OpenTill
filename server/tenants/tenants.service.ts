@@ -16,28 +16,28 @@ export class TenantsService implements OnModuleInit {
   private memoryTenants: Tenant[] = [
     {
       id: "tenant-1",
-      name: "Gourmet Bistro & Cafe",
-      businessType: "Food & Beverage",
-      taxRate: 0.10,
-      currency: "USD",
+      name: "Reyes Motor Parts",
+      businessType: "Motorcycle Parts",
+      taxRate: 0.12,
+      currency: "PHP",
       createdAt: new Date().toISOString(),
       active: true,
     },
     {
       id: "tenant-2",
-      name: "Apex Tech Hub",
-      businessType: "Electronics Retail",
-      taxRate: 0.08,
-      currency: "USD",
+      name: "MotoLine Spare Parts",
+      businessType: "Motorcycle Parts",
+      taxRate: 0.12,
+      currency: "PHP",
       createdAt: new Date().toISOString(),
       active: true,
     },
     {
       id: "tenant-3",
-      name: "Aura Apparel",
-      businessType: "Boutique Fashion",
+      name: "Barrio Cycle Supply",
+      businessType: "Motorcycle Parts",
       taxRate: 0.12,
-      currency: "EUR",
+      currency: "PHP",
       createdAt: new Date().toISOString(),
       active: true,
     }
@@ -102,9 +102,9 @@ export class TenantsService implements OnModuleInit {
     const newTenant: Tenant = {
       id,
       name: body.name || "Unnamed Tenant",
-      businessType: body.businessType || "Retail",
-      taxRate: parseFloat(body.taxRate as any) || 0.10,
-      currency: body.currency || "USD",
+      businessType: body.businessType || "Motorcycle Parts",
+      taxRate: parseFloat(body.taxRate as any) || 0.12,
+      currency: body.currency || "PHP",
       createdAt: new Date().toISOString(),
       active: true
     };

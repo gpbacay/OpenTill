@@ -21,18 +21,20 @@ interface BentoDashboardProps {
 
 // 1. DIGITAL CLOCK COMPONENT (12-Hour Format)
 function DigitalClockWidget() {
-  const [time, setTime] = useState(new Date());
+  const [time, setTime] = useState<Date | null>(null);
 
   useEffect(() => {
-    const timer = setInterval(() => setTime(new Date()), 1000);
+    const tick = () => setTime(new Date());
+    tick();
+    const timer = setInterval(tick, 1000);
     return () => clearInterval(timer);
   }, []);
 
-  const rawHours = time.getHours();
-  const hours = (rawHours % 12 || 12).toString().padStart(2, "0");
-  const minutes = time.getMinutes().toString().padStart(2, "0");
-  const seconds = time.getSeconds().toString().padStart(2, "0");
-  const ampm = rawHours >= 12 ? "PM" : "AM";
+  const rawHours = time?.getHours() ?? 0;
+  const hours = time ? (rawHours % 12 || 12).toString().padStart(2, "0") : "--";
+  const minutes = time ? time.getMinutes().toString().padStart(2, "0") : "--";
+  const seconds = time ? time.getSeconds().toString().padStart(2, "0") : "--";
+  const ampm = !time ? "" : rawHours >= 12 ? "PM" : "AM";
 
   return (
     <div className="flex flex-col items-center justify-center h-full p-4 text-center">
@@ -60,21 +62,22 @@ function DigitalClockWidget() {
 
 // 2. DATE COMPONENT
 function DateWidget() {
-  const [date, setDate] = useState(new Date());
+  const [date, setDate] = useState<Date | null>(null);
 
   useEffect(() => {
-    const timer = setInterval(() => setDate(new Date()), 60000);
+    const tick = () => setDate(new Date());
+    tick();
+    const timer = setInterval(tick, 60000);
     return () => clearInterval(timer);
   }, []);
 
-  const dayName = date.toLocaleDateString("en-US", { weekday: "long" });
-  const dayNum = date.getDate();
-  const monthName = date.toLocaleDateString("en-US", { month: "long" });
-  const yearNum = date.getFullYear();
+  const dayName = date ? date.toLocaleDateString("en-US", { weekday: "long" }) : "";
+  const dayNum = date?.getDate() ?? 0;
+  const monthName = date ? date.toLocaleDateString("en-US", { month: "long" }) : "";
+  const yearNum = date?.getFullYear() ?? "";
 
-  // Draw miniature calendar grid
-  const daysInMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
-  const firstDayIndex = new Date(date.getFullYear(), date.getMonth(), 1).getDay();
+  const daysInMonth = date ? new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate() : 0;
+  const firstDayIndex = date ? new Date(date.getFullYear(), date.getMonth(), 1).getDay() : 0;
   
   const calendarCells = useMemo(() => {
     const cells = [];
@@ -101,7 +104,7 @@ function DateWidget() {
 
       <div className="flex-1 flex gap-2 items-center justify-between">
         <div className="text-center shrink-0 pr-2 border-r border-[#024959]/30">
-          <span className="block text-3xl font-extrabold text-white font-mono leading-none">{dayNum}</span>
+          <span className="block text-3xl font-extrabold text-white font-mono leading-none">{date ? dayNum : ""}</span>
           <span className="block text-[8px] text-slate-500 font-mono uppercase tracking-widest mt-1">{dayName}</span>
         </div>
 
@@ -148,23 +151,6 @@ function DashboardStats({ products, orders, activeTenant }: DashboardStatsProps)
 
   const totalIncome = useMemo(() => {
     return activeTenantOrders.reduce((sum, o) => sum + o.total, 0);
-  }, [activeTenantOrders]);
-
-  const totalSalesCount = useMemo(() => {
-    let count = activeTenantOrders.length * 2;
-    try {
-      if (typeof window !== "undefined") {
-        const savedOrders = localStorage.getItem("opentill_orders");
-        if (savedOrders) {
-          count =
-            activeTenantOrders.length * 3 +
-            Math.floor(Math.random() * Math.max(1, activeTenantOrders.length));
-        }
-      }
-    } catch {
-      count = activeTenantOrders.length * 2;
-    }
-    return Math.max(activeTenantOrders.length, count || 0);
   }, [activeTenantOrders]);
 
   const currencySymbol = activeTenant.currency === "EUR" ? "€" : activeTenant.currency === "PHP" ? "₱" : "$";

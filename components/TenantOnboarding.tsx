@@ -19,9 +19,9 @@ export function TenantOnboarding({
 }: TenantOnboardingProps) {
   // Form states
   const [name, setName] = useState("");
-  const [businessType, setBusinessType] = useState("Food & Beverage");
+  const [businessType, setBusinessType] = useState("Motorcycle Parts");
   const [taxRate, setTaxRate] = useState("12"); // 12% default
-  const [currency, setCurrency] = useState("USD");
+  const [currency, setCurrency] = useState("PHP");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
@@ -94,7 +94,7 @@ export function TenantOnboarding({
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="e.g. Vintage Apparel & Co"
+                placeholder="e.g. Reyes Motor Parts"
                 className="w-full bg-[#0D0D0D] border border-[#024959] rounded-lg px-2.5 py-1 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-[#208C8C]"
               />
             </div>
@@ -109,6 +109,7 @@ export function TenantOnboarding({
                   onChange={(e) => setBusinessType(e.target.value)}
                   className="w-full bg-[#0D0D0D] border border-[#024959] rounded-lg px-2 py-1 text-xs text-white focus:outline-none focus:border-[#208C8C]"
                 >
+                  <option value="Motorcycle Parts">Motorcycle Parts</option>
                   <option value="Food & Beverage">Food & Beverage</option>
                   <option value="Electronics Retail">Electronics Retail</option>
                   <option value="Boutique Fashion">Boutique Fashion</option>
@@ -126,10 +127,10 @@ export function TenantOnboarding({
                   onChange={(e) => setCurrency(e.target.value)}
                   className="w-full bg-[#0D0D0D] border border-[#024959] rounded-lg px-2 py-1 text-xs text-white focus:outline-none focus:border-[#208C8C]"
                 >
+                  <option value="PHP">PHP (₱)</option>
                   <option value="USD">USD ($)</option>
                   <option value="EUR">EUR (€)</option>
                   <option value="GBP">GBP (£)</option>
-                  <option value="PHP">PHP (₱)</option>
                   <option value="SGD">SGD ($)</option>
                 </select>
               </div>

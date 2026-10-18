@@ -24,13 +24,13 @@ interface ActiveCartProps {
   onDeleteHeldCart?: (id: string) => void;
 }
 
-const CASHIERS = ["Cashier Alex", "Cashier Sarah", "Manager Mike", "Supervisor Emma"];
+const CASHIERS = ["Cashier Juan", "Cashier Maria", "Manager Pedro", "Supervisor Ana"];
 
 const LOYALTY_CUSTOMERS: Customer[] = [
   { id: "cust-1", name: "Walk-in Guest", phone: "N/A", loyaltyPoints: 0, email: "walkin@guest.com" },
-  { id: "cust-2", name: "Jane Doe (VIP)", phone: "+1 555-0199", loyaltyPoints: 450, email: "jane@vip.com" },
-  { id: "cust-3", name: "John Smith (Loyal)", phone: "+1 555-0142", loyaltyPoints: 120, email: "john@loyal.com" },
-  { id: "cust-4", name: "Michael Chang", phone: "+1 555-0177", loyaltyPoints: 35, email: "michael@chang.com" },
+  { id: "cust-2", name: "Juan Dela Cruz (VIP)", phone: "+63 917 555 0199", loyaltyPoints: 450, email: "juan@reyes.parts" },
+  { id: "cust-3", name: "Maria Santos", phone: "+63 918 555 0142", loyaltyPoints: 120, email: "maria@motoline.ph" },
+  { id: "cust-4", name: "Carlo Reyes", phone: "+63 919 555 0177", loyaltyPoints: 35, email: "carlo@barriocycle.ph" },
 ];
 
 export function ActiveCart({
