@@ -11,6 +11,7 @@ export default function ProductsPage() {
     handleUpdateProduct,
     handleDeleteProduct,
   } = usePos();
+  if (!activeTenant) return null;
 
   return (
     <ProductsManager

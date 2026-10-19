@@ -1,6 +1,7 @@
-import { Inject, Injectable, OnModuleInit } from "@nestjs/common";
+import { ForbiddenException, Inject, Injectable } from "@nestjs/common";
 import { DatabaseService } from "../database/database.service";
 import { ProductsService } from "../products/products.service";
+import { TenantsService } from "../tenants/tenants.service";
 
 export interface Order {
   id: string;
@@ -31,139 +32,61 @@ export interface OrderItem {
 }
 
 @Injectable()
-export class OrdersService implements OnModuleInit {
-  private memoryOrders: Order[] = [
-    {
-      id: "ord-1001",
-      tenantId: "tenant-1",
-      status: "COMPLETED",
-      subtotal: 535,
-      tax: 64.2,
-      total: 599.2,
-      paymentMethod: "MOBILE_WALLET",
-      isOffline: false,
-      date: "2026-07-12T14:22:15Z",
-      syncedAt: "2026-07-12T14:22:16Z",
-    },
-    {
-      id: "ord-1002",
-      tenantId: "tenant-2",
-      status: "COMPLETED",
-      subtotal: 1070,
-      tax: 128.4,
-      total: 1198.4,
-      paymentMethod: "CARD",
-      isOffline: false,
-      date: "2026-07-12T16:10:42Z",
-      syncedAt: "2026-07-12T16:10:45Z",
-    }
-  ];
+export class OrdersService {
+  private memoryOrders: Order[] = [];
 
-  private memoryOrderItems: OrderItem[] = [
-    {
-      id: "item-1001-1",
-      orderId: "ord-1001",
-      productId: "prod-101",
-      name: "Brake Shoe Set, Honda Wave",
-      price: 350,
-      quantity: 1,
-    },
-    {
-      id: "item-1001-2",
-      orderId: "ord-1001",
-      productId: "prod-103",
-      name: "NGK Spark Plug CPR8EA-9",
-      price: 185,
-      quantity: 1,
-    },
-    {
-      id: "item-1002-1",
-      orderId: "ord-1002",
-      productId: "prod-201",
-      name: "Disc Brake Pad, Yamaha R15",
-      price: 890,
-      quantity: 1,
-    },
-    {
-      id: "item-1002-2",
-      orderId: "ord-1002",
-      productId: "prod-203",
-      name: "Handlebar Grip Pair",
-      price: 180,
-      quantity: 1,
-    }
-  ];
+  private memoryOrderItems: OrderItem[] = [];
 
   constructor(
     @Inject(DatabaseService) private readonly dbService: DatabaseService,
-    @Inject(ProductsService) private readonly productsService: ProductsService
+    @Inject(ProductsService) private readonly productsService: ProductsService,
+    @Inject(TenantsService) private readonly tenantsService: TenantsService
   ) {}
 
-  async onModuleInit() {
-    await this.seedIfNeeded();
-  }
-
-  private async seedIfNeeded() {
-    const client = this.dbService?.client;
-    if (!client) return;
-
-    try {
-      const count = await client.order.count();
-      if (count > 0) return;
-
-      console.log("🌱 [OrdersModule] Seeding orders into database...");
-      for (const o of this.memoryOrders) {
-        await client.order.create({
-          data: {
-            id: o.id,
-            tenantId: o.tenantId,
-            status: o.status,
-            subtotal: o.subtotal,
-            tax: o.tax,
-            total: o.total,
-            paymentMethod: o.paymentMethod,
-            isOffline: o.isOffline,
-            date: new Date(o.date),
-            syncedAt: o.syncedAt ? new Date(o.syncedAt) : null,
-          },
-        });
-      }
-
-      for (const item of this.memoryOrderItems) {
-        await client.orderItem.create({
-          data: {
-            id: item.id,
-            orderId: item.orderId,
-            productId: item.productId,
-            name: item.name,
-            price: item.price,
-            quantity: item.quantity,
-          },
-        });
-      }
-      console.log("✅ [OrdersModule] Order seeding complete.");
-    } catch (err: any) {
-      console.warn("⚠️ [OrdersModule] Seeding check failed:", err.message);
-    }
-  }
-
-  async findAll(): Promise<any[]> {
+  async findAll(userId: string): Promise<any[]> {
+    const owned = await this.tenantsService.ownedIds(userId);
+    if (owned.size === 0) return [];
     if (this.dbService.client) {
       try {
         return await this.dbService.client.order.findMany({
+          where: { tenantId: { in: [...owned] } },
           include: { items: true }
         });
       } catch (err: any) {
         console.error("Failed to query orders from the local database, falling back:", err.message);
       }
     }
-    return this.memoryOrders.map(o => ({
-      ...o,
-      items: this.memoryOrderItems.filter(item => item.orderId === o.id)
-    }));
+    return this.memoryOrders
+      .filter((order) => owned.has(order.tenantId))
+      .map(o => ({
+        ...o,
+        items: this.memoryOrderItems.filter(item => item.orderId === o.id)
+      }));
   }
 
-  async sync(orders: any[], items: any[]): Promise<{ success: boolean; count: number; mode?: string }> {
+  private async assertOwned(userId: string, orders: any[], items: any[]) {
+    const owned = await this.tenantsService.ownedIds(userId);
+    const tenantByOrder = new Map<string, string>();
+    for (const order of orders ?? []) {
+      if (!order?.tenantId || !owned.has(order.tenantId)) {
+        throw new ForbiddenException("You do not have access to this store.");
+      }
+      tenantByOrder.set(order.id, order.tenantId);
+    }
+    for (const item of items ?? []) {
+      const tenantId = tenantByOrder.get(item?.orderId);
+      if (!tenantId) throw new ForbiddenException("You do not have access to this store.");
+      const product = item?.productId
+        ? await this.productsService.getById(item.productId)
+        : null;
+      if (product && product.tenantId !== tenantId) {
+        throw new ForbiddenException("You do not have access to this store.");
+      }
+    }
+  }
+
+  async sync(userId: string, orders: any[], items: any[]): Promise<{ success: boolean; count: number; mode?: string }> {
+    await this.assertOwned(userId, orders, items);
     console.log(`📡 [OrdersModule] Sync batch received: ${orders?.length || 0} orders, ${items?.length || 0} items.`);
 
     if (this.dbService.client) {
@@ -186,10 +109,10 @@ export class OrdersService implements OnModuleInit {
                 syncedAt: new Date(),
                 cashierName: o.cashierName,
                 customerName: o.customerName,
-                discountAmount: o.discountAmount ? parseFloat(o.discountAmount) : null,
-                discountPercent: o.discountPercent ? parseFloat(o.discountPercent) : null,
-                cashReceived: o.cashReceived ? parseFloat(o.cashReceived) : null,
-                changeDue: o.changeDue ? parseFloat(o.changeDue) : null
+                discountAmount: o.discountAmount == null || o.discountAmount === "" ? null : parseFloat(o.discountAmount),
+                discountPercent: o.discountPercent == null || o.discountPercent === "" ? null : parseFloat(o.discountPercent),
+                cashReceived: o.cashReceived == null || o.cashReceived === "" ? null : parseFloat(o.cashReceived),
+                changeDue: o.changeDue == null || o.changeDue === "" ? null : parseFloat(o.changeDue)
               }
             });
             results.push(created);
@@ -217,6 +140,7 @@ export class OrdersService implements OnModuleInit {
 
         return { success: true, count: results.length };
       } catch (err: any) {
+        if (err instanceof ForbiddenException) throw err;
         console.error("Prisma sync error:", err);
       }
     }
@@ -240,10 +164,10 @@ export class OrdersService implements OnModuleInit {
             syncedAt: new Date().toISOString(),
             cashierName: o.cashierName,
             customerName: o.customerName,
-            discountAmount: o.discountAmount ? parseFloat(o.discountAmount) : null,
-            discountPercent: o.discountPercent ? parseFloat(o.discountPercent) : null,
-            cashReceived: o.cashReceived ? parseFloat(o.cashReceived) : null,
-            changeDue: o.changeDue ? parseFloat(o.changeDue) : null
+            discountAmount: o.discountAmount == null || o.discountAmount === "" ? null : parseFloat(o.discountAmount),
+            discountPercent: o.discountPercent == null || o.discountPercent === "" ? null : parseFloat(o.discountPercent),
+            cashReceived: o.cashReceived == null || o.cashReceived === "" ? null : parseFloat(o.cashReceived),
+            changeDue: o.changeDue == null || o.changeDue === "" ? null : parseFloat(o.changeDue)
           };
           this.memoryOrders.push(syncedOrder);
           results.push(syncedOrder);

@@ -5,6 +5,7 @@ import { usePos } from "@/contexts/pos-context";
 
 export default function HomePage() {
   const { products, syncedOrders, activeTenant } = usePos();
+  if (!activeTenant) return null;
 
   return (
     <BentoDashboard

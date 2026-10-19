@@ -7,7 +7,9 @@ import {
   Body,
   Param,
   Inject,
+  Req,
 } from "@nestjs/common";
+import type { AuthedRequest } from "../auth/auth.guard";
 import { ProductsService, Product } from "./products.service";
 
 @Controller("api/products")
@@ -17,27 +19,32 @@ export class ProductsController {
   ) {}
 
   @Get()
-  async getProducts(): Promise<Product[]> {
-    return this.productsService.findAll();
+  async getProducts(@Req() req: AuthedRequest): Promise<Product[]> {
+    return this.productsService.findAll(req.user!.id);
   }
 
   @Post()
-  async createProduct(@Body() body: Partial<Product>): Promise<Product> {
-    return this.productsService.create(body);
+  async createProduct(
+    @Req() req: AuthedRequest,
+    @Body() body: Partial<Product>
+  ): Promise<Product> {
+    return this.productsService.create(req.user!.id, body);
   }
 
   @Put(":id")
   async updateProduct(
+    @Req() req: AuthedRequest,
     @Param("id") id: string,
     @Body() body: Partial<Product>
-  ): Promise<Product | { error: string }> {
-    return this.productsService.update(id, body);
+  ): Promise<Product> {
+    return this.productsService.update(req.user!.id, id, body);
   }
 
   @Delete(":id")
   async deleteProduct(
+    @Req() req: AuthedRequest,
     @Param("id") id: string
-  ): Promise<{ success: boolean; error?: string }> {
-    return this.productsService.delete(id);
+  ): Promise<{ success: boolean }> {
+    return this.productsService.delete(req.user!.id, id);
   }
 }

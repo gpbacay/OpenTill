@@ -1,5 +1,6 @@
-import { Inject, Injectable, OnModuleInit } from "@nestjs/common";
+import { ForbiddenException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { DatabaseService } from "../database/database.service";
+import { TenantsService } from "../tenants/tenants.service";
 
 export interface Product {
   id: string;
@@ -13,151 +14,59 @@ export interface Product {
 }
 
 @Injectable()
-export class ProductsService implements OnModuleInit {
-  private memoryProducts: Product[] = [
-    {
-      id: "prod-101",
-      tenantId: "tenant-1",
-      name: "Brake Shoe Set, Honda Wave",
-      category: "Brakes",
-      sku: "BRK-WAV-01",
-      price: 350,
-      stock: 40,
-      description: "Front and rear brake shoes for Honda Wave 110 and 125.",
-    },
-    {
-      id: "prod-102",
-      tenantId: "tenant-1",
-      name: "Drive Belt, Yamaha Mio",
-      category: "Drive",
-      sku: "DRV-MIO-02",
-      price: 280,
-      stock: 55,
-      description: "Drive belt for Yamaha Mio and Soul scooters.",
-    },
-    {
-      id: "prod-103",
-      tenantId: "tenant-1",
-      name: "NGK Spark Plug CPR8EA-9",
-      category: "Ignition",
-      sku: "IGN-NGK-03",
-      price: 185,
-      stock: 80,
-      description: "Resistor spark plug for underbone motorcycles.",
-    },
-    {
-      id: "prod-104",
-      tenantId: "tenant-1",
-      name: "Motul 5100 10W-40 1L",
-      category: "Lubricants",
-      sku: "OIL-MT5-04",
-      price: 520,
-      stock: 36,
-      description: "Semi-synthetic motorcycle engine oil, 1 liter.",
-    },
-    {
-      id: "prod-201",
-      tenantId: "tenant-2",
-      name: "Disc Brake Pad, Yamaha R15",
-      category: "Brakes",
-      sku: "BRK-R15-21",
-      price: 890,
-      stock: 18,
-      description: "Front disc brake pads for Yamaha R15.",
-    },
-    {
-      id: "prod-202",
-      tenantId: "tenant-2",
-      name: "LED Headlight Bulb H4",
-      category: "Electrical",
-      sku: "ELC-H4-22",
-      price: 450,
-      stock: 30,
-      description: "H4 LED headlight bulb for motorcycle headlights.",
-    },
-    {
-      id: "prod-203",
-      tenantId: "tenant-2",
-      name: "Handlebar Grip Pair",
-      category: "Controls",
-      sku: "GRP-UNI-23",
-      price: 180,
-      stock: 48,
-      description: "Universal rubber handlebar grips, sold as a pair.",
-    },
-    {
-      id: "prod-301",
-      tenantId: "tenant-3",
-      name: "Tubeless Tire 80/90-14",
-      category: "Tires",
-      sku: "TIR-8090-11",
-      price: 1850,
-      stock: 12,
-      description: "Tubeless front tire for scooters, size 80/90-14.",
-    },
-    {
-      id: "prod-302",
-      tenantId: "tenant-3",
-      name: "Inner Tube 2.50-17",
-      category: "Tires",
-      sku: "TUB-250-12",
-      price: 220,
-      stock: 40,
-      description: "Butyl inner tube for 2.50-17 motorcycle wheels.",
-    }
-  ];
+export class ProductsService {
+  private memoryProducts: Product[] = [];
 
-  constructor(@Inject(DatabaseService) private readonly dbService: DatabaseService) {}
+  constructor(
+    @Inject(DatabaseService) private readonly dbService: DatabaseService,
+    @Inject(TenantsService) private readonly tenantsService: TenantsService
+  ) {}
 
-  async onModuleInit() {
-    await this.seedIfNeeded();
-  }
-
-  private async seedIfNeeded() {
-    const client = this.dbService?.client;
-    if (!client) return;
-
-    try {
-      const count = await client.product.count();
-      if (count > 0) return;
-
-      console.log("🌱 [ProductsModule] Seeding products into database...");
-      for (const p of this.memoryProducts) {
-        await client.product.create({
-          data: {
-            id: p.id,
-            tenantId: p.tenantId,
-            name: p.name,
-            category: p.category,
-            sku: p.sku,
-            price: p.price,
-            stock: p.stock,
-            description: p.description,
-          },
-        });
-      }
-      console.log("✅ [ProductsModule] Product seeding complete.");
-    } catch (err: any) {
-      console.warn("⚠️ [ProductsModule] Seeding check failed:", err.message);
-    }
-  }
-
-  async findAll(): Promise<Product[]> {
+  async getById(id: string): Promise<Product | null> {
     if (this.dbService.client) {
       try {
-        return await this.dbService.client.product.findMany();
+        return await this.dbService.client.product.findUnique({ where: { id } });
+      } catch (err: any) {
+        console.error("Failed to load product from the local database, falling back:", err.message);
+      }
+    }
+    return this.memoryProducts.find((product) => product.id === id) ?? null;
+  }
+
+  private async requireOwned(userId: string, id: string): Promise<Product> {
+    const owned = await this.tenantsService.ownedIds(userId);
+    const product = await this.getById(id);
+    if (!product) throw new NotFoundException("Product not found.");
+    if (!owned.has(product.tenantId)) {
+      throw new ForbiddenException("You do not have access to this store.");
+    }
+    return product;
+  }
+
+  async findAll(userId: string): Promise<Product[]> {
+    const owned = await this.tenantsService.ownedIds(userId);
+    const ids = [...owned];
+    if (ids.length === 0) return [];
+    if (this.dbService.client) {
+      try {
+        return await this.dbService.client.product.findMany({
+          where: { tenantId: { in: ids } },
+        });
       } catch (err: any) {
         console.error("Failed to query products from the local database, falling back:", err.message);
       }
     }
-    return this.memoryProducts;
+    return this.memoryProducts.filter((product) => owned.has(product.tenantId));
   }
 
-  async create(body: Partial<Product>): Promise<Product> {
+  async create(userId: string, body: Partial<Product>): Promise<Product> {
+    if (!body.tenantId || !(await this.tenantsService.owns(userId, body.tenantId))) {
+      throw new ForbiddenException("You do not have access to this store.");
+    }
     const id = body.id || `prod-${Date.now()}`;
     const newProd: Product = {
       id,
-      tenantId: body.tenantId || "tenant-1",
+      tenantId: body.tenantId,
       name: body.name || "New Product",
       category: body.category || "General",
       sku: body.sku || `SKU-${Date.now()}`,
@@ -189,7 +98,8 @@ export class ProductsService implements OnModuleInit {
     return newProd;
   }
 
-  async update(id: string, body: Partial<Product>): Promise<Product | { error: string }> {
+  async update(userId: string, id: string, body: Partial<Product>): Promise<Product> {
+    await this.requireOwned(userId, id);
     if (this.dbService.client) {
       try {
         return await this.dbService.client.product.update({
@@ -219,10 +129,11 @@ export class ProductsService implements OnModuleInit {
       };
       return this.memoryProducts[idx];
     }
-    return { error: "Not found" };
+    throw new NotFoundException("Product not found.");
   }
 
-  async delete(id: string): Promise<{ success: boolean; error?: string }> {
+  async delete(userId: string, id: string): Promise<{ success: boolean }> {
+    await this.requireOwned(userId, id);
     if (this.dbService.client) {
       try {
         await this.dbService.client.product.delete({
@@ -239,7 +150,7 @@ export class ProductsService implements OnModuleInit {
       this.memoryProducts.splice(idx, 1);
       return { success: true };
     }
-    return { success: false, error: "Not found" };
+    throw new NotFoundException("Product not found.");
   }
 
   async decrementStock(productId: string, quantity: number) {

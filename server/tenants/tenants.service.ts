@@ -1,4 +1,4 @@
-import { Inject, Injectable, OnModuleInit } from "@nestjs/common";
+import { Inject, Injectable } from "@nestjs/common";
 import { DatabaseService } from "../database/database.service";
 
 export interface Tenant {
@@ -11,132 +11,114 @@ export interface Tenant {
   active: boolean;
 }
 
+interface StoredTenant extends Tenant {
+  ownerId: string;
+}
+
+function toTenant(record: StoredTenant): Tenant {
+  return {
+    id: record.id,
+    name: record.name,
+    businessType: record.businessType,
+    taxRate: record.taxRate,
+    currency: record.currency,
+    createdAt: record.createdAt,
+    active: record.active,
+  };
+}
+
 @Injectable()
-export class TenantsService implements OnModuleInit {
-  private memoryTenants: Tenant[] = [
-    {
-      id: "tenant-1",
-      name: "Reyes Motor Parts",
-      businessType: "Motorcycle Parts",
-      taxRate: 0.12,
-      currency: "PHP",
-      createdAt: new Date().toISOString(),
-      active: true,
-    },
-    {
-      id: "tenant-2",
-      name: "MotoLine Spare Parts",
-      businessType: "Motorcycle Parts",
-      taxRate: 0.12,
-      currency: "PHP",
-      createdAt: new Date().toISOString(),
-      active: true,
-    },
-    {
-      id: "tenant-3",
-      name: "Barrio Cycle Supply",
-      businessType: "Motorcycle Parts",
-      taxRate: 0.12,
-      currency: "PHP",
-      createdAt: new Date().toISOString(),
-      active: true,
-    }
-  ];
+export class TenantsService {
+  private memoryTenants: StoredTenant[] = [];
 
   constructor(@Inject(DatabaseService) private readonly dbService: DatabaseService) {}
 
-  async onModuleInit() {
-    await this.seedIfNeeded();
-  }
-
-  private async seedIfNeeded() {
-    const client = this.dbService?.client;
-    if (!client) return;
-
-    try {
-      const tenantCount = await client.tenant.count();
-      if (tenantCount > 0) return;
-
-      console.log("🌱 [TenantsModule] Seeding tenants into database...");
-      for (const t of this.memoryTenants) {
-        await client.tenant.create({
-          data: {
-            id: t.id,
-            name: t.name,
-            businessType: t.businessType,
-            taxRate: t.taxRate,
-            currency: t.currency,
-            createdAt: new Date(t.createdAt),
-            active: t.active,
-          },
-        });
-      }
-      console.log("✅ [TenantsModule] Tenant seeding complete.");
-    } catch (err: any) {
-      console.warn("⚠️ [TenantsModule] Seeding check failed:", err.message);
-    }
-  }
-
-  async findAll(): Promise<Tenant[]> {
+  async ownedIds(userId: string): Promise<Set<string>> {
     if (this.dbService.client) {
       try {
-        const records = await this.dbService.client.tenant.findMany();
-        return records.map(r => ({
-          id: r.id,
-          name: r.name,
-          businessType: r.businessType,
-          taxRate: r.taxRate,
-          currency: r.currency,
-          createdAt: r.createdAt.toISOString(),
-          active: r.active
-        }));
+        const rows = await this.dbService.client.tenant.findMany({
+          where: { ownerId: userId },
+          select: { id: true },
+        });
+        return new Set(rows.map((row) => row.id));
+      } catch (err: any) {
+        console.error("Failed to query owned stores, falling back:", err.message);
+      }
+    }
+    return new Set(
+      this.memoryTenants.filter((tenant) => tenant.ownerId === userId).map((tenant) => tenant.id)
+    );
+  }
+
+  async owns(userId: string, tenantId: string) {
+    const ids = await this.ownedIds(userId);
+    return ids.has(tenantId);
+  }
+
+  async findAll(userId: string): Promise<Tenant[]> {
+    if (this.dbService.client) {
+      try {
+        const records = await this.dbService.client.tenant.findMany({
+          where: { ownerId: userId },
+        });
+        return records.map((record) =>
+          toTenant({
+            id: record.id,
+            ownerId: record.ownerId ?? userId,
+            name: record.name,
+            businessType: record.businessType,
+            taxRate: record.taxRate,
+            currency: record.currency,
+            createdAt: record.createdAt.toISOString(),
+            active: record.active,
+          })
+        );
       } catch (err: any) {
         console.error("Failed to query tenants from the local database, falling back:", err.message);
       }
     }
-    return this.memoryTenants;
+    return this.memoryTenants
+      .filter((tenant) => tenant.ownerId === userId)
+      .map((tenant) => toTenant(tenant));
   }
 
-  async create(body: Partial<Tenant>): Promise<Tenant> {
-    const id = body.id || `tenant-${Date.now()}`;
-    const newTenant: Tenant = {
-      id,
-      name: body.name || "Unnamed Tenant",
-      businessType: body.businessType || "Motorcycle Parts",
+  async create(userId: string, body: Partial<Tenant>): Promise<Tenant> {
+    const stored: StoredTenant = {
+      id: body.id || `tenant-${Date.now()}`,
+      ownerId: userId,
+      name: body.name || "Unnamed store",
+      businessType: body.businessType || "Retail",
       taxRate: parseFloat(body.taxRate as any) || 0.12,
       currency: body.currency || "PHP",
       createdAt: new Date().toISOString(),
-      active: true
+      active: true,
     };
 
     if (this.dbService.client) {
       try {
         const created = await this.dbService.client.tenant.create({
           data: {
-            id: newTenant.id,
-            name: newTenant.name,
-            businessType: newTenant.businessType,
-            taxRate: newTenant.taxRate,
-            currency: newTenant.currency,
-            createdAt: new Date(newTenant.createdAt),
-            active: newTenant.active
-          }
+            id: stored.id,
+            ownerId: userId,
+            name: stored.name,
+            businessType: stored.businessType,
+            taxRate: stored.taxRate,
+            currency: stored.currency,
+            createdAt: new Date(stored.createdAt),
+            active: stored.active,
+          },
         });
-        return {
+        return toTenant({
+          ...stored,
           id: created.id,
-          name: created.name,
-          businessType: created.businessType,
-          taxRate: created.taxRate,
-          currency: created.currency,
           createdAt: created.createdAt.toISOString(),
-          active: created.active
-        };
+        });
       } catch (err: any) {
         console.error("Failed to insert tenant to the local database, fallback to memory:", err.message);
       }
     }
 
-    this.memoryTenants.push(newTenant);
-    return newTenant;
+    this.memoryTenants.push(stored);
+    return toTenant(stored);
   }
 }

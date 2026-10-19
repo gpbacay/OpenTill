@@ -11,11 +11,7 @@ import React, {
 } from "react";
 import { useRouter } from "next/navigation";
 import { Tenant, Product, Order, OrderItem, HeldCart } from "@/lib/types";
-import {
-  INITIAL_TENANTS,
-  INITIAL_PRODUCTS,
-  INITIAL_ORDERS,
-} from "@/lib/mock-data";
+import { stripDemoData } from "@/lib/demo";
 
 export interface CartItem {
   product: Product;
@@ -24,7 +20,8 @@ export interface CartItem {
 
 interface PosContextValue {
   tenants: Tenant[];
-  activeTenant: Tenant;
+  activeTenant: Tenant | null;
+  hydrated: boolean;
   products: Product[];
   syncedOrders: Order[];
   offlineQueue: { order: Order; items: OrderItem[] }[];
@@ -45,7 +42,6 @@ interface PosContextValue {
   setMobileMenuOpen: (open: boolean) => void;
   setSearchHistory: (value: string) => void;
   setIsDarkMode: (value: boolean | ((prev: boolean) => boolean)) => void;
-  handleNetworkToggle: () => void;
   triggerOfflineSync: () => Promise<void>;
   handleAddToCart: (product: Product) => void;
   handleUpdateQuantity: (productId: string, action: "add" | "sub") => void;
@@ -86,23 +82,38 @@ function readStorage<T>(key: string, fallback: T): T {
   }
 }
 
-function writeOutbox(outbox: Outbox) {
-  localStorage.setItem("opentill_outbox", JSON.stringify(outbox));
+function storeKey(userId: string, name: string) {
+  return `opentill_${userId}_${name}`;
 }
 
-export function PosProvider({ children }: { children: ReactNode }) {
-  const router = useRouter();
-  const [hydrated, setHydrated] = useState(false);
+function writeOutbox(userId: string, outbox: Outbox) {
+  localStorage.setItem(storeKey(userId, "outbox"), JSON.stringify(outbox));
+}
 
-  const [tenants, setTenants] = useState<Tenant[]>(INITIAL_TENANTS);
-  const [activeTenantId, setActiveTenantId] = useState<string>(INITIAL_TENANTS[0].id);
-  const [products, setProducts] = useState<Product[]>(INITIAL_PRODUCTS);
-  const [syncedOrders, setSyncedOrders] = useState<Order[]>(INITIAL_ORDERS);
+async function api(input: string, init?: RequestInit) {
+  const res = await fetch(input, init);
+  if (res.status === 401 && navigator.onLine) window.location.href = "/login";
+  return res;
+}
+
+export function PosProvider({
+  userId,
+  children,
+}: {
+  userId: string;
+  children: ReactNode;
+}) {
+  const router = useRouter();
+  const [scope, setScope] = useState<string | null>(null);
+  const hydrated = scope === userId;
+
+  const [tenants, setTenants] = useState<Tenant[]>([]);
+  const [activeTenantId, setActiveTenantId] = useState("");
+  const [products, setProducts] = useState<Product[]>([]);
+  const [syncedOrders, setSyncedOrders] = useState<Order[]>([]);
   const [offlineQueue, setOfflineQueue] = useState<{ order: Order; items: OrderItem[] }[]>([]);
   const [heldCarts, setHeldCarts] = useState<HeldCart[]>([]);
-  const [browserOnline, setBrowserOnline] = useState(true);
-  const [forcedOffline, setForcedOffline] = useState(false);
-  const isOnline = browserOnline && !forcedOffline;
+  const [isOnline, setIsOnline] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncProgress, setSyncProgress] = useState(0);
   const [isDarkMode, setIsDarkMode] = useState(true);
@@ -121,22 +132,36 @@ export function PosProvider({ children }: { children: ReactNode }) {
   const syncingRef = useRef(false);
   const flushRef = useRef<() => Promise<void>>(async () => {});
 
-  // Load persisted state after mount (SSR-safe)
+  // Load this account's store after mount. Theme stays on the device.
   useEffect(() => {
-    setTenants(readStorage("opentill_tenants", INITIAL_TENANTS));
-    setActiveTenantId(readStorage("opentill_active_tenant_id", INITIAL_TENANTS[0].id));
-    setProducts(readStorage("opentill_products", INITIAL_PRODUCTS));
-    setSyncedOrders(readStorage("opentill_orders", INITIAL_ORDERS));
-    setOfflineQueue(readStorage("opentill_offline_queue", []));
-    setHeldCarts(readStorage("opentill_held_carts", []));
+    const key = (name: string) => storeKey(userId, name);
+    const stored = stripDemoData({
+      tenants: readStorage(key("tenants"), []),
+      products: readStorage(key("products"), []),
+      orders: readStorage(key("orders"), []),
+    });
+    const savedTenantId = readStorage(key("active_tenant_id"), "");
+    const nextTenantId = stored.tenants.some((tenant) => tenant.id === savedTenantId)
+      ? savedTenantId
+      : stored.tenants[0]?.id ?? "";
+    setTenants(stored.tenants);
+    setProducts(stored.products);
+    setSyncedOrders(stored.orders);
+    setActiveTenantId(nextTenantId);
+    setOfflineQueue(
+      readStorage<{ order: Order; items: OrderItem[] }[]>(key("offline_queue"), []).filter(
+        (entry) => entry.order.id !== "ord-1001" && entry.order.id !== "ord-1002"
+      )
+    );
+    setHeldCarts(readStorage(key("held_carts"), []));
     setIsDarkMode(readStorage("opentill_theme_dark", true));
-    outboxRef.current = readStorage("opentill_outbox", EMPTY_OUTBOX);
-    setBrowserOnline(navigator.onLine);
-    setHydrated(true);
-  }, []);
+    outboxRef.current = readStorage(key("outbox"), EMPTY_OUTBOX);
+    setIsOnline(navigator.onLine);
+    setScope(userId);
+  }, [userId]);
 
   useEffect(() => {
-    const apply = () => setBrowserOnline(navigator.onLine);
+    const apply = () => setIsOnline(navigator.onLine);
     window.addEventListener("online", apply);
     window.addEventListener("offline", apply);
     return () => {
@@ -148,59 +173,53 @@ export function PosProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!hydrated) return;
     localStorage.setItem("opentill_theme_dark", JSON.stringify(isDarkMode));
-    if (isDarkMode) {
-      document.documentElement.classList.remove("light-theme");
-      document.body.classList.remove("light-theme");
-    } else {
-      document.documentElement.classList.add("light-theme");
-      document.body.classList.add("light-theme");
-    }
+    document.documentElement.classList.toggle("dark", isDarkMode);
   }, [isDarkMode, hydrated]);
 
   const activeTenant = useMemo(() => {
-    return tenants.find((t) => t.id === activeTenantId) || tenants[0];
+    return tenants.find((t) => t.id === activeTenantId) ?? null;
   }, [tenants, activeTenantId]);
 
   useEffect(() => {
     if (!hydrated) return;
-    localStorage.setItem("opentill_tenants", JSON.stringify(tenants));
-  }, [tenants, hydrated]);
+    localStorage.setItem(storeKey(userId, "tenants"), JSON.stringify(tenants));
+  }, [tenants, hydrated, userId]);
 
   useEffect(() => {
     if (!hydrated) return;
-    localStorage.setItem("opentill_active_tenant_id", activeTenantId);
+    localStorage.setItem(storeKey(userId, "active_tenant_id"), JSON.stringify(activeTenantId));
     setCart([]);
-  }, [activeTenantId, hydrated]);
+  }, [activeTenantId, hydrated, userId]);
 
   useEffect(() => {
     if (!hydrated) return;
-    localStorage.setItem("opentill_products", JSON.stringify(products));
-  }, [products, hydrated]);
+    localStorage.setItem(storeKey(userId, "products"), JSON.stringify(products));
+  }, [products, hydrated, userId]);
 
   useEffect(() => {
     if (!hydrated) return;
-    localStorage.setItem("opentill_orders", JSON.stringify(syncedOrders));
-  }, [syncedOrders, hydrated]);
+    localStorage.setItem(storeKey(userId, "orders"), JSON.stringify(syncedOrders));
+  }, [syncedOrders, hydrated, userId]);
 
   useEffect(() => {
     if (!hydrated) return;
-    localStorage.setItem("opentill_offline_queue", JSON.stringify(offlineQueue));
-  }, [offlineQueue, hydrated]);
+    localStorage.setItem(storeKey(userId, "offline_queue"), JSON.stringify(offlineQueue));
+  }, [offlineQueue, hydrated, userId]);
 
   useEffect(() => {
     if (!hydrated) return;
-    localStorage.setItem("opentill_held_carts", JSON.stringify(heldCarts));
-  }, [heldCarts, hydrated]);
+    localStorage.setItem(storeKey(userId, "held_carts"), JSON.stringify(heldCarts));
+  }, [heldCarts, hydrated, userId]);
 
   const remember = (kind: keyof Outbox, id: string, add: boolean) => {
     const box = outboxRef.current;
     const next = box[kind].filter((item) => item !== id);
     box[kind] = add ? [...next, id] : next;
-    writeOutbox(box);
+    writeOutbox(userId, box);
   };
 
   flushRef.current = async () => {
-    if (!navigator.onLine || forcedOffline || syncingRef.current) return;
+    if (!navigator.onLine || syncingRef.current) return;
     const box = outboxRef.current;
     const hasWork =
       offlineQueueRef.current.length > 0 ||
@@ -215,7 +234,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
 
     try {
       for (const id of [...box.productDeletes]) {
-        const res = await fetch(`/api/products/${id}`, { method: "DELETE" });
+        const res = await api(`/api/products/${id}`, { method: "DELETE" });
         if (res.ok || res.status === 404) remember("productDeletes", id, false);
       }
 
@@ -225,7 +244,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
           remember("productUpserts", id, false);
           continue;
         }
-        const put = await fetch(`/api/products/${id}`, {
+        const put = await api(`/api/products/${id}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(product),
@@ -233,7 +252,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
         const putBody = await put.json().catch(() => null);
         let saved = put.ok && !putBody?.error;
         if (!saved) {
-          const post = await fetch("/api/products", {
+          const post = await api("/api/products", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(product),
@@ -249,7 +268,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
           remember("tenantUpserts", id, false);
           continue;
         }
-        const res = await fetch("/api/tenants", {
+        const res = await api("/api/tenants", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(tenant),
@@ -260,7 +279,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
       const queue = offlineQueueRef.current;
       if (queue.length > 0) {
         setSyncProgress(50);
-        const res = await fetch("/api/orders/sync", {
+        const res = await api("/api/orders/sync", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -283,9 +302,9 @@ export function PosProvider({ children }: { children: ReactNode }) {
       }
 
       const [tenantsRes, productsRes, ordersRes] = await Promise.all([
-        fetch("/api/tenants"),
-        fetch("/api/products"),
-        fetch("/api/orders"),
+        api("/api/tenants"),
+        api("/api/products"),
+        api("/api/orders"),
       ]);
 
       if (tenantsRes.ok) {
@@ -299,6 +318,14 @@ export function PosProvider({ children }: { children: ReactNode }) {
             );
             const ids = new Set(server.map((t: Tenant) => t.id));
             return [...merged, ...local.filter((t) => !ids.has(t.id))];
+          });
+          setActiveTenantId((current) => {
+            const localOnly = tenantsRef.current.filter(
+              (tenant) => !server.some((item: Tenant) => item.id === tenant.id)
+            );
+            const available = [...server, ...localOnly];
+            if (available.some((tenant) => tenant.id === current)) return current;
+            return available[0]?.id ?? "";
           });
         }
       }
@@ -385,11 +412,6 @@ export function PosProvider({ children }: { children: ReactNode }) {
     await flushRef.current();
   };
 
-  const handleNetworkToggle = () => {
-    if (!navigator.onLine) return;
-    setForcedOffline((current) => !current);
-  };
-
   const handleAddToCart = (product: Product) => {
     setCart((prev) => {
       const existing = prev.find((item) => item.product.id === product.id);
@@ -411,6 +433,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
         .map((item) => {
           if (item.product.id === productId) {
             const nextQty = action === "add" ? item.quantity + 1 : item.quantity - 1;
+            if (action === "add" && nextQty > item.product.stock) return item;
             return { ...item, quantity: nextQty };
           }
           return item;
@@ -428,7 +451,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
   };
 
   const handleHoldCart = (label: string) => {
-    if (cart.length === 0) return;
+    if (!activeTenant || cart.length === 0) return;
     const newHold: HeldCart = {
       id: "held-" + Date.now(),
       tenantId: activeTenant.id,
@@ -548,7 +571,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
     }
 
     try {
-      const res = await fetch("/api/orders/sync", {
+      const res = await api("/api/orders/sync", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ orders: [order], items }),
@@ -574,7 +597,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
       return;
     }
     try {
-      const res = await fetch("/api/products", {
+      const res = await api("/api/products", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(newProduct),
@@ -599,7 +622,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
       return;
     }
     try {
-      const res = await fetch(`/api/products/${updatedProduct.id}`, {
+      const res = await api(`/api/products/${updatedProduct.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(updatedProduct),
@@ -621,7 +644,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
     remember("productDeletes", productId, true);
     if (!isOnline) return;
     try {
-      const res = await fetch(`/api/products/${productId}`, { method: "DELETE" });
+      const res = await api(`/api/products/${productId}`, { method: "DELETE" });
       if (!res.ok && res.status !== 404) throw new Error("delete failed");
       remember("productDeletes", productId, false);
     } catch (err) {
@@ -635,12 +658,13 @@ export function PosProvider({ children }: { children: ReactNode }) {
       tenantsRef.current = next;
       return next;
     });
+    setActiveTenantId(newTenant.id);
     if (!isOnline) {
       remember("tenantUpserts", newTenant.id, true);
       return;
     }
     try {
-      const res = await fetch("/api/tenants", {
+      const res = await api("/api/tenants", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(newTenant),
@@ -657,16 +681,19 @@ export function PosProvider({ children }: { children: ReactNode }) {
   };
 
   const tenantSyncedOrders = useMemo(() => {
+    if (!activeTenant) return [];
     return syncedOrders.filter((o) => o.tenantId === activeTenant.id);
-  }, [syncedOrders, activeTenant.id]);
+  }, [syncedOrders, activeTenant]);
 
   const tenantHeldCarts = useMemo(() => {
+    if (!activeTenant) return [];
     return heldCarts.filter((hc) => hc.tenantId === activeTenant.id);
-  }, [heldCarts, activeTenant.id]);
+  }, [heldCarts, activeTenant]);
 
   const value: PosContextValue = {
     tenants,
     activeTenant,
+    hydrated,
     products,
     syncedOrders,
     offlineQueue,
@@ -687,7 +714,6 @@ export function PosProvider({ children }: { children: ReactNode }) {
     setMobileMenuOpen,
     setSearchHistory,
     setIsDarkMode,
-    handleNetworkToggle,
     triggerOfflineSync,
     handleAddToCart,
     handleUpdateQuantity,

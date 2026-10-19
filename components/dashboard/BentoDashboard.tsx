@@ -1,17 +1,17 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
-import { Product, Tenant, Order } from "@/lib/types";
-import { motion } from "motion/react";
-import { 
-  Clock, 
-  Calendar, 
-  Boxes, 
-  CircleDollarSign, 
-  Handshake, 
-  TrendingUp,
-  Store
-} from "lucide-react";
+import { useMemo } from "react";
+import Link from "next/link";
+import { Area, AreaChart, CartesianGrid, XAxis } from "recharts";
+import { Order, Product, Tenant } from "@/lib/types";
+import { money } from "@/lib/money";
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  type ChartConfig,
+} from "@/components/ui/chart";
 
 interface BentoDashboardProps {
   products: Product[];
@@ -19,250 +19,166 @@ interface BentoDashboardProps {
   activeTenant: Tenant;
 }
 
-// 1. DIGITAL CLOCK COMPONENT (12-Hour Format)
-function DigitalClockWidget() {
-  const [time, setTime] = useState<Date | null>(null);
+const chartConfig = {
+  revenue: { label: "Sales", color: "var(--primary)" },
+} satisfies ChartConfig;
 
-  useEffect(() => {
-    const tick = () => setTime(new Date());
-    tick();
-    const timer = setInterval(tick, 1000);
-    return () => clearInterval(timer);
-  }, []);
-
-  const rawHours = time?.getHours() ?? 0;
-  const hours = time ? (rawHours % 12 || 12).toString().padStart(2, "0") : "--";
-  const minutes = time ? time.getMinutes().toString().padStart(2, "0") : "--";
-  const seconds = time ? time.getSeconds().toString().padStart(2, "0") : "--";
-  const ampm = !time ? "" : rawHours >= 12 ? "PM" : "AM";
-
-  return (
-    <div className="flex flex-col items-center justify-center h-full p-4 text-center">
-      <motion.div 
-         initial={{ scale: 0.9, opacity: 0 }}
-         animate={{ scale: 1, opacity: 1 }}
-         className="font-mono text-3xl sm:text-4xl font-extrabold tracking-widest text-white flex items-center justify-center gap-1"
-      >
-        <span>{hours}</span>
-        <span className="animate-pulse text-[#208C8C]">:</span>
-        <span>{minutes}</span>
-        <span className="animate-pulse text-[#208C8C]">:</span>
-        <span className="text-[#89D9C2] text-xl sm:text-2xl self-end mb-0.5">{seconds}</span>
-        <span className="text-[10px] font-bold text-slate-400 ml-2 border border-[#024959] px-1.5 py-0.5 rounded-md self-center bg-[#0D0D0D]">
-          {ampm}
-        </span>
-      </motion.div>
-      <p className="text-[9px] text-slate-400 font-mono uppercase tracking-widest mt-2 flex items-center gap-1.5">
-        <Clock className="w-3.5 h-3.5 text-[#208C8C]" />
-        Current Session Time
-      </p>
-    </div>
-  );
+function dayKey(date: Date) {
+  return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
 }
 
-// 2. DATE COMPONENT
-function DateWidget() {
-  const [date, setDate] = useState<Date | null>(null);
+export default function BentoDashboard({
+  products,
+  orders,
+  activeTenant,
+}: BentoDashboardProps) {
+  const catalog = useMemo(
+    () => products.filter((product) => product.tenantId === activeTenant.id),
+    [products, activeTenant.id]
+  );
+  const sales = useMemo(
+    () => orders.filter((order) => order.tenantId === activeTenant.id && order.status !== "FAILED"),
+    [orders, activeTenant.id]
+  );
 
-  useEffect(() => {
-    const tick = () => setDate(new Date());
-    tick();
-    const timer = setInterval(tick, 60000);
-    return () => clearInterval(timer);
-  }, []);
+  const todayKey = dayKey(new Date());
+  const todayTotal = sales
+    .filter((order) => dayKey(new Date(order.date)) === todayKey)
+    .reduce((sum, order) => sum + order.total, 0);
+  const allTotal = sales.reduce((sum, order) => sum + order.total, 0);
 
-  const dayName = date ? date.toLocaleDateString("en-US", { weekday: "long" }) : "";
-  const dayNum = date?.getDate() ?? 0;
-  const monthName = date ? date.toLocaleDateString("en-US", { month: "long" }) : "";
-  const yearNum = date?.getFullYear() ?? "";
+  const week = useMemo(() => {
+    return Array.from({ length: 7 }, (_, index) => {
+      const date = new Date();
+      date.setHours(0, 0, 0, 0);
+      date.setDate(date.getDate() - (6 - index));
+      const key = dayKey(date);
+      const revenue = sales
+        .filter((order) => dayKey(new Date(order.date)) === key)
+        .reduce((sum, order) => sum + order.total, 0);
+      return {
+        day: date.toLocaleDateString("en-US", { weekday: "short" }),
+        revenue: Math.round(revenue * 100) / 100,
+      };
+    });
+  }, [sales]);
 
-  const daysInMonth = date ? new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate() : 0;
-  const firstDayIndex = date ? new Date(date.getFullYear(), date.getMonth(), 1).getDay() : 0;
-  
-  const calendarCells = useMemo(() => {
-    const cells = [];
-    for (let i = 0; i < firstDayIndex; i++) {
-      cells.push({ day: null, current: false });
-    }
-    for (let i = 1; i <= daysInMonth; i++) {
-      cells.push({ day: i, current: i === dayNum });
-    }
-    return cells.slice(0, 35);
-  }, [dayNum, firstDayIndex, daysInMonth]);
+  const lowStock = catalog.filter((product) => product.stock < 5).slice(0, 5);
+  const recent = sales.slice(0, 6);
 
   return (
-    <div className="flex flex-col justify-between h-full p-4">
-      <div className="flex justify-between items-center mb-1">
-        <div className="flex items-center gap-1.5 text-[#208C8C]">
-          <Calendar className="w-3.5 h-3.5" />
-          <span className="font-mono text-[9px] font-bold tracking-widest text-[#89D9C2]">{monthName.toUpperCase()} {yearNum}</span>
-        </div>
-        <span className="text-[8px] font-mono font-extrabold bg-[#208C8C]/10 border border-[#208C8C]/30 text-[#89D9C2] px-1.5 py-0.2 rounded uppercase">
-          {dayName.substring(0, 3)}
-        </span>
+    <div className="flex h-full flex-col gap-4 overflow-y-auto pb-2">
+      <div className="grid gap-3 sm:grid-cols-3">
+        <Card className="border-0 shadow-none">
+          <CardHeader className="pb-0">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Today</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-3xl font-bold tabular-nums">{money(activeTenant.currency, todayTotal)}</p>
+          </CardContent>
+        </Card>
+        <Card className="border-0 shadow-none">
+          <CardHeader className="pb-0">
+            <CardTitle className="text-sm font-medium text-muted-foreground">All sales</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-3xl font-bold tabular-nums">{money(activeTenant.currency, allTotal)}</p>
+          </CardContent>
+        </Card>
+        <Card className="border-0 shadow-none">
+          <CardHeader className="pb-0">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Products</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-3xl font-bold tabular-nums">{catalog.length}</p>
+          </CardContent>
+        </Card>
       </div>
 
-      <div className="flex-1 flex gap-2 items-center justify-between">
-        <div className="text-center shrink-0 pr-2 border-r border-[#024959]/30">
-          <span className="block text-3xl font-extrabold text-white font-mono leading-none">{date ? dayNum : ""}</span>
-          <span className="block text-[8px] text-slate-500 font-mono uppercase tracking-widest mt-1">{dayName}</span>
-        </div>
+      <div className="grid gap-3 lg:grid-cols-3">
+        <Card className="border-0 shadow-none lg:col-span-2">
+          <CardHeader>
+            <CardTitle className="text-base">This week</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {sales.length === 0 ? (
+              <p className="py-10 text-sm text-muted-foreground">
+                Sales show up here after the first checkout.
+              </p>
+            ) : (
+              <ChartContainer config={chartConfig} className="h-48 w-full">
+                <AreaChart data={week} margin={{ left: 0, right: 0, top: 8 }}>
+                  <CartesianGrid vertical={false} />
+                  <XAxis dataKey="day" tickLine={false} axisLine={false} />
+                  <ChartTooltip content={<ChartTooltipContent />} />
+                  <Area
+                    dataKey="revenue"
+                    type="monotone"
+                    fill="var(--color-revenue)"
+                    stroke="var(--color-revenue)"
+                    fillOpacity={0.2}
+                  />
+                </AreaChart>
+              </ChartContainer>
+            )}
+          </CardContent>
+        </Card>
 
-        {/* Miniature Grid */}
-        <div className="flex-1 grid grid-cols-7 gap-x-0.5 gap-y-0.5 text-[6px] font-mono text-slate-500 max-w-[110px] ml-auto">
-          {["S", "M", "T", "W", "T", "F", "S"].map((d, i) => (
-            <span key={i} className="text-center font-bold text-slate-600">{d}</span>
-          ))}
-          {calendarCells.map((cell, idx) => (
-            <span 
-              key={idx} 
-              className={`text-center py-0.2 rounded-sm ${
-                cell.current 
-                  ? "bg-[#208C8C] text-[#010326] font-extrabold" 
-                  : cell.day 
-                    ? "text-slate-400 hover:text-white" 
-                    : "opacity-0"
-              }`}
-            >
-              {cell.day || ""}
-            </span>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// 3. STATS METRICS COMPONENT
-interface DashboardStatsProps {
-  products: Product[];
-  orders: Order[];
-  activeTenant: Tenant;
-}
-
-function DashboardStats({ products, orders, activeTenant }: DashboardStatsProps) {
-  const tenantProductsCount = useMemo(() => {
-    return products.filter((p) => p.tenantId === activeTenant.id).length;
-  }, [products, activeTenant.id]);
-
-  const activeTenantOrders = useMemo(() => {
-    return orders.filter((o) => o.tenantId === activeTenant.id && o.status === "COMPLETED");
-  }, [orders, activeTenant.id]);
-
-  const totalIncome = useMemo(() => {
-    return activeTenantOrders.reduce((sum, o) => sum + o.total, 0);
-  }, [activeTenantOrders]);
-
-  const currencySymbol = activeTenant.currency === "EUR" ? "€" : activeTenant.currency === "PHP" ? "₱" : "$";
-
-  return (
-    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 h-full p-4 items-center">
-      <motion.div 
-        whileHover={{ scale: 1.01 }}
-        className="bg-[#0D0D0D]/40 border border-[#024959] p-3 rounded-xl flex flex-col items-center justify-center text-center h-full gap-1 hover:border-[#208C8C]/50 transition-colors shadow-inner"
-      >
-        <div className="p-1.5 bg-[#208C8C]/10 rounded-lg text-[#208C8C] mb-0.5 shrink-0 border border-[#208C8C]/20">
-          <Boxes className="w-4 h-4" />
-        </div>
-        <p className="text-[8px] font-mono text-slate-400 font-bold uppercase tracking-wider">Active Catalog</p>
-        <span className="text-base font-extrabold text-white font-mono mt-0.5 border border-[#024959] bg-[#0D0D0D] px-2.5 py-0.5 rounded-full">
-          {tenantProductsCount} SKU
-        </span>
-      </motion.div>
-
-      <motion.div 
-        whileHover={{ scale: 1.01 }}
-        className="bg-[#0D0D0D]/40 border border-[#024959] p-3 rounded-xl flex flex-col items-center justify-center text-center h-full gap-1 hover:border-[#208C8C]/50 transition-colors shadow-inner relative overflow-hidden"
-      >
-        <div className="p-1.5 bg-emerald-500/10 rounded-lg text-emerald-400 mb-0.5 shrink-0 border border-emerald-500/20">
-          <CircleDollarSign className="w-4 h-4" />
-        </div>
-        <p className="text-[8px] font-mono text-slate-400 font-bold uppercase tracking-wider">Total Sales Income</p>
-        <span className="text-base font-extrabold text-emerald-400 font-mono mt-0.5">
-          {currencySymbol}{totalIncome.toFixed(2)}
-        </span>
-      </motion.div>
-
-      <motion.div 
-        whileHover={{ scale: 1.01 }}
-        className="bg-[#0D0D0D]/40 border border-[#024959] p-3 rounded-xl flex flex-col items-center justify-center text-center h-full gap-1 hover:border-[#208C8C]/50 transition-colors shadow-inner"
-      >
-        <div className="p-1.5 bg-amber-500/10 rounded-lg text-amber-400 mb-0.5 shrink-0 border border-amber-500/20">
-          <Handshake className="w-4 h-4" />
-        </div>
-        <p className="text-[8px] font-mono text-slate-400 font-bold uppercase tracking-wider">Transactions Synced</p>
-        <span className="text-base font-extrabold text-amber-400 font-mono mt-0.5">
-          {activeTenantOrders.length} completed
-        </span>
-      </motion.div>
-    </div>
-  );
-}
-
-// MAIN BENTO GRID DASHBOARD
-export default function BentoDashboard({ products, orders, activeTenant }: BentoDashboardProps) {
-  return (
-    <div className="w-full flex flex-col gap-3.5 h-full overflow-y-auto pr-0.5">
-      {/* Top Banner section */}
-      <div className="bg-gradient-to-r from-[#0D0D0D]/80 to-[#024959]/20 border border-[#024959] rounded-xl p-4 shadow-md flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center relative overflow-hidden">
-        <div className="absolute top-0 right-0 p-1 opacity-10">
-          <Boxes className="w-44 h-44 text-[#89D9C2]" />
-        </div>
-        <div className="space-y-1 relative z-10">
-          <h3 className="text-md font-bold text-white tracking-tight font-mono flex items-center gap-2">
-            <TrendingUp className="w-4.5 h-4.5 text-[#89D9C2]" />
-            STORE OVERVIEW
-          </h3>
-          <p className="text-[10px] text-slate-400 font-mono">
-            Real-time Point of Sale status, transaction counters, and active inventory metrics.
-          </p>
-        </div>
-        <div className="bg-[#208C8C]/10 border border-[#208C8C]/30 px-3 py-1.5 rounded-lg sm:text-right">
-          <span className="block text-[8px] text-slate-500 font-mono">STORE ID</span>
-          <span className="text-[#89D9C2] font-mono text-xs font-bold uppercase tracking-wider">{activeTenant.id.substring(7, 15)}</span>
-        </div>
+        <Card className="border-0 shadow-none">
+          <CardHeader>
+            <CardTitle className="text-base">Low stock</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {lowStock.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Nothing is running low.</p>
+            ) : (
+              lowStock.map((product) => (
+                <div key={product.id} className="flex items-baseline justify-between gap-3">
+                  <span className="truncate text-sm">{product.name}</span>
+                  <span className="shrink-0 text-sm tabular-nums text-amber-400">
+                    {product.stock} left
+                  </span>
+                </div>
+              ))
+            )}
+          </CardContent>
+        </Card>
       </div>
 
-      {/* Grid container */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
-        {/* Card 1: Clock */}
-        <div className="bg-[#0D0D0D]/60 border border-[#024959] rounded-2xl shadow-sm min-h-[120px] hover:border-[#208C8C]/40 transition-colors">
-          <DigitalClockWidget />
-        </div>
-
-        {/* Card 2: Date Calendar */}
-        <div className="bg-[#0D0D0D]/60 border border-[#024959] rounded-2xl shadow-sm min-h-[120px] hover:border-[#208C8C]/40 transition-colors">
-          <DateWidget />
-        </div>
-
-        {/* Card 3: Shift Merchant Info */}
-        <div className="bg-[#0D0D0D]/60 border border-[#024959] rounded-2xl shadow-sm min-h-[120px] hover:border-[#208C8C]/40 transition-colors p-4 flex flex-col justify-between font-mono text-[9px] text-slate-400">
-          <div className="flex justify-between items-center border-b border-[#024959]/30 pb-1.5">
-            <span className="flex items-center gap-1 font-bold text-[#89D9C2]">
-              <Store className="w-3.5 h-3.5" />
-              TERMINAL DETAILS
-            </span>
-            <span className="bg-[#208C8C]/10 border border-[#208C8C]/20 px-1.5 py-0.2 rounded text-[8px] text-[#89D9C2]">
-              ACTIVE
-            </span>
-          </div>
-          <div className="flex-1 flex flex-col justify-center space-y-1 mt-1.5 text-xs text-white">
-            <p className="flex justify-between font-bold">
-              <span className="text-[10px] font-normal text-slate-400">Business:</span>
-              <span>{activeTenant.name}</span>
+      <Card className="border-0 shadow-none">
+        <CardHeader>
+          <CardTitle className="text-base">Recent</CardTitle>
+          <CardAction>
+            <Link href="/records" className="text-sm text-muted-foreground hover:text-foreground">
+              All sales
+            </Link>
+          </CardAction>
+        </CardHeader>
+        <CardContent className="space-y-1">
+          {recent.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No sales yet.{" "}
+              <Link href="/orders" className="text-foreground underline-offset-4 hover:underline">
+                Open the register
+              </Link>
             </p>
-            <p className="flex justify-between font-bold">
-              <span className="text-[10px] font-normal text-slate-400">Tax Setup:</span>
-              <span>{(activeTenant.taxRate * 100).toFixed(0)}% VAT Inc.</span>
-            </p>
-          </div>
-        </div>
-
-        {/* Card 4: Financial & Product Summary metrics (Full row span) */}
-        <div className="md:col-span-2 lg:col-span-3 bg-[#0D0D0D]/60 border border-[#024959] rounded-2xl shadow-sm hover:border-[#208C8C]/40 transition-colors">
-          <DashboardStats products={products} orders={orders} activeTenant={activeTenant} />
-        </div>
-      </div>
+          ) : (
+            recent.map((order) => (
+              <div key={order.id} className="flex items-center justify-between rounded-md px-2 py-2 hover:bg-accent">
+                <div>
+                  <p className="text-sm">{order.customerName || "Walk-in"}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {new Date(order.date).toLocaleString()}
+                  </p>
+                </div>
+                <p className="text-sm font-medium tabular-nums">
+                  {money(activeTenant.currency, order.total)}
+                </p>
+              </div>
+            ))
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

@@ -1,9 +1,17 @@
 import type { Metadata } from "next";
+import { Figtree } from "next/font/google";
+import { AuthProvider } from "@/contexts/auth-context";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import "./globals.css";
+
+const figtree = Figtree({
+  subsets: ["latin"],
+  variable: "--font-figtree",
+});
 
 export const metadata: Metadata = {
   title: "OpenTill",
-  description: "Offline-first point of sale system",
+  description: "Point of sale",
 };
 
 export default function RootLayout({
@@ -12,8 +20,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body className="antialiased">{children}</body>
+    <html lang="en" className={`dark ${figtree.variable}`} suppressHydrationWarning>
+      <body className="antialiased">
+        <TooltipProvider>
+          <AuthProvider>{children}</AuthProvider>
+        </TooltipProvider>
+      </body>
     </html>
   );
 }

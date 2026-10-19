@@ -8,14 +8,34 @@ generator client {
   provider = "prisma-client-js"
 }
 
+model User {
+  id           String    @id
+  name         String
+  email        String    @unique
+  passwordHash String
+  createdAt    DateTime  @default(now())
+  sessions     Session[]
+  tenants      Tenant[]
+}
+
+model Session {
+  id        String   @id
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
 model Tenant {
   id           String    @id
+  ownerId      String?
   name         String
   businessType String
   taxRate      Float
   currency     String
   createdAt    DateTime  @default(now())
   active       Boolean   @default(true)
+  owner        User?     @relation(fields: [ownerId], references: [id])
   products     Product[]
   orders       Order[]
 }

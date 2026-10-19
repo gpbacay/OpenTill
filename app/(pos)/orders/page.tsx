@@ -1,9 +1,11 @@
 "use client";
 
-import { Boxes, ShoppingCart } from "lucide-react";
 import { RegisterCatalog } from "@/components/RegisterCatalog";
 import { ActiveCart } from "@/components/ActiveCart";
 import { usePos } from "@/contexts/pos-context";
+import { money } from "@/lib/money";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
 
 export default function OrdersPage() {
   const {
@@ -24,43 +26,26 @@ export default function OrdersPage() {
     handleDeleteHeldCart,
   } = usePos();
 
-  return (
-    <div className="flex flex-col h-full overflow-hidden relative">
-      <div className="flex lg:hidden bg-[#0D0D0D] border border-[#024959] p-1 rounded-xl mb-3 shrink-0">
-        <button
-          onClick={() => setMobileRegisterTab("catalog")}
-          className={`flex-1 py-2 text-[10px] font-mono uppercase tracking-wider font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
-            mobileRegisterTab === "catalog"
-              ? "bg-[#208C8C] text-[#010326] shadow-md"
-              : "text-slate-400 hover:text-white"
-          }`}
-        >
-          <Boxes className="w-3.5 h-3.5" />
-          Catalog
-        </button>
-        <button
-          onClick={() => setMobileRegisterTab("cart")}
-          className={`flex-1 py-2 text-[10px] font-mono uppercase tracking-wider font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 relative ${
-            mobileRegisterTab === "cart"
-              ? "bg-[#208C8C] text-[#010326] shadow-md"
-              : "text-slate-400 hover:text-white"
-          }`}
-        >
-          <ShoppingCart className="w-3.5 h-3.5" />
-          Active Cart
-          {cart.length > 0 && (
-            <span className="absolute top-1 right-2 bg-amber-500 text-[#010326] text-[8px] font-extrabold w-4 h-4 rounded-full flex items-center justify-center animate-bounce">
-              {cart.reduce((sum, item) => sum + item.quantity, 0)}
-            </span>
-          )}
-        </button>
-      </div>
+  if (!activeTenant) return null;
+  const count = cart.reduce((sum, item) => sum + item.quantity, 0);
+  const subtotal = cart.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 h-full overflow-hidden">
+  return (
+    <div className="relative flex h-full flex-col overflow-hidden">
+      <Tabs
+        value={mobileRegisterTab}
+        onValueChange={(value) => setMobileRegisterTab(value as "catalog" | "cart")}
+        className="mb-3 lg:hidden"
+      >
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="catalog">Catalog</TabsTrigger>
+          <TabsTrigger value="cart">Cart{count > 0 ? ` ${count}` : ""}</TabsTrigger>
+        </TabsList>
+      </Tabs>
+
+      <div className="grid h-full min-h-0 grid-cols-1 gap-4 overflow-hidden lg:grid-cols-12">
         <div
-          className={`${
-            mobileRegisterTab === "catalog" ? "block" : "hidden"
-          } lg:block lg:col-span-7 xl:col-span-8 overflow-hidden h-full`}
+          className={`${mobileRegisterTab === "catalog" ? "block" : "hidden"} min-h-0 lg:col-span-7 lg:block xl:col-span-8`}
         >
           <RegisterCatalog
             products={products}
@@ -69,9 +54,7 @@ export default function OrdersPage() {
           />
         </div>
         <div
-          className={`${
-            mobileRegisterTab === "cart" ? "block" : "hidden"
-          } lg:block lg:col-span-5 xl:col-span-4 overflow-hidden h-full`}
+          className={`${mobileRegisterTab === "cart" ? "block" : "hidden"} min-h-0 lg:col-span-5 lg:block xl:col-span-4`}
         >
           <ActiveCart
             cart={cart}
@@ -89,36 +72,14 @@ export default function OrdersPage() {
         </div>
       </div>
 
-      {mobileRegisterTab === "catalog" && cart.length > 0 && (
-        <div className="lg:hidden absolute bottom-20 left-3 right-3 z-40 animate-slide-in-up">
-          <button
-            onClick={() => setMobileRegisterTab("cart")}
-            className="w-full bg-[#208C8C] hover:bg-[#208C8C]/90 text-[#010326] font-mono text-[11px] font-extrabold py-3 px-4 rounded-xl shadow-lg border border-[#89D9C2]/30 flex justify-between items-center"
-          >
-            <span className="flex items-center gap-1.5">
-              <ShoppingCart className="w-4 h-4 animate-bounce" />
-              <span>
-                VIEW CART ({cart.reduce((sum, item) => sum + item.quantity, 0)}{" "}
-                ITEMS)
-              </span>
-            </span>
-            <span>
-              {activeTenant.currency === "EUR"
-                ? "€"
-                : activeTenant.currency === "PHP"
-                  ? "₱"
-                  : "$"}
-              {cart
-                .reduce(
-                  (sum, item) => sum + item.product.price * item.quantity,
-                  0
-                )
-                .toFixed(2)}{" "}
-              →
-            </span>
-          </button>
-        </div>
-      )}
+      {mobileRegisterTab === "catalog" && cart.length > 0 ? (
+        <Button
+          className="absolute inset-x-0 bottom-2 lg:hidden"
+          onClick={() => setMobileRegisterTab("cart")}
+        >
+          Cart {money(activeTenant.currency, subtotal)}
+        </Button>
+      ) : null}
     </div>
   );
 }

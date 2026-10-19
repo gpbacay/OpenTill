@@ -1,131 +1,119 @@
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { X, RefreshCw } from "lucide-react";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { usePathname, useRouter } from "next/navigation";
+import { useAuth } from "@/contexts/auth-context";
 import { PosProvider, usePos } from "@/contexts/pos-context";
-import Sidebar, { MENU_ITEMS } from "@/components/layout/Sidebar";
+import AppSidebar, { MENU_ITEMS } from "@/components/layout/Sidebar";
 import Header from "@/components/layout/Header";
+import { TenantOnboarding } from "@/components/TenantOnboarding";
+import { Button } from "@/components/ui/button";
+import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 
 function PosShell({ children }: { children: React.ReactNode }) {
   const {
+    hydrated,
     activeTenant,
-    offlineQueue,
-    isOnline,
+    tenants,
     isSyncing,
     syncProgress,
-    isDarkMode,
-    mobileMenuOpen,
-    setMobileMenuOpen,
-    setIsDarkMode,
-    handleNetworkToggle,
-    triggerOfflineSync,
+    handleAddTenant,
+    handleSwitchTenant,
   } = usePos();
   const pathname = usePathname();
+  const { user, logout } = useAuth();
+
+  if (!hydrated) {
+    return <div className="min-h-screen bg-background" />;
+  }
+
+  if (!activeTenant && pathname === "/account") {
+    return <div className="min-h-screen bg-background px-6">{children}</div>;
+  }
+
+  if (!activeTenant) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background px-6">
+        <div className="w-full max-w-md">
+          <h1 className="mb-1 text-3xl font-bold">Open your store</h1>
+          <p className="mb-2 text-sm text-muted-foreground">
+            Sales and products stay with the store you create.
+          </p>
+          <p className="mb-4 text-sm text-muted-foreground">Signed in as {user?.name}</p>
+          <div className="mb-6 flex gap-2">
+            <Button variant="ghost" asChild>
+              <Link href="/account">Account</Link>
+            </Button>
+            <Button variant="ghost" onClick={() => void logout()}>
+              Log out
+            </Button>
+          </div>
+          <TenantOnboarding
+            tenants={tenants}
+            activeTenant={null}
+            onAddTenant={handleAddTenant}
+            onSwitchTenant={handleSwitchTenant}
+          />
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-[#0D0D0D] text-slate-100 flex flex-row antialiased select-none">
-      <aside className="hidden lg:block w-64 h-screen sticky top-0 shrink-0">
-        <Sidebar
-          activeTenant={activeTenant}
-          offlineQueueCount={offlineQueue.length}
-        />
-      </aside>
-
-      {mobileMenuOpen && (
-        <div className="fixed inset-0 z-50 flex lg:hidden animate-fade-in">
-          <div
-            onClick={() => setMobileMenuOpen(false)}
-            className="fixed inset-0 bg-black/80 backdrop-blur-sm"
-          ></div>
-          <div className="relative flex w-64 max-w-xs flex-col bg-[#0D0D0D] border-r border-[#024959] h-full shadow-2xl animate-slide-in-left">
-            <div className="absolute top-3.5 right-3 z-50">
-              <button
-                onClick={() => setMobileMenuOpen(false)}
-                className="p-1 rounded-md border border-[#024959] text-slate-400 hover:text-white"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-            <Sidebar
-              activeTenant={activeTenant}
-              offlineQueueCount={offlineQueue.length}
-              onNavigate={() => setMobileMenuOpen(false)}
+    <SidebarProvider>
+      <AppSidebar />
+      <SidebarInset className="h-svh overflow-hidden shadow-none">
+        <Header />
+        {isSyncing ? (
+          <div className="h-0.5 bg-secondary">
+            <div
+              className="h-full bg-primary transition-all"
+              style={{ width: `${syncProgress}%` }}
             />
           </div>
-        </div>
-      )}
-
-      <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
-        <Header
-          isOnline={isOnline}
-          onToggleNetwork={handleNetworkToggle}
-          activeTenant={activeTenant}
-          offlineQueueCount={offlineQueue.length}
-          onTriggerSync={triggerOfflineSync}
-          isSyncing={isSyncing}
-          onMobileMenuToggle={() => setMobileMenuOpen(true)}
-          isDarkMode={isDarkMode}
-          onToggleDarkMode={() => setIsDarkMode(!isDarkMode)}
-        />
-
-        {isSyncing && (
-          <div className="bg-gradient-to-r from-[#024959] to-[#010326] border-b border-[#208C8C]/40 text-center py-2 px-4 shrink-0 animate-pulse">
-            <div className="max-w-md mx-auto flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2 text-[10px] font-mono text-[#89D9C2]">
-                <RefreshCw className="w-3 h-3 animate-spin text-[#89D9C2]" />
-                <span>
-                  Saving queued sales to the local database...
-                </span>
-              </div>
-              <span className="text-[10px] font-bold text-white font-mono">
-                {syncProgress}%
-              </span>
-            </div>
-            <div className="max-w-md mx-auto h-0.5 bg-[#010326] rounded-full overflow-hidden mt-1.5 border border-[#208C8C]/20">
-              <div
-                className="h-full bg-gradient-to-r from-[#208C8C] to-[#89D9C2] transition-all duration-300"
-                style={{ width: `${syncProgress}%` }}
-              ></div>
-            </div>
-          </div>
-        )}
-
-        <main className="flex-1 overflow-hidden p-3 pb-20 md:px-5 md:pt-5 lg:pb-5 flex flex-col">
+        ) : null}
+        <main className="flex min-h-0 flex-1 flex-col overflow-hidden px-4 pb-16 md:pb-4">
           {children}
         </main>
-
-        <nav className="lg:hidden fixed bottom-0 inset-x-0 z-40 border-t border-[#024959] bg-[#0D0D0D]/95 backdrop-blur-md pb-[env(safe-area-inset-bottom)]">
-          <div className="grid grid-cols-5">
-            {MENU_ITEMS.map((item) => {
-              const active =
-                item.href === "/"
-                  ? pathname === "/"
-                  : pathname.startsWith(item.href);
-              const Icon = item.icon;
-              return (
-                <Link
-                  key={item.id}
-                  href={item.href}
-                  className={`flex flex-col items-center justify-center gap-0.5 min-h-14 text-[10px] font-mono ${
-                    active ? "text-[#89D9C2]" : "text-slate-400"
-                  }`}
-                >
-                  <Icon className="w-5 h-5" />
-                  {item.label}
-                </Link>
-              );
-            })}
-          </div>
+        <nav className="fixed inset-x-2 bottom-2 z-40 grid grid-cols-5 rounded-xl bg-card p-1 md:hidden">
+          {MENU_ITEMS.map((item) => {
+            const active =
+              item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+            return (
+              <Link
+                key={item.id}
+                href={item.href}
+                className={`flex flex-col items-center gap-0.5 rounded-lg py-2 text-[11px] ${
+                  active ? "bg-accent text-foreground" : "text-muted-foreground"
+                }`}
+              >
+                <HugeiconsIcon icon={item.icon} size={16} />
+                {item.label}
+              </Link>
+            );
+          })}
         </nav>
-      </div>
-    </div>
+      </SidebarInset>
+    </SidebarProvider>
   );
 }
 
 export default function PosLayout({ children }: { children: React.ReactNode }) {
+  const { user, ready } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (ready && !user) router.replace("/login");
+  }, [ready, user, router]);
+
+  if (!ready || !user) {
+    return <div className="min-h-screen bg-background" />;
+  }
+
   return (
-    <PosProvider>
+    <PosProvider userId={user.id}>
       <PosShell>{children}</PosShell>
     </PosProvider>
   );

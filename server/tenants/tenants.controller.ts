@@ -1,4 +1,5 @@
-import { Controller, Get, Post, Body, Inject } from "@nestjs/common";
+import { Controller, Get, Post, Body, Inject, Req } from "@nestjs/common";
+import type { AuthedRequest } from "../auth/auth.guard";
 import { TenantsService, Tenant } from "./tenants.service";
 
 @Controller("api/tenants")
@@ -8,12 +9,12 @@ export class TenantsController {
   ) {}
 
   @Get()
-  async getTenants(): Promise<Tenant[]> {
-    return this.tenantsService.findAll();
+  async getTenants(@Req() req: AuthedRequest): Promise<Tenant[]> {
+    return this.tenantsService.findAll(req.user!.id);
   }
 
   @Post()
-  async createTenant(@Body() body: Partial<Tenant>): Promise<Tenant> {
-    return this.tenantsService.create(body);
+  async createTenant(@Req() req: AuthedRequest, @Body() body: Partial<Tenant>): Promise<Tenant> {
+    return this.tenantsService.create(req.user!.id, body);
   }
 }
