@@ -153,7 +153,7 @@ export function SalesView() {
             rows={rows}
             columns={columns}
             rowKey={(o) => o.id}
-            onRowClick={(o) => setSelectedId((current) => (current === o.id ? null : o.id))}
+            onRowClick={(o, checked) => setSelectedId((current) => (checked ? o.id : current === o.id ? null : current))}
             selectedKey={selectedId}
             bulkActions={(chosen) => (
               <>

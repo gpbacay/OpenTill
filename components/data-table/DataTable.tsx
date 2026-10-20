@@ -15,7 +15,8 @@ interface DataTableProps<T> {
   rows: T[];
   columns: Column<T>[];
   rowKey: (row: T) => string;
-  onRowClick?: (row: T) => void;
+  /** Clicking a row also ticks (or unticks) its checkbox; `checked` is the new state. */
+  onRowClick?: (row: T, checked: boolean) => void;
   /** Row whose detail panel is open. */
   selectedKey?: string | null;
   empty: ReactNode;
@@ -28,9 +29,9 @@ interface DataTableProps<T> {
   bulkActions?: (chosen: T[], clear: () => void) => ReactNode;
 }
 
-// Hidden until the row is hovered or focused, or something is already selected. Always shown on touch screens.
+// Row checkboxes stay hidden until the row is hovered or focused, or something is already selected (always shown on
+// touch screens). The select-all checkbox in the header is always visible so a selection can always be undone.
 const REVEAL = "opacity-0 group-hover/row:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100";
-const REVEAL_HEAD = "opacity-0 group-hover/table:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100";
 
 /** Sticky-header table with pagination and row selection. Rows arrive already searched and filtered. */
 export function DataTable<T>({
@@ -98,16 +99,16 @@ export function DataTable<T>({
           </div>
         </div>
       ) : null}
-      <div className="group/table min-h-0 flex-1 overflow-auto">
+      <div className="min-h-0 flex-1 overflow-auto">
         <table className="w-full min-w-max border-separate border-spacing-0 text-sm">
           <thead>
             <tr>
               {selectable ? (
-                <th scope="col" className="sticky top-0 z-10 w-10 bg-card py-2.5 pl-3 shadow-[0_1px_0_var(--input)]">
+                <th scope="col" className="sticky top-0 z-10 w-10 bg-card py-2.5 pl-3 text-left align-middle shadow-[0_1px_0_var(--input)]">
                   <input
                     type="checkbox"
                     aria-label="Select all rows on this page"
-                    className={`size-4 cursor-pointer accent-primary ${anyChosen ? "opacity-100" : REVEAL_HEAD}`}
+                    className="block size-4 cursor-pointer accent-primary"
                     checked={visible.length > 0 && pageChosen === visible.length}
                     ref={(el) => {
                       if (el) el.indeterminate = pageChosen > 0 && pageChosen < visible.length;
@@ -143,19 +144,26 @@ export function DataTable<T>({
                 return (
                   <tr
                     key={key}
-                    onClick={onRowClick ? () => onRowClick(row) : undefined}
+                    onClick={
+                      selectable || onRowClick
+                        ? () => {
+                            if (selectable) toggle(row);
+                            onRowClick?.(row, selectable ? !checked : false);
+                          }
+                        : undefined
+                    }
                     aria-selected={selectedKey === key}
                     data-checked={checked}
-                    className={`group/row hover:bg-accent/60 aria-selected:bg-accent data-[checked=true]:bg-accent/70 ${onRowClick ? "cursor-pointer" : ""}`}
+                    className={`group/row cursor-pointer hover:bg-accent/60 aria-selected:bg-accent data-[checked=true]:bg-accent/70`}
                   >
                     {selectable ? (
-                      <td className="w-10 py-2.5 pl-3 align-middle" onClick={(event) => event.stopPropagation()}>
+                      <td className="w-10 py-2.5 pl-3 text-left align-middle">
                         <input
                           type="checkbox"
                           aria-label="Select row"
-                          className={`size-4 cursor-pointer accent-primary ${anyChosen || checked ? "opacity-100" : REVEAL}`}
+                          className={`block size-4 cursor-pointer accent-primary ${anyChosen || checked ? "opacity-100" : REVEAL}`}
                           checked={checked}
-                          onChange={() => toggle(row)}
+                          readOnly
                         />
                       </td>
                     ) : null}

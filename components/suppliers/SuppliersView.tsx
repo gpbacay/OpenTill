@@ -171,7 +171,7 @@ export function SuppliersView() {
         rows={rows}
         columns={columns}
         rowKey={(s) => s.id}
-        onRowClick={(s) => setSelectedId((current) => (current === s.id ? null : s.id))}
+        onRowClick={(s, checked) => setSelectedId((current) => (checked ? s.id : current === s.id ? null : current))}
         selectedKey={selectedId}
         bulkActions={(chosen, clear) => (
           <>

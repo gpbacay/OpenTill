@@ -125,7 +125,7 @@ export function ExpensesView() {
         rows={rows}
         columns={columns}
         rowKey={(e) => e.id}
-        onRowClick={(e) => setSelectedId((current) => (current === e.id ? null : e.id))}
+        onRowClick={(e, checked) => setSelectedId((current) => (checked ? e.id : current === e.id ? null : current))}
         selectedKey={selectedId}
         bulkActions={(chosen, clear) => (
           <>

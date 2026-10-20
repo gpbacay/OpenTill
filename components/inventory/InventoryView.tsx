@@ -245,7 +245,7 @@ export function InventoryView() {
           rows={stockRows}
           columns={stockColumns}
           rowKey={(p) => p.id}
-          onRowClick={(p) => setSelectedId((current) => (current === p.id ? null : p.id))}
+          onRowClick={(p, checked) => setSelectedId((current) => (checked ? p.id : current === p.id ? null : current))}
           selectedKey={selectedId}
           resetKey={filtered}
           bulkActions={(chosen, clear) => (
