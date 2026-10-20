@@ -4,10 +4,13 @@ import { useMemo, useState } from "react";
 import { useOps } from "@/contexts/ops-context";
 import { usePos } from "@/contexts/pos-context";
 import { money } from "@/lib/money";
+import { useSearchParams } from "next/navigation";
+import { pickParam } from "@/lib/query";
 import { Product, StockMovement, reorderLevel, stockState } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { DeleteButton, ExportButton } from "@/components/data-table/bulk";
 import { DataTable, type Column } from "@/components/data-table/DataTable";
 import { FilterSelect, SearchBox, StatTile, Toolbar, matches } from "@/components/data-table/controls";
 import { ColumnManager, customColumnDefs, customFieldRows, customText } from "@/components/data-table/custom-columns";
@@ -17,6 +20,7 @@ import { StockDialog, type StockAction } from "./StockDialog";
 
 const STATUS_OPTIONS = [
   { value: "all", label: "All stock" },
+  { value: "restock", label: "Needs restocking" },
   { value: "low", label: "Low" },
   { value: "out", label: "Out" },
   { value: "ok", label: "In stock" },
@@ -33,12 +37,13 @@ const TYPE_OPTIONS = [
 const TYPE_LABEL: Record<string, string> = { RESTOCK: "Restock", SALE: "Sale", ADJUSTMENT: "Adjustment", OPENING: "Opening" };
 
 export function InventoryView() {
-  const { products, activeTenant } = usePos();
+  const { products, activeTenant, handleDeleteProduct } = usePos();
   const { suppliers, movements, columnsFor } = useOps();
+  const params = useSearchParams();
   const [tab, setTab] = useState<"stock" | "history">("stock");
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("all");
-  const [status, setStatus] = useState("all");
+  const [status, setStatus] = useState(() => pickParam(params.get("status"), STATUS_OPTIONS.map((o) => o.value), "all"));
   const [supplier, setSupplier] = useState("all");
   const [type, setType] = useState("all");
   const [productTarget, setProductTarget] = useState<Product | "new" | null>(null);
@@ -67,7 +72,7 @@ export function InventoryView() {
         .filter(
           (p) =>
             (category === "all" || p.category === category) &&
-            (status === "all" || stockState(p) === status) &&
+            (status === "all" || (status === "restock" ? stockState(p) !== "ok" : stockState(p) === status)) &&
             (supplier === "all" || (p.supplierId ?? "") === (supplier === "none" ? "" : supplier)) &&
             matches(query, p.name, p.sku, p.category, supplierName(p.supplierId), customText(p))
         )
@@ -243,6 +248,24 @@ export function InventoryView() {
           onRowClick={(p) => setSelectedId((current) => (current === p.id ? null : p.id))}
           selectedKey={selectedId}
           resetKey={filtered}
+          bulkActions={(chosen, clear) => (
+            <>
+              <ExportButton
+                filename="products.csv"
+                headers={["Name", "SKU", "Category", "Supplier", "Cost", "Price", "In stock", "Warn at", ...customColumns.map((c) => c.label)]}
+                rows={chosen.map((p) => [p.name, p.sku, p.category, supplierName(p.supplierId), p.costPrice ?? 0, p.price, p.stock, reorderLevel(p), ...customColumns.map((c) => p.custom?.[c.id] ?? "")])}
+              />
+              <DeleteButton
+                count={chosen.length}
+                noun="product"
+                onConfirm={() => {
+                  chosen.forEach((p) => handleDeleteProduct(p.id));
+                  if (chosen.some((p) => p.id === selectedId)) setSelectedId(null);
+                  clear();
+                }}
+              />
+            </>
+          )}
           empty={catalog.length === 0 ? "No products yet. Add your first one." : "Nothing matches those filters."}
         />
       ) : (
@@ -251,6 +274,13 @@ export function InventoryView() {
           columns={historyColumns}
           rowKey={(m) => m.id}
           resetKey={filtered}
+          bulkActions={(chosen) => (
+            <ExportButton
+              filename="stock-history.csv"
+              headers={["When", "Product", "Type", "Change", "Cost each", "Supplier", "Note"]}
+              rows={chosen.map((m) => [new Date(m.date).toLocaleString(), m.productName, TYPE_LABEL[m.type] ?? m.type, m.quantity, m.unitCost, supplierName(m.supplierId), m.note])}
+            />
+          )}
           empty="No stock changes yet."
         />
       )}

@@ -1,0 +1,74 @@
+[
+  {
+    "category": "Rent",
+    "description": "Monthly shop rent",
+    "amount": 18000,
+    "timesPerMonth": 1
+  },
+  {
+    "category": "Utilities",
+    "description": "Electricity bill",
+    "amount": 4200,
+    "timesPerMonth": 0
+  },
+  {
+    "category": "Utilities",
+    "description": "Water bill",
+    "amount": 650,
+    "timesPerMonth": 0
+  },
+  {
+    "category": "Utilities",
+    "description": "Internet",
+    "amount": 1599,
+    "timesPerMonth": 0
+  },
+  {
+    "category": "Salaries",
+    "description": "Cashier salary (Jun)",
+    "amount": 9500,
+    "timesPerMonth": 1
+  },
+  {
+    "category": "Salaries",
+    "description": "Helper salary",
+    "amount": 8000,
+    "timesPerMonth": 1
+  },
+  {
+    "category": "Transport",
+    "description": "Delivery fuel",
+    "amount": 800,
+    "timesPerMonth": 3
+  },
+  {
+    "category": "Supplies",
+    "description": "Receipt paper rolls",
+    "amount": 450,
+    "timesPerMonth": 1
+  },
+  {
+    "category": "Maintenance",
+    "description": "Signage repair",
+    "amount": 1200,
+    "timesPerMonth": 1
+  },
+  {
+    "category": "Marketing",
+    "description": "Facebook page boost",
+    "amount": 500,
+    "timesPerMonth": 2
+  },
+  {
+    "category": "Supplies",
+    "description": "Plastic bags & cleaning",
+    "amount": 380,
+    "timesPerMonth": 4
+  },
+  {
+    "category": "Transport",
+    "description": "Jeep fare to supplier",
+    "amount": 120,
+    "timesPerMonth": 6
+  }
+]

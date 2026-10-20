@@ -1,0 +1,482 @@
+[
+  {
+    "name": "Engine Oil 10W-40 1L",
+    "category": "Oils & Fluids",
+    "sku": "OIL-1040-1L",
+    "price": 285,
+    "stock": 48,
+    "supplier": "motul",
+    "custom": {
+      "brand": "Motul",
+      "shelf": "A1"
+    }
+  },
+  {
+    "name": "Engine Oil 20W-50 1L",
+    "category": "Oils & Fluids",
+    "sku": "OIL-2050-1L",
+    "price": 260,
+    "stock": 36,
+    "supplier": "motul",
+    "custom": {
+      "brand": "Motul",
+      "shelf": "A1"
+    }
+  },
+  {
+    "name": "Gear Oil 80W-90 120ml",
+    "category": "Oils & Fluids",
+    "sku": "OIL-GEAR-120",
+    "price": 85,
+    "stock": 60,
+    "supplier": "motul",
+    "custom": {
+      "brand": "Motul",
+      "shelf": "A2"
+    }
+  },
+  {
+    "name": "Brake Fluid DOT3 250ml",
+    "category": "Oils & Fluids",
+    "sku": "FLD-DOT3-250",
+    "price": 150,
+    "stock": 22,
+    "supplier": "motul",
+    "custom": {
+      "brand": "Prestone",
+      "shelf": "A2"
+    }
+  },
+  {
+    "name": "Coolant 1L",
+    "category": "Oils & Fluids",
+    "sku": "FLD-COOL-1L",
+    "price": 180,
+    "stock": 14,
+    "supplier": "motul",
+    "custom": {
+      "brand": "Prestone",
+      "shelf": "A2"
+    }
+  },
+  {
+    "name": "Spark Plug NGK CPR8EA-9",
+    "category": "Engine",
+    "sku": "ENG-NGK-CPR8",
+    "price": 195,
+    "stock": 40,
+    "supplier": "ngk",
+    "custom": {
+      "brand": "NGK",
+      "shelf": "B1"
+    }
+  },
+  {
+    "name": "Spark Plug NGK C7HSA",
+    "category": "Engine",
+    "sku": "ENG-NGK-C7HSA",
+    "price": 120,
+    "stock": 55,
+    "supplier": "ngk",
+    "custom": {
+      "brand": "NGK",
+      "shelf": "B1"
+    }
+  },
+  {
+    "name": "Air Filter Mio i125",
+    "category": "Engine",
+    "sku": "ENG-AF-MIO125",
+    "price": 220,
+    "stock": 18,
+    "supplier": "yamaha",
+    "custom": {
+      "brand": "Yamaha",
+      "shelf": "B2"
+    }
+  },
+  {
+    "name": "Air Filter Click 125",
+    "category": "Engine",
+    "sku": "ENG-AF-CLK125",
+    "price": 240,
+    "stock": 4,
+    "supplier": "honda",
+    "custom": {
+      "brand": "Honda",
+      "shelf": "B2"
+    }
+  },
+  {
+    "name": "Oil Filter Universal",
+    "category": "Engine",
+    "sku": "ENG-OF-UNI",
+    "price": 140,
+    "stock": 30,
+    "supplier": "honda",
+    "custom": {
+      "brand": "Hiflo",
+      "shelf": "B2"
+    }
+  },
+  {
+    "name": "Piston Kit 53mm",
+    "category": "Engine",
+    "sku": "ENG-PK-53",
+    "price": 1450,
+    "stock": 6,
+    "supplier": "yamaha",
+    "custom": {
+      "brand": "Yamaha",
+      "shelf": "B3"
+    }
+  },
+  {
+    "name": "Gasket Set Raider 150",
+    "category": "Engine",
+    "sku": "ENG-GS-RDR150",
+    "price": 680,
+    "stock": 9,
+    "supplier": "honda",
+    "custom": {
+      "brand": "Suzuki",
+      "shelf": "B3"
+    }
+  },
+  {
+    "name": "Brake Pad Front Mio",
+    "category": "Brakes",
+    "sku": "BRK-BP-MIOF",
+    "price": 320,
+    "stock": 25,
+    "supplier": "yamaha",
+    "custom": {
+      "brand": "Yamaha",
+      "shelf": "C1"
+    }
+  },
+  {
+    "name": "Brake Pad Rear Click",
+    "category": "Brakes",
+    "sku": "BRK-BP-CLKR",
+    "price": 290,
+    "stock": 3,
+    "supplier": "honda",
+    "custom": {
+      "brand": "Honda",
+      "shelf": "C1"
+    }
+  },
+  {
+    "name": "Brake Shoe Rear Smash",
+    "category": "Brakes",
+    "sku": "BRK-BS-SMSH",
+    "price": 210,
+    "stock": 17,
+    "supplier": "honda",
+    "custom": {
+      "brand": "Suzuki",
+      "shelf": "C1"
+    }
+  },
+  {
+    "name": "Brake Disc 220mm",
+    "category": "Brakes",
+    "sku": "BRK-DISC-220",
+    "price": 1250,
+    "stock": 5,
+    "supplier": "kalye",
+    "custom": {
+      "brand": "RCB",
+      "shelf": "C2"
+    }
+  },
+  {
+    "name": "Brake Lever Universal",
+    "category": "Brakes",
+    "sku": "BRK-LVR-UNI",
+    "price": 175,
+    "stock": 20,
+    "supplier": "kalye",
+    "custom": {
+      "brand": "RCB",
+      "shelf": "C2"
+    }
+  },
+  {
+    "name": "Drive Chain 428H-120L",
+    "category": "Drivetrain",
+    "sku": "DRV-CH-428-120",
+    "price": 780,
+    "stock": 12,
+    "supplier": "honda",
+    "custom": {
+      "brand": "DID",
+      "shelf": "D1"
+    }
+  },
+  {
+    "name": "Drive Chain 520-120L",
+    "category": "Drivetrain",
+    "sku": "DRV-CH-520-120",
+    "price": 1650,
+    "stock": 7,
+    "supplier": "honda",
+    "custom": {
+      "brand": "DID",
+      "shelf": "D1"
+    }
+  },
+  {
+    "name": "Sprocket Set Raider 150",
+    "category": "Drivetrain",
+    "sku": "DRV-SP-RDR",
+    "price": 1100,
+    "stock": 8,
+    "supplier": "honda",
+    "custom": {
+      "brand": "Suzuki",
+      "shelf": "D1"
+    }
+  },
+  {
+    "name": "CVT Belt Mio i125",
+    "category": "Drivetrain",
+    "sku": "DRV-BELT-MIO",
+    "price": 650,
+    "stock": 11,
+    "supplier": "yamaha",
+    "custom": {
+      "brand": "Yamaha",
+      "shelf": "D2"
+    }
+  },
+  {
+    "name": "Clutch Lining Set",
+    "category": "Drivetrain",
+    "sku": "DRV-CL-SET",
+    "price": 540,
+    "stock": 0,
+    "supplier": "honda",
+    "custom": {
+      "brand": "Honda",
+      "shelf": "D2"
+    }
+  },
+  {
+    "name": "Front Tire 70/90-17",
+    "category": "Tires & Wheels",
+    "sku": "TIR-F-709017",
+    "price": 1350,
+    "stock": 10,
+    "supplier": "kalye",
+    "custom": {
+      "brand": "Pirelli",
+      "shelf": "E1"
+    }
+  },
+  {
+    "name": "Rear Tire 80/90-17",
+    "category": "Tires & Wheels",
+    "sku": "TIR-R-809017",
+    "price": 1580,
+    "stock": 9,
+    "supplier": "kalye",
+    "custom": {
+      "brand": "Pirelli",
+      "shelf": "E1"
+    }
+  },
+  {
+    "name": "Inner Tube 17in",
+    "category": "Tires & Wheels",
+    "sku": "TIR-TUBE-17",
+    "price": 195,
+    "stock": 34,
+    "supplier": "kalye",
+    "custom": {
+      "brand": "Swallow",
+      "shelf": "E2"
+    }
+  },
+  {
+    "name": "Tire Valve Stem (pair)",
+    "category": "Tires & Wheels",
+    "sku": "TIR-VLV",
+    "price": 45,
+    "stock": 80,
+    "supplier": "kalye",
+    "custom": {
+      "brand": "Generic",
+      "shelf": "E2"
+    }
+  },
+  {
+    "name": "Battery YTX5L-BS",
+    "category": "Electrical",
+    "sku": "ELC-BAT-YTX5L",
+    "price": 1250,
+    "stock": 8,
+    "supplier": "honda",
+    "custom": {
+      "brand": "Motolite",
+      "shelf": "F1"
+    }
+  },
+  {
+    "name": "Battery 12N7A",
+    "category": "Electrical",
+    "sku": "ELC-BAT-12N7A",
+    "price": 980,
+    "stock": 2,
+    "supplier": "honda",
+    "custom": {
+      "brand": "Motolite",
+      "shelf": "F1"
+    }
+  },
+  {
+    "name": "LED Headlight H4",
+    "category": "Electrical",
+    "sku": "ELC-LED-H4",
+    "price": 560,
+    "stock": 15,
+    "supplier": "kalye",
+    "custom": {
+      "brand": "Osram",
+      "shelf": "F2"
+    }
+  },
+  {
+    "name": "Turn Signal Set LED",
+    "category": "Electrical",
+    "sku": "ELC-TS-LED",
+    "price": 240,
+    "stock": 26,
+    "supplier": "kalye",
+    "custom": {
+      "brand": "Generic",
+      "shelf": "F2"
+    }
+  },
+  {
+    "name": "Horn 12V",
+    "category": "Electrical",
+    "sku": "ELC-HORN-12V",
+    "price": 180,
+    "stock": 19,
+    "supplier": "kalye",
+    "custom": {
+      "brand": "Generic",
+      "shelf": "F2"
+    }
+  },
+  {
+    "name": "Rectifier Regulator Mio",
+    "category": "Electrical",
+    "sku": "ELC-RR-MIO",
+    "price": 690,
+    "stock": 6,
+    "supplier": "yamaha",
+    "custom": {
+      "brand": "Yamaha",
+      "shelf": "F3"
+    }
+  },
+  {
+    "name": "Side Mirror Pair",
+    "category": "Accessories",
+    "sku": "ACC-MIR-PR",
+    "price": 260,
+    "stock": 28,
+    "supplier": "kalye",
+    "custom": {
+      "brand": "Generic",
+      "shelf": "G1"
+    }
+  },
+  {
+    "name": "Handle Grip Rubber",
+    "category": "Accessories",
+    "sku": "ACC-GRIP",
+    "price": 130,
+    "stock": 32,
+    "supplier": "kalye",
+    "custom": {
+      "brand": "Domino",
+      "shelf": "G1"
+    }
+  },
+  {
+    "name": "Helmet Half-Face",
+    "category": "Accessories",
+    "sku": "ACC-HLM-HF",
+    "price": 850,
+    "stock": 14,
+    "supplier": "kalye",
+    "custom": {
+      "brand": "MT Helmets",
+      "shelf": "G2"
+    }
+  },
+  {
+    "name": "Phone Holder Handlebar",
+    "category": "Accessories",
+    "sku": "ACC-PH-HOLD",
+    "price": 320,
+    "stock": 21,
+    "supplier": "kalye",
+    "custom": {
+      "brand": "Generic",
+      "shelf": "G2"
+    }
+  },
+  {
+    "name": "Chain Lube 150ml",
+    "category": "Accessories",
+    "sku": "ACC-LUBE-150",
+    "price": 165,
+    "stock": 44,
+    "supplier": "motul",
+    "custom": {
+      "brand": "Motul",
+      "shelf": "G1"
+    }
+  },
+  {
+    "name": "Throttle Cable",
+    "category": "Cables",
+    "sku": "CBL-THR",
+    "price": 110,
+    "stock": 23,
+    "supplier": "kalye",
+    "custom": {
+      "brand": "Generic",
+      "shelf": "H1"
+    }
+  },
+  {
+    "name": "Clutch Cable",
+    "category": "Cables",
+    "sku": "CBL-CLT",
+    "price": 120,
+    "stock": 1,
+    "supplier": "kalye",
+    "custom": {
+      "brand": "Generic",
+      "shelf": "H1"
+    }
+  },
+  {
+    "name": "Speedometer Cable",
+    "category": "Cables",
+    "sku": "CBL-SPD",
+    "price": 135,
+    "stock": 16,
+    "supplier": "kalye",
+    "custom": {
+      "brand": "Generic",
+      "shelf": "H1"
+    }
+  }
+]

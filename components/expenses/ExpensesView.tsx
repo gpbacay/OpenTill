@@ -4,10 +4,13 @@ import { useMemo, useState } from "react";
 import { useOps } from "@/contexts/ops-context";
 import { usePos } from "@/contexts/pos-context";
 import { money } from "@/lib/money";
-import { PERIOD_OPTIONS, inPeriod } from "@/lib/periods";
+import { useSearchParams } from "next/navigation";
+import { inPeriod, inRange, rangeFromParams } from "@/lib/periods";
 import { Expense } from "@/lib/types";
 import { Button } from "@/components/ui/button";
+import { DeleteButton, ExportButton } from "@/components/data-table/bulk";
 import { DataTable, type Column } from "@/components/data-table/DataTable";
+import { DateRangeFilter } from "@/components/data-table/DateRangeFilter";
 import { FilterSelect, SearchBox, StatTile, Toolbar, matches } from "@/components/data-table/controls";
 import { ColumnManager, customColumnDefs, customFieldRows, customText } from "@/components/data-table/custom-columns";
 import { DetailPanel, Fields, SplitView } from "@/components/data-table/DetailPanel";
@@ -17,10 +20,11 @@ const PAY_LABEL = { CASH: "Cash", CARD: "Card", MOBILE_WALLET: "Wallet" } as con
 
 export function ExpensesView() {
   const { activeTenant, tenantSyncedOrders } = usePos();
-  const { expenses, suppliers, columnsFor } = useOps();
+  const { expenses, suppliers, columnsFor, deleteExpense } = useOps();
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("all");
-  const [period, setPeriod] = useState("month");
+  const params = useSearchParams();
+  const [range, setRange] = useState(() => rangeFromParams(params, "month"));
   const [supplier, setSupplier] = useState("all");
   const [target, setTarget] = useState<Expense | "new" | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -33,14 +37,14 @@ export function ExpensesView() {
       expenses
         .filter(
           (e) =>
-            inPeriod(e.date, period) &&
+            inRange(e.date, range) &&
             (category === "all" || e.category === category) &&
             (supplier === "all" || (e.supplierId ?? "") === (supplier === "none" ? "" : supplier)) &&
             matches(query, e.description, e.category, supplierName(e.supplierId), customText(e))
         )
         .sort((a, b) => b.date.localeCompare(a.date)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [expenses, period, category, supplier, query, suppliers]
+    [expenses, range, category, supplier, query, suppliers]
   );
 
   const month = useMemo(() => {
@@ -103,7 +107,7 @@ export function ExpensesView() {
       </div>
       <Toolbar>
         <SearchBox value={query} onChange={setQuery} placeholder="Search expenses…" />
-        <FilterSelect label="Period" value={period} onChange={setPeriod} options={PERIOD_OPTIONS} />
+        <DateRangeFilter value={range} onChange={setRange} />
         <FilterSelect label="Category" value={category} onChange={setCategory} options={[{ value: "all", label: "All categories" }, ...categories.map((c) => ({ value: c, label: c }))]} />
         <FilterSelect
           label="Supplier"
@@ -123,7 +127,26 @@ export function ExpensesView() {
         rowKey={(e) => e.id}
         onRowClick={(e) => setSelectedId((current) => (current === e.id ? null : e.id))}
         selectedKey={selectedId}
-        resetKey={`${query}|${period}|${category}|${supplier}`}
+        bulkActions={(chosen, clear) => (
+          <>
+            <span className="text-muted-foreground">Total {money(currency, chosen.reduce((sum, e) => sum + e.amount, 0))}</span>
+            <ExportButton
+              filename="expenses.csv"
+              headers={["Date", "Category", "Description", "Supplier", "Paid with", "Amount", ...columnsFor("expenses").map((c) => c.label)]}
+              rows={chosen.map((e) => [new Date(e.date).toLocaleDateString(), e.category, e.description, supplierName(e.supplierId), PAY_LABEL[e.paymentMethod] ?? e.paymentMethod, e.amount, ...columnsFor("expenses").map((c) => e.custom?.[c.id] ?? "")])}
+            />
+            <DeleteButton
+              count={chosen.length}
+              noun="expense"
+              onConfirm={() => {
+                chosen.forEach((e) => deleteExpense(e.id));
+                if (chosen.some((e) => e.id === selectedId)) setSelectedId(null);
+                clear();
+              }}
+            />
+          </>
+        )}
+        resetKey={`${query}|${range.from}|${range.to}|${category}|${supplier}`}
         empty={expenses.length === 0 ? "No expenses yet. Add rent, bills and anything else you pay for." : "Nothing matches those filters."}
       />
       </SplitView>

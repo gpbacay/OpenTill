@@ -12,7 +12,6 @@ import React, {
 import { useRouter } from "next/navigation";
 import { Tenant, Product, Order, OrderItem, HeldCart, StockMovement } from "@/lib/types";
 import { subscribe } from "@/lib/realtime";
-import { stripDemoData } from "@/lib/demo";
 import { writeLocalSession } from "@/lib/local-auth";
 
 export interface CartItem {
@@ -136,11 +135,11 @@ export function PosProvider({
   // Load this account's store after mount. Theme stays on the device.
   useEffect(() => {
     const key = (name: string) => storeKey(userId, name);
-    const stored = stripDemoData({
-      tenants: readStorage(key("tenants"), []),
-      products: readStorage(key("products"), []),
-      orders: readStorage(key("orders"), []),
-    });
+    const stored = {
+      tenants: readStorage<Tenant[]>(key("tenants"), []),
+      products: readStorage<Product[]>(key("products"), []),
+      orders: readStorage<Order[]>(key("orders"), []),
+    };
     const savedTenantId = readStorage(key("active_tenant_id"), "");
     const nextTenantId = stored.tenants.some((tenant) => tenant.id === savedTenantId)
       ? savedTenantId
@@ -149,11 +148,7 @@ export function PosProvider({
     setProducts(stored.products);
     setSyncedOrders(stored.orders);
     setActiveTenantId(nextTenantId);
-    setOfflineQueue(
-      readStorage<{ order: Order; items: OrderItem[] }[]>(key("offline_queue"), []).filter(
-        (entry) => entry.order.id !== "ord-1001" && entry.order.id !== "ord-1002"
-      )
-    );
+    setOfflineQueue(readStorage<{ order: Order; items: OrderItem[] }[]>(key("offline_queue"), []));
     setHeldCarts(readStorage(key("held_carts"), []));
     setIsDarkMode(readStorage("opentill_theme_dark", true));
     outboxRef.current = readStorage(key("outbox"), EMPTY_OUTBOX);

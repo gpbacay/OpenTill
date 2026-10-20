@@ -1,0 +1,26 @@
+[
+  {
+    "key": "brand",
+    "tableName": "products",
+    "label": "Brand",
+    "type": "text"
+  },
+  {
+    "key": "shelf",
+    "tableName": "products",
+    "label": "Shelf",
+    "type": "text"
+  },
+  {
+    "key": "terms",
+    "tableName": "suppliers",
+    "label": "Payment terms",
+    "type": "text"
+  },
+  {
+    "key": "receipt",
+    "tableName": "expenses",
+    "label": "Receipt no.",
+    "type": "text"
+  }
+]

@@ -14,6 +14,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { useAuth } from "@/contexts/auth-context";
 import { usePos } from "@/contexts/pos-context";
+import { useRealtimeStatus } from "@/lib/realtime";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -36,7 +37,7 @@ import {
 
 // `primary` items sit in the phone's bottom bar; the rest live in the store menu on small screens.
 export const MENU_ITEMS = [
-  { id: "home", href: "/", label: "Home", icon: Home01Icon, primary: true },
+  { id: "home", href: "/", label: "Dashboard", icon: Home01Icon, primary: true },
   { id: "orders", href: "/orders", label: "Register", icon: ShoppingCart01Icon, primary: true },
   { id: "records", href: "/records", label: "Sales", icon: Invoice01Icon, primary: true },
   { id: "inventory", href: "/inventory", label: "Inventory", icon: Package01Icon, primary: true },
@@ -53,7 +54,7 @@ export function sectionFromPath(pathname: string) {
 
 export function titleFromPath(pathname: string) {
   const section = sectionFromPath(pathname);
-  return MENU_ITEMS.find((item) => item.id === section)?.label ?? (section === "account" ? "Account" : "Home");
+  return MENU_ITEMS.find((item) => item.id === section)?.label ?? (section === "account" ? "Account" : "Dashboard");
 }
 
 function initials(name: string) {
@@ -69,17 +70,31 @@ export function StoreMenu() {
   const router = useRouter();
   const { user } = useAuth();
   const { activeTenant, tenants, handleSwitchTenant } = usePos();
+  const status = useRealtimeStatus();
   if (!activeTenant || !user) return null;
+  const dot = {
+    live: { color: "bg-primary", label: "Online: updates arrive instantly" },
+    polling: { color: "bg-amber-400", label: "Online: live updates unavailable, refreshing every 20 seconds" },
+    offline: { color: "bg-destructive", label: "Offline: changes are saved on this device" },
+  }[status];
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button className="flex w-full items-center gap-3 rounded-md px-2 py-2 text-left hover:bg-sidebar-accent">
-          <Avatar className="size-8">
-            <AvatarFallback className="bg-primary text-xs font-semibold text-primary-foreground">
-              {initials(user.name)}
-            </AvatarFallback>
-          </Avatar>
+          <span className="relative shrink-0">
+            <Avatar className="size-8">
+              <AvatarFallback className="bg-primary text-xs font-semibold text-primary-foreground">
+                {initials(user.name)}
+              </AvatarFallback>
+            </Avatar>
+            <span
+              role="status"
+              aria-label={dot.label}
+              title={dot.label}
+              className={`absolute -top-0.5 -right-0.5 size-3 rounded-full ring-2 ring-sidebar ${dot.color}`}
+            />
+          </span>
           <span className="min-w-0">
             <span className="block truncate text-sm font-medium text-foreground">
               {user.name}

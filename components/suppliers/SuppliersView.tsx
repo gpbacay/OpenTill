@@ -7,6 +7,7 @@ import { money } from "@/lib/money";
 import { Supplier } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { DeleteButton, ExportButton } from "@/components/data-table/bulk";
 import { DataTable, type Column } from "@/components/data-table/DataTable";
 import { FilterSelect, SearchBox, StatTile, Toolbar, matches } from "@/components/data-table/controls";
 import { ColumnManager, customColumnDefs, customFieldRows, customText } from "@/components/data-table/custom-columns";
@@ -21,7 +22,7 @@ const STATUS = [
 
 export function SuppliersView() {
   const { products, activeTenant } = usePos();
-  const { suppliers, movements, expenses, columnsFor } = useOps();
+  const { suppliers, movements, expenses, columnsFor, deleteSupplier } = useOps();
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("all");
   const [target, setTarget] = useState<Supplier | "new" | null>(null);
@@ -172,6 +173,24 @@ export function SuppliersView() {
         rowKey={(s) => s.id}
         onRowClick={(s) => setSelectedId((current) => (current === s.id ? null : s.id))}
         selectedKey={selectedId}
+        bulkActions={(chosen, clear) => (
+          <>
+            <ExportButton
+              filename="suppliers.csv"
+              headers={["Name", "Contact", "Phone", "Email", "Address", "Status", ...columnsFor("suppliers").map((c) => c.label)]}
+              rows={chosen.map((s) => [s.name, s.contactPerson, s.phone, s.email, s.address, s.active ? "Active" : "Inactive", ...columnsFor("suppliers").map((c) => s.custom?.[c.id] ?? "")])}
+            />
+            <DeleteButton
+              count={chosen.length}
+              noun="supplier"
+              onConfirm={() => {
+                chosen.forEach((s) => deleteSupplier(s.id));
+                if (chosen.some((s) => s.id === selectedId)) setSelectedId(null);
+                clear();
+              }}
+            />
+          </>
+        )}
         resetKey={`${query}|${status}`}
         empty={suppliers.length === 0 ? "No suppliers yet. Add the people you buy stock from." : "Nothing matches those filters."}
       />

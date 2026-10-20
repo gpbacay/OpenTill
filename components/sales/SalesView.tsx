@@ -3,14 +3,17 @@
 import { useMemo, useState } from "react";
 import { usePos } from "@/contexts/pos-context";
 import { money } from "@/lib/money";
-import { PERIOD_OPTIONS, inPeriod } from "@/lib/periods";
+import { inRange, rangeFromParams } from "@/lib/periods";
+import { useSearchParams } from "next/navigation";
 import { Order } from "@/lib/types";
 import { DetailPanel, Fields, SplitView } from "@/components/data-table/DetailPanel";
 import { AnalyticsPanel } from "@/components/AnalyticsPanel";
 import { PrintReceipt } from "@/components/PrintReceipt";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { DeleteButton, ExportButton } from "@/components/data-table/bulk";
 import { DataTable, type Column } from "@/components/data-table/DataTable";
+import { DateRangeFilter } from "@/components/data-table/DateRangeFilter";
 import { FilterSelect, SearchBox, StatTile, Toolbar, matches } from "@/components/data-table/controls";
 
 const STATUS = [
@@ -29,12 +32,13 @@ const PAY_LABEL: Record<string, string> = { CASH: "Cash", CARD: "Card", MOBILE_W
 
 export function SalesView() {
   const { activeTenant, tenantSyncedOrders } = usePos();
+  const params = useSearchParams();
   const [tab, setTab] = useState<"sales" | "reports">("sales");
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("all");
   const [payment, setPayment] = useState("all");
   const [cashier, setCashier] = useState("all");
-  const [period, setPeriod] = useState("month");
+  const [range, setRange] = useState(() => rangeFromParams(params, "month"));
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const currency = activeTenant?.currency ?? "PHP";
 
@@ -48,14 +52,14 @@ export function SalesView() {
       tenantSyncedOrders
         .filter(
           (o) =>
-            inPeriod(o.date, period) &&
+            inRange(o.date, range) &&
             (status === "all" || o.status === status) &&
             (payment === "all" || o.paymentMethod === payment) &&
             (cashier === "all" || o.cashierName === cashier) &&
             matches(query, o.id, o.customerName, o.cashierName, ...(o.items ?? []).map((i) => i.name))
         )
         .sort((a, b) => b.date.localeCompare(a.date)),
-    [tenantSyncedOrders, period, status, payment, cashier, query]
+    [tenantSyncedOrders, range, status, payment, cashier, query]
   );
 
   const totals = useMemo(() => {
@@ -140,7 +144,7 @@ export function SalesView() {
           </div>
           <Toolbar>
             <SearchBox value={query} onChange={setQuery} placeholder="Search customer, cashier, item…" />
-            <FilterSelect label="Period" value={period} onChange={setPeriod} options={PERIOD_OPTIONS} />
+            <DateRangeFilter value={range} onChange={setRange} />
             <FilterSelect label="Status" value={status} onChange={setStatus} options={STATUS} />
             <FilterSelect label="Payment" value={payment} onChange={setPayment} options={PAYMENT} />
             <FilterSelect label="Cashier" value={cashier} onChange={setCashier} options={[{ value: "all", label: "All cashiers" }, ...cashiers.map((c) => ({ value: c, label: c }))]} />
@@ -151,7 +155,17 @@ export function SalesView() {
             rowKey={(o) => o.id}
             onRowClick={(o) => setSelectedId((current) => (current === o.id ? null : o.id))}
             selectedKey={selectedId}
-            resetKey={`${query}|${period}|${status}|${payment}|${cashier}`}
+            bulkActions={(chosen) => (
+              <>
+                <span className="text-muted-foreground">Total {money(currency, chosen.filter((o) => o.status !== "FAILED").reduce((sum, o) => sum + o.total, 0))}</span>
+                <ExportButton
+                  filename="sales.csv"
+                  headers={["When", "Receipt", "Customer", "Cashier", "Payment", "Discount", "Total", "Status"]}
+                  rows={chosen.map((o) => [new Date(o.date).toLocaleString(), o.id, o.customerName ?? "Walk-in", o.cashierName ?? "", PAY_LABEL[o.paymentMethod] ?? o.paymentMethod, o.discountAmount ?? 0, o.total, o.status])}
+                />
+              </>
+            )}
+            resetKey={`${query}|${range.from}|${range.to}|${status}|${payment}|${cashier}`}
             empty={tenantSyncedOrders.length === 0 ? "Completed checkouts show up here." : "Nothing matches those filters."}
           />
         </>

@@ -5,6 +5,7 @@ A multi-tenant, offline-first Point of Sale system for retail operations: regist
 ## Features
 
 - **Register:** Ring up sales from a product catalog. Leave "Cash received" empty for an exact payment and the cashier defaults to the signed-in user. Held carts and receipt printing included
+- **Dashboard:** Pick a date range (presets or exact From / To dates) and the sales, expenses, trend chart, recent sales and deliveries all follow it. Each card has an arrow in its corner that opens that page with the same dates
 - **Inventory:** Stock levels with low and out-of-stock warnings, restocks from suppliers, stock adjustments (damage, count corrections) and a full stock history. Stock only moves through logged changes, so the numbers always add up
 - **Sales:** Searchable, filterable sales table (period, status, payment, cashier) with receipts and a Reports tab
 - **Suppliers:** Contacts, what you bought from each and when they last delivered
@@ -12,7 +13,7 @@ A multi-tenant, offline-first Point of Sale system for retail operations: regist
 - **Custom columns:** Add your own columns (for example "Brand" on products) to the Inventory, Suppliers and Expenses tables with the **Columns** button. They appear in the table, the add/edit form and search
 - **Realtime:** Changes show up on every open tab and device within a moment
 - **Offline-first:** Keep working without a connection. Everything is saved on the device and syncs when the API is reachable again
-- **Tables:** Sticky headers, pagination, search and filters everywhere; phone layout with a bottom navigation bar
+- **Tables:** Sticky headers, pagination, search and filters everywhere. Tick rows (a checkbox appears when you hover a row) to export them as CSV or delete them in bulk; phone layout with a bottom navigation bar
 - **Multi-tenant:** Onboard and switch between stores
 
 ## Tech Stack
@@ -45,8 +46,16 @@ A multi-tenant, offline-first Point of Sale system for retail operations: regist
 1. Install dependencies:
    `npm install`
 2. Copy `.env.example` to `.env`. `DATABASE_URL` already points at the local SQLite file.
-3. Generate the Prisma client and create the database file:
+3. Generate the Prisma client and build the database from the migrations in `prisma/migrations/`:
    `npx prisma generate`
-   `npm run db:push`
+   `npm run db:migrate`
 4. Start the app:
    `npm run dev`
+5. Optional, load sample data into a store you already have (see below):
+   `npm run db:seed`
+
+### Database migrations and sample data
+
+- Schema changes are Prisma migrations. Edit `prisma/schema.prisma`, then run `npm run db:migrate:dev -- --name what_changed` to create and apply one. `npm run db:migrate` applies pending migrations (use it on any other machine).
+- Sample data is not hardcoded in the app. `prisma/seed.ts` builds it from the JSON files in `prisma/seed/data/` (suppliers, catalog, expenses, people, custom columns) and writes real rows that every page reads from the database. All dates are generated relative to today, so the dashboard and date filters always have recent history.
+- `npm run db:seed` loads it into `test1`'s "JRS MOTOR PARTS". Pick another store with `npm run db:seed -- --user alice --store "My Shop" --days 90` (the store is created if it does not exist). Running it again replaces that store's earlier sample rows and leaves rows you entered yourself alone.

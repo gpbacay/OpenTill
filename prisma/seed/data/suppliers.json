@@ -1,0 +1,74 @@
+[
+  {
+    "key": "motul",
+    "name": "Motul Philippines Distribution",
+    "contactPerson": "Carlo Mendoza",
+    "phone": "0917 555 0101",
+    "email": "orders@motul-dist.example",
+    "address": "Quezon City",
+    "active": true,
+    "custom": {
+      "terms": "Net 30"
+    }
+  },
+  {
+    "key": "ngk",
+    "name": "NGK Spark Plug Trading",
+    "contactPerson": "Liza Tan",
+    "phone": "0918 555 0102",
+    "email": "sales@ngk-trading.example",
+    "address": "Mandaluyong",
+    "active": true,
+    "custom": {
+      "terms": "Net 30"
+    }
+  },
+  {
+    "key": "yamaha",
+    "name": "Yamaha Genuine Parts Hub",
+    "contactPerson": "Ramon Dizon",
+    "phone": "0919 555 0103",
+    "email": "parts@yamaha-hub.example",
+    "address": "Pasig",
+    "active": true,
+    "custom": {
+      "terms": "Net 15"
+    }
+  },
+  {
+    "key": "honda",
+    "name": "Honda Parts Wholesale",
+    "contactPerson": "Joy Bautista",
+    "phone": "0920 555 0104",
+    "email": "wholesale@honda-parts.example",
+    "address": "Caloocan",
+    "active": true,
+    "custom": {
+      "terms": "Net 15"
+    }
+  },
+  {
+    "key": "kalye",
+    "name": "Kalye Moto Accessories",
+    "contactPerson": "Boy Santos",
+    "phone": "0921 555 0105",
+    "email": "kalyemoto@example.com",
+    "address": "Divisoria, Manila",
+    "active": true,
+    "custom": {
+      "terms": "COD"
+    }
+  },
+  {
+    "key": "olddepot",
+    "name": "Old Tire Depot (inactive)",
+    "contactPerson": "",
+    "phone": "0922 555 0106",
+    "email": "",
+    "address": "Valenzuela",
+    "active": false,
+    "custom": {
+      "terms": "COD"
+    }
+  }
+]
