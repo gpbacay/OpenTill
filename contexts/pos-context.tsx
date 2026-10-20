@@ -10,7 +10,8 @@ import React, {
   type ReactNode,
 } from "react";
 import { useRouter } from "next/navigation";
-import { Tenant, Product, Order, OrderItem, HeldCart } from "@/lib/types";
+import { Tenant, Product, Order, OrderItem, HeldCart, StockMovement } from "@/lib/types";
+import { subscribe } from "@/lib/realtime";
 import { stripDemoData } from "@/lib/demo";
 import { writeLocalSession } from "@/lib/local-auth";
 
@@ -35,13 +36,9 @@ interface PosContextValue {
   syncProgress: number;
   isDarkMode: boolean;
   mobileRegisterTab: "catalog" | "cart";
-  mobileRecordsTab: "logs" | "analytics";
   mobileMenuOpen: boolean;
-  searchHistory: string;
   setMobileRegisterTab: (tab: "catalog" | "cart") => void;
-  setMobileRecordsTab: (tab: "logs" | "analytics") => void;
   setMobileMenuOpen: (open: boolean) => void;
-  setSearchHistory: (value: string) => void;
   setIsDarkMode: (value: boolean | ((prev: boolean) => boolean)) => void;
   triggerOfflineSync: () => Promise<void>;
   handleAddToCart: (product: Product) => void;
@@ -55,6 +52,7 @@ interface PosContextValue {
   handleAddProduct: (newProduct: Product) => Promise<void>;
   handleUpdateProduct: (updatedProduct: Product) => Promise<void>;
   handleDeleteProduct: (productId: string) => Promise<void>;
+  handleApplyMovement: (movement: StockMovement) => void;
   handleAddTenant: (newTenant: Tenant) => Promise<void>;
   handleSwitchTenant: (tenantId: string) => void;
 }
@@ -123,9 +121,7 @@ export function PosProvider({
   const [syncProgress, setSyncProgress] = useState(0);
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [mobileRegisterTab, setMobileRegisterTab] = useState<"catalog" | "cart">("catalog");
-  const [mobileRecordsTab, setMobileRecordsTab] = useState<"logs" | "analytics">("logs");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [searchHistory, setSearchHistory] = useState("");
   const [cart, setCart] = useState<CartItem[]>([]);
   const offlineQueueRef = useRef(offlineQueue);
   offlineQueueRef.current = offlineQueue;
@@ -386,6 +382,7 @@ export function PosProvider({
             discountPercent: o.discountPercent,
             cashReceived: o.cashReceived,
             changeDue: o.changeDue,
+            items: o.items,
           }));
           setSyncedOrders((local) => {
             const ids = new Set(mapped.map((o) => o.id));
@@ -411,6 +408,7 @@ export function PosProvider({
   useEffect(() => {
     if (!hydrated || !isOnline) return;
     void flushRef.current();
+    return subscribe(["products", "orders"], () => void flushRef.current());
   }, [hydrated, isOnline]);
 
   const triggerOfflineSync = async () => {
@@ -548,7 +546,7 @@ export function PosProvider({
     const saved: Order = isOnline
       ? order
       : { ...order, status: "PENDING_SYNC", isOffline: true, syncedAt: undefined };
-    setSyncedOrders((prev) => [saved, ...prev]);
+    setSyncedOrders((prev) => [{ ...saved, items }, ...prev]);
 
     const queueIt = () => {
       const queued: Order = {
@@ -558,7 +556,7 @@ export function PosProvider({
         syncedAt: undefined,
       };
       setSyncedOrders((prev) =>
-        prev.map((existing) => (existing.id === queued.id ? queued : existing))
+        prev.map((existing) => (existing.id === queued.id ? { ...queued, items } : existing))
       );
       setOfflineQueue((prev) => {
         const next = [
@@ -657,6 +655,28 @@ export function PosProvider({
     }
   };
 
+  // Stock only moves through movements. Apply it locally now; the server applies the same movement once, by id.
+  const handleApplyMovement = (movement: StockMovement) => {
+    setProducts((prev) => {
+      const next = prev.map((product) =>
+        product.id !== movement.productId
+          ? product
+          : {
+              ...product,
+              stock: product.stock + movement.quantity,
+              ...(movement.type === "RESTOCK" || movement.type === "OPENING"
+                ? {
+                    costPrice: movement.unitCost && movement.unitCost > 0 ? movement.unitCost : product.costPrice,
+                    supplierId: movement.supplierId || product.supplierId,
+                  }
+                : {}),
+            }
+      );
+      productsRef.current = next;
+      return next;
+    });
+  };
+
   const handleAddTenant = async (newTenant: Tenant) => {
     setTenants((prev) => {
       const next = [...prev, newTenant];
@@ -711,13 +731,9 @@ export function PosProvider({
     syncProgress,
     isDarkMode,
     mobileRegisterTab,
-    mobileRecordsTab,
     mobileMenuOpen,
-    searchHistory,
     setMobileRegisterTab,
-    setMobileRecordsTab,
     setMobileMenuOpen,
-    setSearchHistory,
     setIsDarkMode,
     triggerOfflineSync,
     handleAddToCart,
@@ -731,6 +747,7 @@ export function PosProvider({
     handleAddProduct,
     handleUpdateProduct,
     handleDeleteProduct,
+    handleApplyMovement,
     handleAddTenant,
     handleSwitchTenant,
   };

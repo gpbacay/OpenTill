@@ -4,12 +4,16 @@ A multi-tenant, offline-first Point of Sale system for retail operations: regist
 
 ## Features
 
-- **Register:** Ring up sales from a product catalog with an active cart, held carts, and receipt printing
-- **Offline-first:** Keep selling without a connection. Sales, catalog edits, and new stores stay on the device and sync to the local database when the register can reach it
-- **Mobile-first:** Phone layout with a bottom navigation bar. Wider screens use the side navigation
-- **Multi-tenant:** Onboard and switch between store tenants from a shared workspace
-- **Products:** Create and manage catalog items per tenant
-- **Analytics & dashboard:** Sales trends, inventory signals, and operational overview in a bento-style dashboard
+- **Register:** Ring up sales from a product catalog. Leave "Cash received" empty for an exact payment and the cashier defaults to the signed-in user. Held carts and receipt printing included
+- **Inventory:** Stock levels with low and out-of-stock warnings, restocks from suppliers, stock adjustments (damage, count corrections) and a full stock history. Stock only moves through logged changes, so the numbers always add up
+- **Sales:** Searchable, filterable sales table (period, status, payment, cashier) with receipts and a Reports tab
+- **Suppliers:** Contacts, what you bought from each and when they last delivered
+- **Expenses:** Track rent, bills and restocks, filter by period, category and supplier, and see what is left after expenses
+- **Custom columns:** Add your own columns (for example "Brand" on products) to the Inventory, Suppliers and Expenses tables with the **Columns** button. They appear in the table, the add/edit form and search
+- **Realtime:** Changes show up on every open tab and device within a moment
+- **Offline-first:** Keep working without a connection. Everything is saved on the device and syncs when the API is reachable again
+- **Tables:** Sticky headers, pagination, search and filters everywhere; phone layout with a bottom navigation bar
+- **Multi-tenant:** Onboard and switch between stores
 
 ## Tech Stack
 
@@ -25,9 +29,14 @@ A multi-tenant, offline-first Point of Sale system for retail operations: regist
 ### Architecture notes
 
 - Locally, Next.js (`:3000`) and the NestJS API (`:3001`) run together via `npm run dev`. Next rewrites `/api/*` to Nest.
-- Domain APIs live under `server/` as Nest modules: **tenants**, **products**, **orders**, plus a shared **database** module that reads and writes the SQLite file through Prisma (`DATABASE_URL`).
-- Schema models live in `prisma/schema.prisma` (Tenant, Product, Order, OrderItem).
-- The register keeps a copy in the browser (`localStorage`). Checkout, catalog edits, and new stores work with no network. When the local API is reachable again, that queue is written to SQLite.
+- **Modular monolith.** One deployable API, split into Nest modules under `server/`. Each module owns its controller, service and Prisma tables, and talks to others only through exported services:
+  `tenants`, `products`, `inventory` (stock ledger), `orders`, `suppliers`, `expenses`, `columns` (custom columns), `realtime` (change feed), `auth`, plus a shared `database` module.
+  Store-scoped CRUD (suppliers, expenses, columns) shares one base class in `server/common/`, so a new module is a table, a `build()` validator and a tiny controller.
+- **Realtime.** Every write publishes `{tenantId, topic}` to `RealtimeService`. `GET /api/events` streams those as Server-Sent Events to the owner's browsers, which re-fetch the affected list.
+- **Graceful degradation.** The browser keeps a local copy of every list plus an outbox of unsent changes (`lib/use-collection.ts`), so every page renders and accepts edits with the API down. If the live stream cannot connect, the app falls back to polling every 20 seconds. If SQLite is unreachable the API serves from an in-memory store. Stock changes are idempotent by id, so replaying the outbox never double counts.
+- **Stock.** `Product.stock` is only changed by stock movements (`OPENING`, `RESTOCK`, `ADJUSTMENT`) and by sales (`SALE`). Each is a row in `StockMovement`.
+- **Tables.** `components/data-table/` holds the shared `DataTable` (sticky header, pagination), search and filter controls and the custom column manager. Lists are searched, filtered and paged in the browser, which is what lets them work offline.
+- Schema models live in `prisma/schema.prisma`.
 
 ## Run Locally
 

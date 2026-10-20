@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Product, Tenant } from "@/lib/types";
+import { Product, Tenant, reorderLevel } from "@/lib/types";
 import { money } from "@/lib/money";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -36,7 +36,8 @@ export function RegisterCatalog({ products, activeTenant, onAddToCart }: Registe
       const matchesQuery =
         !query ||
         product.name.toLowerCase().includes(query) ||
-        product.sku.toLowerCase().includes(query);
+        product.sku.toLowerCase().includes(query) ||
+        Object.values(product.custom ?? {}).some((value) => value.toLowerCase().includes(query));
       const matchesCategory = selectedCategory === "All" || product.category === selectedCategory;
       return matchesQuery && matchesCategory;
     });
@@ -130,7 +131,7 @@ export function RegisterCatalog({ products, activeTenant, onAddToCart }: Registe
                       <span className="block truncate text-sm font-medium">{product.name}</span>
                       <span className="block text-xs text-muted-foreground">
                         {product.sku}
-                        {out ? "  Out of stock" : product.stock < 5 ? `  ${product.stock} left` : ""}
+                        {out ? "  Out of stock" : product.stock <= reorderLevel(product) ? `  ${product.stock} left` : ""}
                       </span>
                     </span>
                     <span className="text-sm tabular-nums">

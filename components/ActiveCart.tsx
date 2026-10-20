@@ -96,11 +96,9 @@ export function ActiveCart({
   const handleCheckoutSubmit = (event: React.FormEvent) => {
     event.preventDefault();
     if (cart.length === 0) return;
-    if (!cashierName.trim()) {
-      setCheckoutError("Enter the cashier name.");
-      return;
-    }
-    const cashReceivedNum = parseFloat(cashReceived);
+    const cashier = cashierName.trim() || user?.name || "Cashier";
+    // Leaving "Cash received" empty means the customer paid the exact amount.
+    const cashReceivedNum = cashReceived.trim() === "" ? total : parseFloat(cashReceived);
     if (paymentMethod === "CASH" && (Number.isNaN(cashReceivedNum) || cashReceivedNum < total)) {
       setCheckoutError(`Cash needs to cover ${money(activeTenant.currency, total)}.`);
       return;
@@ -119,7 +117,7 @@ export function ActiveCart({
       isOffline: !isOnline,
       date: new Date().toISOString(),
       syncedAt: isOnline ? new Date().toISOString() : undefined,
-      cashierName: cashierName.trim(),
+      cashierName: cashier,
       customerName: customerName.trim() || undefined,
       discountAmount,
       discountPercent,
@@ -135,7 +133,7 @@ export function ActiveCart({
       quantity: item.quantity,
     }));
 
-    if (cashierKey) localStorage.setItem(cashierKey, cashierName.trim());
+    if (cashierKey && cashierName.trim()) localStorage.setItem(cashierKey, cashierName.trim());
     onCheckout(order, items);
     setCheckoutError("");
     setReceiptOrder(order);
@@ -284,7 +282,7 @@ export function ActiveCart({
               id="cashier"
               value={cashierName}
               onChange={(event) => setCashierName(event.target.value)}
-              placeholder="Name"
+              placeholder={user?.name ?? "Name"}
             />
           </div>
           <div className="space-y-1">
@@ -337,7 +335,7 @@ export function ActiveCart({
               inputMode="decimal"
               value={cashReceived}
               onChange={(event) => setCashReceived(event.target.value)}
-              placeholder={money(activeTenant.currency, total)}
+              placeholder={`${money(activeTenant.currency, total)} (exact)`}
             />
             <div className="flex flex-wrap gap-2">
               {cashSuggestions.map((amount) => (

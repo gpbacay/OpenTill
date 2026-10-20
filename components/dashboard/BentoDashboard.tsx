@@ -3,7 +3,9 @@
 import { useMemo } from "react";
 import Link from "next/link";
 import { Area, AreaChart, CartesianGrid, XAxis } from "recharts";
-import { Order, Product, Tenant } from "@/lib/types";
+import { Order, Product, Tenant, stockState } from "@/lib/types";
+import { useOps } from "@/contexts/ops-context";
+import { inPeriod } from "@/lib/periods";
 import { money } from "@/lib/money";
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -32,6 +34,7 @@ export default function BentoDashboard({
   orders,
   activeTenant,
 }: BentoDashboardProps) {
+  const { expenses } = useOps();
   const catalog = useMemo(
     () => products.filter((product) => product.tenantId === activeTenant.id),
     [products, activeTenant.id]
@@ -45,7 +48,9 @@ export default function BentoDashboard({
   const todayTotal = sales
     .filter((order) => dayKey(new Date(order.date)) === todayKey)
     .reduce((sum, order) => sum + order.total, 0);
-  const allTotal = sales.reduce((sum, order) => sum + order.total, 0);
+  const monthTotal = sales.filter((order) => inPeriod(order.date, "month")).reduce((sum, order) => sum + order.total, 0);
+  const monthExpenses = expenses.filter((e) => inPeriod(e.date, "month")).reduce((sum, e) => sum + e.amount, 0);
+  const stockValue = catalog.reduce((sum, p) => sum + Math.max(0, p.stock) * (p.costPrice ?? 0), 0);
 
   const week = useMemo(() => {
     return Array.from({ length: 7 }, (_, index) => {
@@ -63,34 +68,51 @@ export default function BentoDashboard({
     });
   }, [sales]);
 
-  const lowStock = catalog.filter((product) => product.stock < 5).slice(0, 5);
-  const recent = sales.slice(0, 6);
+  const lowStockAll = catalog.filter((product) => stockState(product) !== "ok").sort((a, b) => a.stock - b.stock);
+  const lowStock = lowStockAll.slice(0, 6);
+  const recent = useMemo(() => [...sales].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 6), [sales]);
 
   return (
     <div className="flex h-full flex-col gap-4 overflow-y-auto pb-2">
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Card className="border-0 shadow-none">
           <CardHeader className="pb-0">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Today</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Sales today</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold tabular-nums">{money(activeTenant.currency, todayTotal)}</p>
+            <p className="text-2xl font-bold tabular-nums">{money(activeTenant.currency, todayTotal)}</p>
           </CardContent>
         </Card>
         <Card className="border-0 shadow-none">
           <CardHeader className="pb-0">
-            <CardTitle className="text-sm font-medium text-muted-foreground">All sales</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Sales this month</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold tabular-nums">{money(activeTenant.currency, allTotal)}</p>
+            <p className="text-2xl font-bold tabular-nums">{money(activeTenant.currency, monthTotal)}</p>
           </CardContent>
         </Card>
         <Card className="border-0 shadow-none">
           <CardHeader className="pb-0">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Products</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              <Link href="/expenses" className="hover:text-foreground">Expenses this month</Link>
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold tabular-nums">{catalog.length}</p>
+            <p className="text-2xl font-bold tabular-nums">{money(activeTenant.currency, monthExpenses)}</p>
+            <p className={`text-xs tabular-nums ${monthTotal - monthExpenses < 0 ? "text-destructive" : "text-muted-foreground"}`}>
+              {money(activeTenant.currency, monthTotal - monthExpenses)} left after expenses
+            </p>
+          </CardContent>
+        </Card>
+        <Card className="border-0 shadow-none">
+          <CardHeader className="pb-0">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              <Link href="/inventory" className="hover:text-foreground">Stock value</Link>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-bold tabular-nums">{money(activeTenant.currency, stockValue)}</p>
+            <p className="text-xs text-muted-foreground">{catalog.length} products</p>
           </CardContent>
         </Card>
       </div>
@@ -126,7 +148,12 @@ export default function BentoDashboard({
 
         <Card className="border-0 shadow-none">
           <CardHeader>
-            <CardTitle className="text-base">Low stock</CardTitle>
+            <CardTitle className="text-base">Needs restocking{lowStockAll.length > 0 ? ` (${lowStockAll.length})` : ""}</CardTitle>
+            <CardAction>
+              <Link href="/inventory" className="text-sm text-muted-foreground hover:text-foreground">
+                Inventory
+              </Link>
+            </CardAction>
           </CardHeader>
           <CardContent className="space-y-3">
             {lowStock.length === 0 ? (
@@ -136,7 +163,7 @@ export default function BentoDashboard({
                 <div key={product.id} className="flex items-baseline justify-between gap-3">
                   <span className="truncate text-sm">{product.name}</span>
                   <span className="shrink-0 text-sm tabular-nums text-amber-400">
-                    {product.stock} left
+                    {product.stock <= 0 ? "Out" : `${product.stock} left`}
                   </span>
                 </div>
               ))

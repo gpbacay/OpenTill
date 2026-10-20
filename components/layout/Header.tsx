@@ -7,21 +7,14 @@ import { FullScreenIcon, MinimizeScreenIcon } from "@hugeicons/core-free-icons";
 import { usePos } from "@/contexts/pos-context";
 import { Button } from "@/components/ui/button";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import { StoreMenu } from "@/components/layout/Sidebar";
-
-function titleFromPath(pathname: string) {
-  if (pathname.startsWith("/orders")) return "Register";
-  if (pathname.startsWith("/products")) return "Products";
-  if (pathname.startsWith("/records")) return "Sales";
-  if (pathname.startsWith("/settings")) return "Settings";
-  if (pathname.startsWith("/account")) return "Account";
-  return "Home";
-}
+import { StoreMenu, titleFromPath } from "@/components/layout/Sidebar";
+import { useRealtimeStatus } from "@/lib/realtime";
 
 export default function Header() {
   const pathname = usePathname();
   const { isOnline, offlineQueue, isSyncing, triggerOfflineSync, activeTenant } = usePos();
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const live = useRealtimeStatus();
   const queued = offlineQueue.filter((entry) => entry.order.tenantId === activeTenant?.id).length;
 
   useEffect(() => {
@@ -44,8 +37,16 @@ export default function Header() {
       <h1 className="text-lg font-semibold">{titleFromPath(pathname)}</h1>
       <div className="ml-auto flex items-center gap-2">
         {!isOnline ? (
-          <span className="text-sm text-amber-400">Offline</span>
-        ) : null}
+          <span className="text-sm text-amber-400">Offline: changes are saved on this device</span>
+        ) : (
+          <span
+            className="flex items-center gap-1.5 text-xs text-muted-foreground"
+            title={live === "live" ? "Updates arrive instantly" : "Live updates are unavailable, refreshing every 20 seconds"}
+          >
+            <span className={`size-2 rounded-full ${live === "live" ? "bg-primary" : "bg-amber-400"}`} />
+            {live === "live" ? "Live" : "Refreshing"}
+          </span>
+        )}
         {queued > 0 ? (
           <Button
             size="sm"

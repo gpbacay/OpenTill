@@ -6,6 +6,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/auth-context";
 import { PosProvider, usePos } from "@/contexts/pos-context";
+import { OpsProvider } from "@/contexts/ops-context";
 import AppSidebar, { MENU_ITEMS } from "@/components/layout/Sidebar";
 import Header from "@/components/layout/Header";
 import { TenantOnboarding } from "@/components/TenantOnboarding";
@@ -62,6 +63,7 @@ function PosShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
+    <OpsProvider userId={user?.id ?? ""}>
     <SidebarProvider>
       <AppSidebar />
       <SidebarInset className="h-svh overflow-hidden shadow-none">
@@ -78,7 +80,7 @@ function PosShell({ children }: { children: React.ReactNode }) {
           {children}
         </main>
         <nav className="fixed inset-x-2 bottom-2 z-40 grid grid-cols-5 rounded-xl bg-card p-1 md:hidden">
-          {MENU_ITEMS.map((item) => {
+          {MENU_ITEMS.filter((item) => item.primary).map((item) => {
             const active =
               item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
             return (
@@ -97,6 +99,7 @@ function PosShell({ children }: { children: React.ReactNode }) {
         </nav>
       </SidebarInset>
     </SidebarProvider>
+    </OpsProvider>
   );
 }
 

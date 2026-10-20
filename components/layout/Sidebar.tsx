@@ -9,6 +9,8 @@ import {
   Package01Icon,
   Settings01Icon,
   ShoppingCart01Icon,
+  TruckDeliveryIcon,
+  Wallet01Icon,
 } from "@hugeicons/core-free-icons";
 import { useAuth } from "@/contexts/auth-context";
 import { usePos } from "@/contexts/pos-context";
@@ -32,21 +34,26 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 
+// `primary` items sit in the phone's bottom bar; the rest live in the store menu on small screens.
 export const MENU_ITEMS = [
-  { id: "home", href: "/", label: "Home", icon: Home01Icon },
-  { id: "orders", href: "/orders", label: "Register", icon: ShoppingCart01Icon },
-  { id: "products", href: "/products", label: "Products", icon: Package01Icon },
-  { id: "records", href: "/records", label: "Sales", icon: Invoice01Icon },
-  { id: "settings", href: "/settings", label: "Settings", icon: Settings01Icon },
+  { id: "home", href: "/", label: "Home", icon: Home01Icon, primary: true },
+  { id: "orders", href: "/orders", label: "Register", icon: ShoppingCart01Icon, primary: true },
+  { id: "records", href: "/records", label: "Sales", icon: Invoice01Icon, primary: true },
+  { id: "inventory", href: "/inventory", label: "Inventory", icon: Package01Icon, primary: true },
+  { id: "expenses", href: "/expenses", label: "Expenses", icon: Wallet01Icon, primary: true },
+  { id: "suppliers", href: "/suppliers", label: "Suppliers", icon: TruckDeliveryIcon, primary: false },
+  { id: "settings", href: "/settings", label: "Settings", icon: Settings01Icon, primary: false },
 ] as const;
 
-function sectionFromPath(pathname: string) {
-  if (pathname.startsWith("/orders")) return "orders";
-  if (pathname.startsWith("/products")) return "products";
-  if (pathname.startsWith("/records")) return "records";
-  if (pathname.startsWith("/settings")) return "settings";
-  if (pathname.startsWith("/account")) return "account";
-  return "home";
+export function sectionFromPath(pathname: string) {
+  const match = MENU_ITEMS.find((item) => item.href !== "/" && pathname.startsWith(item.href));
+  if (match) return match.id;
+  return pathname.startsWith("/account") ? "account" : "home";
+}
+
+export function titleFromPath(pathname: string) {
+  const section = sectionFromPath(pathname);
+  return MENU_ITEMS.find((item) => item.id === section)?.label ?? (section === "account" ? "Account" : "Home");
 }
 
 function initials(name: string) {
@@ -90,6 +97,11 @@ export function StoreMenu() {
           </DropdownMenuItem>
         ))}
         <DropdownMenuSeparator />
+        {MENU_ITEMS.filter((item) => !item.primary).map((item) => (
+          <DropdownMenuItem key={item.id} className="md:hidden" onSelect={() => router.push(item.href)}>
+            {item.label}
+          </DropdownMenuItem>
+        ))}
         <DropdownMenuItem onSelect={() => router.push("/account")}>
           Account
         </DropdownMenuItem>

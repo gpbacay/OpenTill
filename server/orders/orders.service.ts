@@ -1,6 +1,8 @@
 import { ForbiddenException, Inject, Injectable } from "@nestjs/common";
 import { DatabaseService } from "../database/database.service";
+import { InventoryService } from "../inventory/inventory.service";
 import { ProductsService } from "../products/products.service";
+import { RealtimeService } from "../realtime/realtime.service";
 import { TenantsService } from "../tenants/tenants.service";
 
 export interface Order {
@@ -40,7 +42,9 @@ export class OrdersService {
   constructor(
     @Inject(DatabaseService) private readonly dbService: DatabaseService,
     @Inject(ProductsService) private readonly productsService: ProductsService,
-    @Inject(TenantsService) private readonly tenantsService: TenantsService
+    @Inject(TenantsService) private readonly tenantsService: TenantsService,
+    @Inject(InventoryService) private readonly inventory: InventoryService,
+    @Inject(RealtimeService) private readonly realtime: RealtimeService
   ) {}
 
   async findAll(userId: string): Promise<any[]> {
@@ -87,6 +91,8 @@ export class OrdersService {
 
   async sync(userId: string, orders: any[], items: any[]): Promise<{ success: boolean; count: number; mode?: string }> {
     await this.assertOwned(userId, orders, items);
+    const tenantByOrder = new Map<string, string>((orders ?? []).map((o) => [o.id, o.tenantId]));
+    const dateByOrder = new Map<string, string>((orders ?? []).map((o) => [o.id, o.date]));
     console.log(`📡 [OrdersModule] Sync batch received: ${orders?.length || 0} orders, ${items?.length || 0} items.`);
 
     if (this.dbService.client) {
@@ -135,9 +141,14 @@ export class OrdersService {
 
             // Clean decoupling: use injected ProductsService to decrement stock!
             await this.productsService.decrementStock(item.productId, parseInt(item.quantity) || 1);
+            await this.inventory.logSale(
+              { id: item.id, productId: item.productId, name: item.name, quantity: parseInt(item.quantity) || 1 },
+              { tenantId: tenantByOrder.get(item.orderId)!, date: new Date(dateByOrder.get(item.orderId) ?? Date.now()) }
+            );
           }
         }
 
+        this.announce(orders);
         return { success: true, count: results.length };
       } catch (err: any) {
         if (err instanceof ForbiddenException) throw err;
@@ -190,10 +201,23 @@ export class OrdersService {
           this.memoryOrderItems.push(newOrderItem);
           // Decrement in memory using injected ProductsService
           await this.productsService.decrementStock(item.productId, parseInt(item.quantity) || 1);
+          await this.inventory.logSale(
+            { id: item.id, productId: item.productId, name: item.name, quantity: parseInt(item.quantity) || 1 },
+            { tenantId: tenantByOrder.get(item.orderId)!, date: new Date(dateByOrder.get(item.orderId) ?? Date.now()) }
+          );
         }
       }
     }
 
+    this.announce(orders);
     return { success: true, count: results.length, mode: "memory" };
+  }
+
+  private announce(orders: any[]) {
+    for (const tenantId of new Set((orders ?? []).map((o) => o.tenantId as string))) {
+      this.realtime.emit(tenantId, "orders");
+      this.realtime.emit(tenantId, "products");
+      this.realtime.emit(tenantId, "stock");
+    }
   }
 }

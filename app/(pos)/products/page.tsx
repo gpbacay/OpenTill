@@ -1,25 +1,6 @@
-"use client";
+import { redirect } from "next/navigation";
 
-import { ProductsManager } from "@/components/ProductsManager";
-import { usePos } from "@/contexts/pos-context";
-
+// Products now live in Inventory; keep old links working.
 export default function ProductsPage() {
-  const {
-    products,
-    activeTenant,
-    handleAddProduct,
-    handleUpdateProduct,
-    handleDeleteProduct,
-  } = usePos();
-  if (!activeTenant) return null;
-
-  return (
-    <ProductsManager
-      products={products}
-      activeTenant={activeTenant}
-      onAddProduct={handleAddProduct}
-      onUpdateProduct={handleUpdateProduct}
-      onDeleteProduct={handleDeleteProduct}
-    />
-  );
+  redirect("/inventory");
 }

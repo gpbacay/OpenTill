@@ -21,6 +21,69 @@ export interface Product {
   price: number;
   stock: number;
   description: string;
+  // Optional: products cached before these existed won't have them.
+  costPrice?: number;
+  reorderLevel?: number;
+  supplierId?: string | null;
+  custom?: Record<string, string>;
+}
+
+export const DEFAULT_REORDER_LEVEL = 5;
+export const reorderLevel = (product: Product) => product.reorderLevel ?? DEFAULT_REORDER_LEVEL;
+export const stockState = (product: Product): "out" | "low" | "ok" =>
+  product.stock <= 0 ? "out" : product.stock <= reorderLevel(product) ? "low" : "ok";
+
+export interface Supplier {
+  id: string;
+  tenantId: string;
+  name: string;
+  contactPerson: string;
+  phone: string;
+  email: string;
+  address: string;
+  notes: string;
+  active: boolean;
+  custom?: Record<string, string>;
+  createdAt: string;
+}
+
+export interface Expense {
+  id: string;
+  tenantId: string;
+  date: string;
+  category: string;
+  description: string;
+  amount: number;
+  paymentMethod: PaymentMethod;
+  supplierId: string | null;
+  custom?: Record<string, string>;
+  createdAt: string;
+}
+
+export type MovementType = "OPENING" | "RESTOCK" | "ADJUSTMENT" | "SALE";
+
+export interface StockMovement {
+  id: string;
+  tenantId: string;
+  productId: string;
+  productName: string;
+  type: MovementType;
+  quantity: number; // signed
+  unitCost: number | null;
+  supplierId: string | null;
+  note: string;
+  date: string;
+}
+
+export type CustomColumnTable = "products" | "suppliers" | "expenses";
+
+export interface CustomColumn {
+  id: string;
+  tenantId: string;
+  tableName: CustomColumnTable;
+  label: string;
+  type: "text" | "number" | "date";
+  createdAt: string;
 }
 
 export type PaymentMethod = "CASH" | "CARD" | "MOBILE_WALLET";
@@ -42,6 +105,7 @@ export interface Order {
   discountPercent?: number;
   cashReceived?: number;
   changeDue?: number;
+  items?: OrderItem[];
 }
 
 export interface Customer {

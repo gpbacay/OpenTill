@@ -41,36 +41,40 @@ model Tenant {
 }
 
 model Product {
-  id          String   @id
-  tenantId    String
-  name        String
-  category    String
-  sku         String
-  price       Float
-  stock       Int
-  description String
-  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  id           String  @id
+  tenantId     String
+  name         String
+  category     String
+  sku          String
+  price        Float
+  stock        Int
+  description  String
+  costPrice    Float   @default(0)
+  reorderLevel Int     @default(5)
+  supplierId   String?
+  custom       String  @default("{}") // JSON {customColumnId: value}
+  tenant       Tenant  @relation(fields: [tenantId], references: [id])
 }
 
 model Order {
-  id             String      @id
-  tenantId       String
-  status         String      // "COMPLETED" | "PENDING_SYNC" | "FAILED"
-  subtotal       Float
-  tax            Float
-  total          Float
-  paymentMethod  String      // "CASH" | "CARD" | "MOBILE_WALLET"
-  isOffline      Boolean     @default(false)
-  date           DateTime    @default(now())
-  syncedAt       DateTime?
-  cashierName    String?
-  customerName   String?
-  discountAmount Float?
+  id              String      @id
+  tenantId        String
+  status          String // "COMPLETED" | "PENDING_SYNC" | "FAILED"
+  subtotal        Float
+  tax             Float
+  total           Float
+  paymentMethod   String // "CASH" | "CARD" | "MOBILE_WALLET"
+  isOffline       Boolean     @default(false)
+  date            DateTime    @default(now())
+  syncedAt        DateTime?
+  cashierName     String?
+  customerName    String?
+  discountAmount  Float?
   discountPercent Float?
-  cashReceived   Float?
-  changeDue      Float?
-  tenant         Tenant      @relation(fields: [tenantId], references: [id])
-  items          OrderItem[]
+  cashReceived    Float?
+  changeDue       Float?
+  tenant          Tenant      @relation(fields: [tenantId], references: [id])
+  items           OrderItem[]
 }
 
 model OrderItem {
@@ -81,4 +85,64 @@ model OrderItem {
   price     Float
   quantity  Int
   order     Order  @relation(fields: [orderId], references: [id])
+}
+
+model Supplier {
+  id            String   @id
+  tenantId      String
+  name          String
+  contactPerson String   @default("")
+  phone         String   @default("")
+  email         String   @default("")
+  address       String   @default("")
+  notes         String   @default("")
+  active        Boolean  @default(true)
+  custom        String   @default("{}")
+  createdAt     DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model Expense {
+  id            String   @id
+  tenantId      String
+  date          DateTime
+  category      String
+  description   String
+  amount        Float
+  paymentMethod String   @default("CASH")
+  supplierId    String?
+  custom        String   @default("{}")
+  createdAt     DateTime @default(now())
+
+  @@index([tenantId, date])
+}
+
+// Append-only stock ledger. quantity is a signed delta: RESTOCK/OPENING add, SALE subtracts, ADJUSTMENT either.
+model StockMovement {
+  id          String   @id
+  tenantId    String
+  productId   String
+  productName String
+  type        String // "OPENING" | "RESTOCK" | "ADJUSTMENT" | "SALE"
+  quantity    Int
+  unitCost    Float?
+  supplierId  String?
+  note        String   @default("")
+  date        DateTime @default(now())
+
+  @@index([tenantId, date])
+  @@index([productId])
+}
+
+// User-defined extra columns for the products / suppliers / expenses tables. Values live in each row's `custom` JSON.
+model CustomColumn {
+  id        String   @id
+  tenantId  String
+  tableName String // "products" | "suppliers" | "expenses"
+  label     String
+  type      String   @default("text") // "text" | "number" | "date"
+  createdAt DateTime @default(now())
+
+  @@index([tenantId])
 }
