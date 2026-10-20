@@ -83,8 +83,7 @@ export function ActiveCart({
   const subtotal = cart.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
   const discountAmount = subtotal * (discountPercent / 100);
   const discountedSubtotal = Math.max(0, subtotal - discountAmount);
-  const tax = discountedSubtotal * activeTenant.taxRate;
-  const total = discountedSubtotal + tax;
+  const total = discountedSubtotal;
 
   const cashSuggestions = useMemo(() => {
     if (total <= 0) return [];
@@ -114,7 +113,7 @@ export function ActiveCart({
       tenantId: activeTenant.id,
       status: isOnline ? "COMPLETED" : "PENDING_SYNC",
       subtotal: discountedSubtotal,
-      tax,
+      tax: 0,
       total,
       paymentMethod,
       isOffline: !isOnline,
@@ -358,7 +357,6 @@ export function ActiveCart({
 
         <div className="flex items-end justify-between">
           <div className="text-xs text-muted-foreground">
-            <p>Tax {money(activeTenant.currency, tax)}</p>
             {discountAmount > 0 ? <p>Discount {money(activeTenant.currency, discountAmount)}</p> : null}
           </div>
           <p className="text-2xl font-bold tabular-nums">{money(activeTenant.currency, total)}</p>

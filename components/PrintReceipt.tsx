@@ -53,7 +53,6 @@ export function PrintReceipt({ order, items, tenant }: PrintReceiptProps) {
           <span>Total</span>
           <span>{money(tenant.currency, order.total)}</span>
         </p>
-        <p className="text-xs">Tax {money(tenant.currency, order.tax)}</p>
         {order.paymentMethod === "CASH" ? (
           <>
             <p className="text-xs">Cash {money(tenant.currency, order.cashReceived || 0)}</p>

@@ -12,6 +12,7 @@ import React, {
 import { useRouter } from "next/navigation";
 import { Tenant, Product, Order, OrderItem, HeldCart } from "@/lib/types";
 import { stripDemoData } from "@/lib/demo";
+import { writeLocalSession } from "@/lib/local-auth";
 
 export interface CartItem {
   product: Product;
@@ -92,7 +93,11 @@ function writeOutbox(userId: string, outbox: Outbox) {
 
 async function api(input: string, init?: RequestInit) {
   const res = await fetch(input, init);
-  if (res.status === 401 && navigator.onLine) window.location.href = "/login";
+  if (res.status === 401 && navigator.onLine) {
+    // Drop the stale local session too, or /login bounces straight back to "/" and loops.
+    writeLocalSession(null);
+    window.location.href = "/login";
+  }
   return res;
 }
 

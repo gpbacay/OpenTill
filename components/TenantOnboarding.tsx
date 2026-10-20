@@ -50,26 +50,20 @@ export function TenantOnboarding({
 }: TenantOnboardingProps) {
   const [name, setName] = useState("");
   const [businessType, setBusinessType] = useState("Retail");
-  const [taxRate, setTaxRate] = useState("12");
   const [currency, setCurrency] = useState("PHP");
   const [error, setError] = useState("");
 
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
-    const parsedTax = parseFloat(taxRate);
     if (!name.trim()) {
       setError("Enter a store name.");
-      return;
-    }
-    if (Number.isNaN(parsedTax) || parsedTax < 0 || parsedTax > 100) {
-      setError("Tax needs to be between 0 and 100.");
       return;
     }
     onAddTenant({
       id: `tenant-${Date.now()}`,
       name: name.trim(),
       businessType,
-      taxRate: parsedTax / 100,
+      taxRate: 0,
       currency,
       createdAt: new Date().toISOString(),
       active: true,
@@ -118,18 +112,6 @@ export function TenantOnboarding({
             </Select>
           </div>
         </div>
-        <div className="space-y-1">
-          <Label htmlFor="tax-rate">Tax %</Label>
-          <Input
-            id="tax-rate"
-            type="number"
-            min={0}
-            max={100}
-            step="0.1"
-            value={taxRate}
-            onChange={(event) => setTaxRate(event.target.value)}
-          />
-        </div>
         <Button type="submit" className="w-full">
           Create store
         </Button>
@@ -154,7 +136,7 @@ export function TenantOnboarding({
                   <span className="min-w-0">
                     <span className="block truncate text-sm font-medium">{tenant.name}</span>
                     <span className="block truncate text-xs text-muted-foreground">
-                      {tenant.businessType} {tenant.currency} {(tenant.taxRate * 100).toFixed(0)}% tax
+                      {tenant.businessType} {tenant.currency}
                     </span>
                   </span>
                 </CardContent>

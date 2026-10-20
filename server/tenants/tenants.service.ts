@@ -88,7 +88,7 @@ export class TenantsService {
       ownerId: userId,
       name: body.name || "Unnamed store",
       businessType: body.businessType || "Retail",
-      taxRate: parseFloat(body.taxRate as any) || 0.12,
+      taxRate: parseFloat(body.taxRate as any) || 0,
       currency: body.currency || "PHP",
       createdAt: new Date().toISOString(),
       active: true,
