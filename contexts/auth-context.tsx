@@ -47,6 +47,12 @@ async function errorMessage(res: Response) {
   return "Something went wrong.";
 }
 
+/** A non-JSON 404/5xx is the proxy (Vercel blocks localhost), not the Nest API. */
+function apiMissing(res: Response) {
+  if ((res.headers.get("content-type") ?? "").includes("json")) return false;
+  return res.status === 404 || res.status >= 500;
+}
+
 function asUser(value: { id: string; name: string; username: string }): LocalUser {
   return { id: value.id, name: value.name, username: value.username };
 }
@@ -65,6 +71,7 @@ async function syncPendingAccounts() {
           password: account.pendingPassword,
         }),
       });
+      if (apiMissing(res)) return;
       if (res.ok || res.status === 409) clearPendingPassword(account.id);
     } catch {
       return;
@@ -114,6 +121,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username: normalized, password }),
       });
+      if (apiMissing(res)) throw new Error("api");
       if (res.ok) {
         const next = asUser(await res.json());
         await rememberLocalAccount(next, password);
@@ -163,6 +171,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...draft, password }),
       });
+      if (apiMissing(res)) throw new Error("api");
       if (!res.ok) return errorMessage(res);
       const next = asUser(await res.json());
       await rememberLocalAccount(next, password);
@@ -195,6 +204,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
+      if (apiMissing(res)) throw new Error("api");
       if (res.status === 401) {
         const message = await errorMessage(res);
         if (message === "Sign in required.") {
