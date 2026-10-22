@@ -134,6 +134,7 @@ function PosShell({ children }: { children: React.ReactNode }) {
         </main>
         <nav
           aria-label="Main"
+          data-bottom-nav
           className="fixed inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-40 flex items-center gap-2 md:hidden"
         >
           {/* Bar and "+" share one height and corner radius; tabs use the inner radius (outer minus the bar's padding). */}

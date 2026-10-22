@@ -164,3 +164,11 @@
 [data-slot="scroll-area"]:has(.is-scrolling) [data-slot="scroll-area-scrollbar"] {
   opacity: 1;
 }
+
+/* Phones: hide the bottom bar while typing, so it never covers the field sitting just above the keyboard. */
+@media (max-width: 767px) {
+  body:has(input:not([type="checkbox"], [type="radio"], [type="file"], [type="button"], [type="submit"], [type="range"]):focus, textarea:focus)
+    [data-bottom-nav] {
+    display: none;
+  }
+}

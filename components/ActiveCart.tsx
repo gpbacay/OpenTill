@@ -273,7 +273,7 @@ export function ActiveCart({
   }
 
   return (
-    <form onSubmit={handleCheckoutSubmit} noValidate className="flex h-full flex-col gap-3">
+    <form onSubmit={handleCheckoutSubmit} noValidate className="flex h-full min-h-0 flex-col gap-3 overflow-y-auto">
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
           {cart.reduce((sum, item) => sum + item.quantity, 0) === 1
@@ -329,7 +329,7 @@ export function ActiveCart({
         </div>
       ) : null}
 
-      <ScrollArea className="min-h-0 flex-1">
+      <ScrollArea className="min-h-24 flex-1">
         {cart.length === 0 ? (
           <p className="py-10 text-center text-sm text-muted-foreground">Nothing on this sale</p>
         ) : (

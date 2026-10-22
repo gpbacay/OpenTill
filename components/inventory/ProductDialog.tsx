@@ -129,7 +129,7 @@ export function ProductDialog({ target, onClose }: Props) {
 
   return (
     <Dialog open={target !== null} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto">
+      <DialogContent>
         <DialogHeader>
           <DialogTitle>{editing ? "Edit product" : "Add product"}</DialogTitle>
         </DialogHeader>
