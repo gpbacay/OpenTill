@@ -8,9 +8,11 @@ interface PrintReceiptProps {
   order: Order;
   items: OrderItem[];
   tenant: Tenant;
+  /** Hide the full-width Print button when the caller shows its own. */
+  showPrint?: boolean;
 }
 
-export function PrintReceipt({ order, items, tenant }: PrintReceiptProps) {
+export function PrintReceipt({ order, items, tenant, showPrint = true }: PrintReceiptProps) {
   return (
     <div className="flex flex-col items-center">
       <style>{`
@@ -62,9 +64,11 @@ export function PrintReceipt({ order, items, tenant }: PrintReceiptProps) {
           <p className="text-xs">{order.paymentMethod === "CARD" ? "Card" : "Wallet"}</p>
         )}
       </div>
-      <Button className="non-printable-actions mt-3 w-full max-w-[320px]" onClick={() => window.print()}>
-        Print
-      </Button>
+      {showPrint ? (
+        <Button className="non-printable-actions mt-3 w-full max-w-[320px]" onClick={() => window.print()}>
+          Print
+        </Button>
+      ) : null}
     </div>
   );
 }

@@ -30,6 +30,12 @@ export function Breadcrumbs() {
       { label: "Inventory", href: "/inventory" },
       { label: product?.name ?? "Product details" },
     ];
+  } else if (parts[0] === "reports" && parts[1] === "view") {
+    crumbs = [
+      { label: "Dashboard", href: "/" },
+      { label: "Reports", href: "/reports" },
+      { label: "Report" },
+    ];
   } else {
     crumbs = [
       { label: "Dashboard", href: "/" },

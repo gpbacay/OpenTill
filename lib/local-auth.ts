@@ -2,6 +2,8 @@ export interface LocalUser {
   id: string;
   name: string;
   username: string;
+  /** Profile picture as a small image data URL; missing or "" for none. */
+  avatar?: string;
 }
 
 interface LocalAccount extends LocalUser {
@@ -20,7 +22,7 @@ function readSession(storage: Storage): LocalUser | null {
     if (!saved) return null;
     const user = JSON.parse(saved) as LocalUser;
     if (!user?.id || !user.username) return null;
-    return { id: user.id, name: user.name, username: user.username };
+    return { id: user.id, name: user.name, username: user.username, avatar: user.avatar ?? "" };
   } catch {
     return null;
   }
@@ -117,6 +119,7 @@ export async function rememberLocalAccount(
     id: user.id,
     name: user.name,
     username: user.username,
+    avatar: user.avatar ?? existing?.avatar ?? "",
     salt,
     passwordHash,
     ...(pendingPassword ? { pendingPassword } : {}),
@@ -142,7 +145,7 @@ export function touchLocalAccount(user: LocalUser) {
   if (!current) return;
   writeAccounts(
     accounts.map((account) =>
-      account.id === user.id ? { ...account, name: user.name, username: user.username } : account
+      account.id === user.id ? { ...account, name: user.name, username: user.username, avatar: user.avatar ?? account.avatar } : account
     )
   );
 }
@@ -159,7 +162,7 @@ export function clearPendingPassword(id: string) {
 
 export async function updateLocalAccount(
   userId: string,
-  body: { name: string; username: string; currentPassword?: string; newPassword?: string }
+  body: { name: string; username: string; currentPassword?: string; newPassword?: string; avatar?: string }
 ) {
   const accounts = readAccounts();
   const current = accounts.find((account) => account.id === userId);
@@ -190,10 +193,11 @@ export async function updateLocalAccount(
     ...current,
     name: body.name.trim(),
     username,
+    avatar: body.avatar ?? current.avatar ?? "",
     salt,
     passwordHash,
     ...(current.pendingPassword ? { pendingPassword: body.newPassword || current.pendingPassword } : {}),
   };
   writeAccounts(accounts.map((account) => (account.id === userId ? next : account)));
-  return { id: next.id, name: next.name, username: next.username };
+  return { id: next.id, name: next.name, username: next.username, avatar: next.avatar };
 }

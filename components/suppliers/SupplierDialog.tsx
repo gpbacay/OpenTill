@@ -11,6 +11,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { CustomFieldInputs } from "@/components/data-table/custom-columns";
+import { FieldError, check, clearError, invalid } from "@/components/FieldError";
+import { collect, emailError, maxLength, phoneError, required, type FieldErrors } from "@/lib/validation";
 
 const blank = { name: "", contactPerson: "", phone: "", email: "", address: "", notes: "", active: true };
 
@@ -19,12 +21,12 @@ export function SupplierDialog({ target, onClose }: { target: Supplier | "new" |
   const { suppliers, saveSupplier, deleteSupplier, columnsFor } = useOps();
   const [form, setForm] = useState(blank);
   const [custom, setCustom] = useState<Record<string, string>>({});
-  const [error, setError] = useState("");
+  const [errors, setErrors] = useState<FieldErrors>({});
   const editing = target && target !== "new" ? target : null;
 
   useEffect(() => {
     if (!target) return;
-    setError("");
+    setErrors({});
     if (target === "new") {
       setForm(blank);
       setCustom({});
@@ -35,16 +37,27 @@ export function SupplierDialog({ target, onClose }: { target: Supplier | "new" |
   }, [target]);
 
   if (!activeTenant) return null;
-  const set = (field: keyof typeof blank) => (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+  const set = (field: keyof typeof blank) => (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    clearError(setErrors, event.target.id);
     setForm((prev) => ({ ...prev, [field]: event.target.value }));
+  };
 
   const submit = (event: React.FormEvent) => {
     event.preventDefault();
     const name = form.name.trim();
-    if (!name) return setError("Give the supplier a name.");
-    if (suppliers.some((s) => s.id !== editing?.id && s.name.toLowerCase() === name.toLowerCase())) {
-      return setError(`${name} is already in your supplier list.`);
-    }
+    const duplicate = suppliers.some((s) => s.id !== editing?.id && s.name.toLowerCase() === name.toLowerCase());
+    const ok = check(
+      collect({
+        "sup-name":
+          required(name, "Give the supplier a name.") ??
+          maxLength(name, 80, "Name") ??
+          (duplicate ? `${name} is already in your supplier list.` : undefined),
+        "sup-phone": phoneError(form.phone),
+        "sup-email": emailError(form.email),
+      }),
+      setErrors
+    );
+    if (!ok) return;
     saveSupplier({
       id: editing?.id ?? uid("sup"),
       tenantId: activeTenant.id,
@@ -67,11 +80,11 @@ export function SupplierDialog({ target, onClose }: { target: Supplier | "new" |
         <DialogHeader>
           <DialogTitle>{editing ? "Edit supplier" : "Add supplier"}</DialogTitle>
         </DialogHeader>
-        <form onSubmit={submit} className="space-y-3">
-          {error ? <p className="text-sm text-destructive">{error}</p> : null}
+        <form onSubmit={submit} noValidate className="space-y-3">
           <div className="space-y-1">
-            <Label htmlFor="sup-name">Name</Label>
-            <Input id="sup-name" value={form.name} onChange={set("name")} autoFocus />
+            <Label htmlFor="sup-name" required>Name</Label>
+            <Input id="sup-name" {...invalid(errors, "sup-name")} value={form.name} onChange={set("name")} autoFocus />
+            <FieldError errors={errors} id="sup-name" />
           </div>
           <div className="grid grid-cols-2 gap-2">
             <div className="space-y-1">
@@ -80,12 +93,18 @@ export function SupplierDialog({ target, onClose }: { target: Supplier | "new" |
             </div>
             <div className="space-y-1">
               <Label htmlFor="sup-phone">Phone</Label>
-              <Input id="sup-phone" type="tel" value={form.phone} onChange={set("phone")} />
+              <Input id="sup-phone" {...invalid(errors, "sup-phone")} type="tel" value={form.phone} onChange={(e) => {
+                // Phone numbers: digits plus + ( ) - . and spaces, never letters.
+                e.target.value = e.target.value.replace(/[^\d\s+().-]/g, "");
+                set("phone")(e);
+              }} />
+              <FieldError errors={errors} id="sup-phone" />
             </div>
           </div>
           <div className="space-y-1">
             <Label htmlFor="sup-email">Email</Label>
-            <Input id="sup-email" type="email" value={form.email} onChange={set("email")} />
+            <Input id="sup-email" {...invalid(errors, "sup-email")} type="email" value={form.email} onChange={set("email")} />
+            <FieldError errors={errors} id="sup-email" />
           </div>
           <div className="space-y-1">
             <Label htmlFor="sup-address">Address</Label>

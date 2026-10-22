@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef, type ReactNode } from "react";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { Cancel01Icon } from "@hugeicons/core-free-icons";
 import { Button } from "@/components/ui/button";
 
 /**
@@ -50,8 +52,8 @@ export function DetailPanel({
           <h2 className="truncate text-base font-semibold">{title}</h2>
           {subtitle ? <p className="truncate text-xs text-muted-foreground">{subtitle}</p> : null}
         </div>
-        <Button size="sm" variant="ghost" onClick={onClose}>
-          Close
+        <Button size="icon-sm" variant="ghost" onClick={onClose} aria-label="Close" title="Close" className="shrink-0">
+          <HugeiconsIcon icon={Cancel01Icon} size={16} />
         </Button>
       </div>
       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-2">{children}</div>

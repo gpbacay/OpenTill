@@ -9,6 +9,9 @@ import { Product } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { NumberInput } from "@/components/NumberInput";
+import { FieldError, check, clearError, invalid } from "@/components/FieldError";
+import { collect, numberError, type FieldErrors } from "@/lib/validation";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 export type StockAction = { product: Product; mode: "restock" | "adjust" };
@@ -24,7 +27,7 @@ export function StockDialog({ action, onClose }: { action: StockAction | null; o
   const [reason, setReason] = useState(REASONS[0]);
   const [note, setNote] = useState("");
   const [logExpense, setLogExpense] = useState(true);
-  const [error, setError] = useState("");
+  const [errors, setErrors] = useState<FieldErrors>({});
 
   useEffect(() => {
     if (!action) return;
@@ -34,7 +37,7 @@ export function StockDialog({ action, onClose }: { action: StockAction | null; o
     setReason(REASONS[0]);
     setNote("");
     setLogExpense(true);
-    setError("");
+    setErrors({});
   }, [action]);
 
   if (!action || !activeTenant) return <Dialog open={false} />;
@@ -45,9 +48,24 @@ export function StockDialog({ action, onClose }: { action: StockAction | null; o
 
   const submit = (event: React.FormEvent) => {
     event.preventDefault();
-    if (!qty) return setError(mode === "restock" ? "Enter how many arrived." : "Enter the change, like 3 or -2.");
-    if (mode === "restock" && qty < 0) return setError("A restock can't be negative. Use Adjust to remove stock.");
-    if (product.stock + qty < 0) return setError(`Only ${product.stock} in stock, so you can't remove ${-qty}.`);
+    const ok = check(
+      collect({
+        "s-qty":
+          numberError(quantity, mode === "restock" ? "how many arrived" : "the change", { required: true, integer: true }) ??
+          (qty === 0
+            ? mode === "restock"
+              ? "Enter how many arrived."
+              : "Enter the change, like 3 or -2."
+            : mode === "restock" && qty < 0
+              ? "A restock can't be negative. Use Adjust to remove stock."
+              : product.stock + qty < 0
+                ? `Only ${product.stock} in stock, so you can't remove ${-qty}.`
+                : undefined),
+        "s-cost": mode === "restock" ? numberError(unitCost, "the cost", { min: 0 }) : undefined,
+      }),
+      setErrors
+    );
+    if (!ok) return;
     const now = new Date().toISOString();
     recordMovement({
       id: uid("mov"),
@@ -84,18 +102,25 @@ export function StockDialog({ action, onClose }: { action: StockAction | null; o
           <DialogTitle>{mode === "restock" ? "Restock" : "Adjust stock"}: {product.name}</DialogTitle>
           <DialogDescription>Currently {product.stock} in stock.</DialogDescription>
         </DialogHeader>
-        <form onSubmit={submit} className="space-y-3">
-          {error ? <p className="text-sm text-destructive">{error}</p> : null}
+        <form onSubmit={submit} noValidate className="space-y-3">
           <div className="space-y-1">
-            <Label htmlFor="s-qty">{mode === "restock" ? "Quantity received" : "Change (+ adds, − removes)"}</Label>
-            <Input id="s-qty" type="number" step={1} value={quantity} onChange={(e) => setQuantity(e.target.value)} autoFocus />
+            <Label htmlFor="s-qty" required>{mode === "restock" ? "Quantity received" : "Change (+ adds, − removes)"}</Label>
+            <NumberInput id="s-qty" {...invalid(errors, "s-qty")} decimals={false} negative={mode === "adjust"} value={quantity} onChange={(e) => {
+              clearError(setErrors, "s-qty");
+              setQuantity(e.target.value);
+            }} autoFocus />
+            <FieldError errors={errors} id="s-qty" />
           </div>
           {mode === "restock" ? (
             <>
               <div className="grid grid-cols-2 gap-2">
                 <div className="space-y-1">
                   <Label htmlFor="s-cost">Cost each</Label>
-                  <Input id="s-cost" type="number" min={0} step="0.01" value={unitCost} onChange={(e) => setUnitCost(e.target.value)} />
+                  <NumberInput id="s-cost" {...invalid(errors, "s-cost")} value={unitCost} onChange={(e) => {
+                      clearError(setErrors, "s-cost");
+                      setUnitCost(e.target.value);
+                    }} />
+                  <FieldError errors={errors} id="s-cost" />
                 </div>
                 <div className="space-y-1">
                   <Label htmlFor="s-supplier">Supplier</Label>

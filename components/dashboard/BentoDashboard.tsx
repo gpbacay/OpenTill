@@ -2,25 +2,18 @@
 
 import { useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { ArrowUpRight01Icon, PlusSignIcon } from "@hugeicons/core-free-icons";
+import { ArrowUpRight01Icon } from "@hugeicons/core-free-icons";
 import { Area, AreaChart, CartesianGrid, XAxis } from "recharts";
 import { Order, Product, Tenant, stockState } from "@/lib/types";
 import { useOps } from "@/contexts/ops-context";
 import { DateRange, inRange, presetRange, rangeQuery, toDateInput } from "@/lib/periods";
 import { money } from "@/lib/money";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DateRangeFilter } from "@/components/data-table/DateRangeFilter";
 import { ResetFiltersButton } from "@/components/data-table/controls";
-import { ProductDialog } from "@/components/inventory/ProductDialog";
+import { AddMenu } from "@/components/layout/AddMenu";
 import { DashboardPageSkeleton } from "@/components/loading/PageSkeletons";
 import {
   ChartContainer,
@@ -80,10 +73,8 @@ export default function BentoDashboard({
   orders,
   activeTenant,
 }: BentoDashboardProps) {
-  const router = useRouter();
   const { expenses, suppliers, movements, ready } = useOps();
   const [range, setRange] = useState<DateRange>(() => presetRange("month"));
-  const [addingProduct, setAddingProduct] = useState(false);
   const currency = activeTenant.currency;
   const query = rangeQuery(range);
 
@@ -157,24 +148,12 @@ export default function BentoDashboard({
     <div className="flex h-full flex-col gap-4 overflow-y-auto pb-2">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <h2 className="text-lg font-semibold">{activeTenant.name}</h2>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button size="icon" aria-label="Add">
-              <HugeiconsIcon icon={PlusSignIcon} size={16} />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="min-w-40">
-            <DropdownMenuItem onSelect={() => router.push("/orders")}>New sale</DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => router.push("/expenses")}>Add expense</DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => setAddingProduct(true)}>Add product</DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <AddMenu />
         <div className="ml-auto flex items-center gap-2">
           <DateRangeFilter value={range} onChange={setRange} />
           {range.preset !== "month" ? <ResetFiltersButton onClick={() => setRange(presetRange("month"))} /> : null}
         </div>
       </div>
-      <ProductDialog target={addingProduct ? "new" : null} onClose={() => setAddingProduct(false)} />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <DashCard title="Sales" href={`/records?${query}`} open="Open sales for this date range">

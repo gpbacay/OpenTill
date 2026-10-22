@@ -26,6 +26,8 @@ export interface Product {
   reorderLevel?: number;
   supplierId?: string | null;
   custom?: Record<string, string>;
+  /** Optional photo as a small image data URL; missing or "" for none. */
+  image?: string;
 }
 
 export const DEFAULT_REORDER_LEVEL = 5;

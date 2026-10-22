@@ -189,7 +189,11 @@ export function PosProvider({
 
   useEffect(() => {
     if (!hydrated) return;
-    localStorage.setItem(storeKey(userId, "products"), JSON.stringify(products));
+    try {
+      localStorage.setItem(storeKey(userId, "products"), JSON.stringify(products));
+    } catch {
+      // Storage full (product photos are the big part): the server copy is still saved; only the offline cache lags.
+    }
   }, [products, hydrated, userId]);
 
   useEffect(() => {

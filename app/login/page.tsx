@@ -8,17 +8,19 @@ import { useAuth } from "@/contexts/auth-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { FieldError, check, clearError, invalid } from "@/components/FieldError";
+import { collect, passwordError, required, usernameError, type FieldErrors } from "@/lib/validation";
 
 export default function LoginPage() {
   const router = useRouter();
   const { user, ready, login, register } = useAuth();
   const [creating, setCreating] = useState(false);
-  const [name, setName] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
+  const [errors, setErrors] = useState<FieldErrors>({});
   const [pending, setPending] = useState(false);
 
   const continueToRequestedPage = () => {
@@ -35,10 +37,19 @@ export default function LoginPage() {
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
-    setPending(true);
     setError("");
+    const ok = check(
+      collect(
+        creating
+          ? { username: usernameError(username), password: passwordError(password) }
+          : { username: required(username, "Enter your username."), password: required(password, "Enter your password.") }
+      ),
+      setErrors
+    );
+    if (!ok) return;
+    setPending(true);
     const message = creating
-      ? await register(name, username, password)
+      ? await register(username, password)
       : await login(username, password, remember);
     setPending(false);
     if (message) {
@@ -62,37 +73,35 @@ export default function LoginPage() {
         <p className="mt-1 mb-6 text-sm text-muted-foreground">
           {creating ? "Create an account on this device." : "Sign in on this device."}
         </p>
-        <form className="flex flex-col gap-4" onSubmit={submit}>
-          {creating ? (
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="name">Name</Label>
-              <Input
-                id="name"
-                autoComplete="name"
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-              />
-            </div>
-          ) : null}
+        <form className="flex flex-col gap-4" onSubmit={submit} noValidate>
           <div className="flex flex-col gap-2">
-            <Label htmlFor="username">Username</Label>
+            <Label htmlFor="username" required>Username</Label>
             <Input
               id="username"
+              {...invalid(errors, "username")}
               autoComplete="username"
               value={username}
-              onChange={(event) => setUsername(event.target.value)}
+              onChange={(event) => {
+                clearError(setErrors, "username");
+                setUsername(event.target.value);
+              }}
             />
+            <FieldError errors={errors} id="username" />
           </div>
           <div className="flex flex-col gap-2">
-            <Label htmlFor="password">Password</Label>
+            <Label htmlFor="password" required>Password</Label>
             <div className="relative">
               <Input
                 id="password"
+                {...invalid(errors, "password")}
                 type={showPassword ? "text" : "password"}
                 autoComplete={creating ? "new-password" : "current-password"}
                 className="pr-8"
                 value={password}
-                onChange={(event) => setPassword(event.target.value)}
+                onChange={(event) => {
+                  clearError(setErrors, "password");
+                  setPassword(event.target.value);
+                }}
               />
               <button
                 type="button"
@@ -103,6 +112,7 @@ export default function LoginPage() {
                 <HugeiconsIcon icon={showPassword ? EyeOffIcon : EyeIcon} size={16} />
               </button>
             </div>
+            <FieldError errors={errors} id="password" />
           </div>
           {!creating ? (
             <div className="flex items-center gap-2">
@@ -131,6 +141,7 @@ export default function LoginPage() {
             onClick={() => {
               setCreating((value) => !value);
               setError("");
+              setErrors({});
             }}
           >
             {creating ? "Sign in" : "Create an account"}

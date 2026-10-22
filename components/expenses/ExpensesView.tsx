@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { DeleteButton, ExportButton } from "@/components/data-table/bulk";
 import { DataTable, type Column } from "@/components/data-table/DataTable";
 import { DateRangeFilter } from "@/components/data-table/DateRangeFilter";
-import { FilterSelect, ResetFiltersButton, SearchBox, StatTile, Toolbar, matches } from "@/components/data-table/controls";
+import { FilterSelect, ResetFiltersButton, SearchBox, StatTile, FilterBar, ViewBySelect, matches, useViewMode } from "@/components/data-table/controls";
 import { ColumnManager, customColumnDefs, customFieldRows, customText } from "@/components/data-table/custom-columns";
 import { DetailPanel, Fields, SplitView } from "@/components/data-table/DetailPanel";
 import { ExpenseDialog } from "./ExpenseDialog";
@@ -27,6 +27,7 @@ export function ExpensesView() {
   const params = useSearchParams();
   const [range, setRange] = useState(() => rangeFromParams(params, "month"));
   const [supplier, setSupplier] = useState("all");
+  const [view, setView] = useViewMode("expenses", "table");
   const [target, setTarget] = useState<Expense | "new" | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const currency = activeTenant?.currency ?? "PHP";
@@ -92,6 +93,7 @@ export function ExpensesView() {
       <p className="text-3xl font-bold tabular-nums">{money(currency, selected.amount)}</p>
       <Fields
         rows={[
+          ["ID", <span key="expense-id" className="break-all font-mono text-xs">{selected.id}</span>],
           ["Category", selected.category],
           ["Paid with", PAY_LABEL[selected.paymentMethod] ?? selected.paymentMethod],
           ["Supplier", supplierName(selected.supplierId)],
@@ -115,7 +117,15 @@ export function ExpensesView() {
         />
         <StatTile label="Biggest cost" value={month.top ? month.top[0] : "—"} hint={month.top ? money(currency, month.top[1]) : undefined} />
       </div>
-      <Toolbar>
+      <FilterBar
+        active={filtersActive}
+        actions={
+          <>
+            <ColumnManager table="expenses" />
+            <Button onClick={() => setTarget("new")}>Add expense</Button>
+          </>
+        }
+      >
         <SearchBox value={query} onChange={setQuery} placeholder="Search expenses…" />
         <DateRangeFilter value={range} onChange={setRange} />
         <FilterSelect label="Category" value={category} onChange={setCategory} options={[{ value: "all", label: "All categories" }, ...categories.map((c) => ({ value: c, label: c }))]} />
@@ -125,17 +135,16 @@ export function ExpensesView() {
           onChange={setSupplier}
           options={[{ value: "all", label: "All suppliers" }, { value: "none", label: "No supplier" }, ...suppliers.map((s) => ({ value: s.id, label: s.name }))]}
         />
+        <ViewBySelect value={view} onChange={setView} />
         {filtersActive ? <ResetFiltersButton onClick={resetFilters} /> : null}
         <span className="text-sm text-muted-foreground">Showing {money(currency, shown)}</span>
-        <div className="ml-auto flex gap-2">
-          <ColumnManager table="expenses" />
-          <Button onClick={() => setTarget("new")}>Add expense</Button>
-        </div>
-      </Toolbar>
+      </FilterBar>
       <DataTable
         rows={rows}
         columns={columns}
         rowKey={(e) => e.id}
+        view={view}
+        cardValue="amount"
         onRowClick={(e, checked) => setSelectedId((current) => (checked ? e.id : current === e.id ? null : current))}
         selectedKey={selectedId}
         bulkActions={(chosen, clear) => (

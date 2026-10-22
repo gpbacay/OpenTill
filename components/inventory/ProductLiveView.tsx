@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { ArrowLeft01Icon } from "@hugeicons/core-free-icons";
+import { ArrowLeft01Icon, Image01Icon } from "@hugeicons/core-free-icons";
 import { useOps } from "@/contexts/ops-context";
 import { usePos } from "@/contexts/pos-context";
 import { money } from "@/lib/money";
@@ -69,6 +69,13 @@ export function ProductLiveView({ productId }: { productId: string }) {
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <section className="space-y-5 rounded-xl bg-card p-4 sm:p-6">
+          {product.image ? (
+            <img src={product.image} alt={product.name} className="aspect-[4/3] w-full max-w-sm rounded-xl border border-border object-cover" />
+          ) : (
+            <div className="flex aspect-[4/3] w-full max-w-sm items-center justify-center rounded-xl border border-dashed border-border bg-muted/30 text-muted-foreground">
+              <HugeiconsIcon icon={Image01Icon} size={32} />
+            </div>
+          )}
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
               <p className="break-all font-mono text-xs text-muted-foreground">{product.id}</p>

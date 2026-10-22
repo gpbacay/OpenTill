@@ -9,8 +9,11 @@ import { Expense, PaymentMethod } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { NumberInput } from "@/components/NumberInput";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { CustomFieldInputs } from "@/components/data-table/custom-columns";
+import { FieldError, check, clearError, invalid } from "@/components/FieldError";
+import { collect, maxLength, numberError, required, type FieldErrors } from "@/lib/validation";
 
 export const EXPENSE_CATEGORIES = ["Inventory", "Rent", "Utilities", "Salaries", "Transport", "Maintenance", "Marketing", "Supplies", "Other"];
 
@@ -28,12 +31,12 @@ export function ExpenseDialog({ target, onClose }: { target: Expense | "new" | n
   const { expenses, suppliers, saveExpense, deleteExpense, columnsFor } = useOps();
   const [form, setForm] = useState(blank());
   const [custom, setCustom] = useState<Record<string, string>>({});
-  const [error, setError] = useState("");
+  const [errors, setErrors] = useState<FieldErrors>({});
   const editing = target && target !== "new" ? target : null;
 
   useEffect(() => {
     if (!target) return;
-    setError("");
+    setErrors({});
     if (target === "new") {
       setForm(blank());
       setCustom({});
@@ -51,16 +54,25 @@ export function ExpenseDialog({ target, onClose }: { target: Expense | "new" | n
   }, [target]);
 
   if (!activeTenant) return null;
-  const set = (field: keyof ReturnType<typeof blank>) => (event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+  const set = (field: keyof ReturnType<typeof blank>) => (event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    clearError(setErrors, event.target.id);
     setForm((prev) => ({ ...prev, [field]: event.target.value }));
+  };
   const categories = [...new Set([...EXPENSE_CATEGORIES, ...expenses.map((e) => e.category)])];
 
   const submit = (event: React.FormEvent) => {
     event.preventDefault();
+    const ok = check(
+      collect({
+        "e-amount": numberError(form.amount, "the amount spent", { required: true, positive: true }),
+        "e-date": form.date ? undefined : "Pick the date.",
+        "e-category": required(form.category, "Pick or type a category.") ?? maxLength(form.category, 40, "Category"),
+        "e-desc": maxLength(form.description, 200, "The description"),
+      }),
+      setErrors
+    );
+    if (!ok) return;
     const amount = parseFloat(form.amount);
-    if (Number.isNaN(amount) || amount <= 0) return setError("Enter the amount spent.");
-    if (!form.date) return setError("Pick the date.");
-    if (!form.category.trim()) return setError("Pick a category.");
     saveExpense({
       id: editing?.id ?? uid("exp"),
       tenantId: activeTenant.id,
@@ -82,22 +94,24 @@ export function ExpenseDialog({ target, onClose }: { target: Expense | "new" | n
         <DialogHeader>
           <DialogTitle>{editing ? "Edit expense" : "Add expense"}</DialogTitle>
         </DialogHeader>
-        <form onSubmit={submit} className="space-y-3">
-          {error ? <p className="text-sm text-destructive">{error}</p> : null}
+        <form onSubmit={submit} noValidate className="space-y-3">
           <div className="grid grid-cols-2 gap-2">
             <div className="space-y-1">
-              <Label htmlFor="e-amount">Amount</Label>
-              <Input id="e-amount" type="number" min={0} step="0.01" value={form.amount} onChange={set("amount")} autoFocus />
+              <Label htmlFor="e-amount" required>Amount</Label>
+              <NumberInput id="e-amount" {...invalid(errors, "e-amount")} value={form.amount} onChange={set("amount")} autoFocus />
+              <FieldError errors={errors} id="e-amount" />
             </div>
             <div className="space-y-1">
-              <Label htmlFor="e-date">Date</Label>
-              <Input id="e-date" type="date" value={form.date} onChange={set("date")} />
+              <Label htmlFor="e-date" required>Date</Label>
+              <Input id="e-date" {...invalid(errors, "e-date")} type="date" value={form.date} onChange={set("date")} />
+              <FieldError errors={errors} id="e-date" />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-2">
             <div className="space-y-1">
-              <Label htmlFor="e-category">Category</Label>
-              <Input id="e-category" list="e-categories" value={form.category} onChange={set("category")} />
+              <Label htmlFor="e-category" required>Category</Label>
+              <Input id="e-category" {...invalid(errors, "e-category")} list="e-categories" value={form.category} onChange={set("category")} />
+              <FieldError errors={errors} id="e-category" />
               <datalist id="e-categories">
                 {categories.map((c) => (
                   <option key={c} value={c} />
@@ -115,7 +129,8 @@ export function ExpenseDialog({ target, onClose }: { target: Expense | "new" | n
           </div>
           <div className="space-y-1">
             <Label htmlFor="e-desc">What was it for?</Label>
-            <Input id="e-desc" value={form.description} onChange={set("description")} />
+            <Input id="e-desc" {...invalid(errors, "e-desc")} value={form.description} onChange={set("description")} />
+            <FieldError errors={errors} id="e-desc" />
           </div>
           <div className="space-y-1">
             <Label htmlFor="e-supplier">Supplier (optional)</Label>

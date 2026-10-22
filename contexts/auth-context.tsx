@@ -27,13 +27,15 @@ interface AccountUpdate {
   username: string;
   currentPassword?: string;
   newPassword?: string;
+  /** New profile picture (image data URL), or "" to remove it. */
+  avatar?: string;
 }
 
 interface AuthContextValue {
   user: LocalUser | null;
   ready: boolean;
   login: (username: string, password: string, remember: boolean) => Promise<string | null>;
-  register: (name: string, username: string, password: string) => Promise<string | null>;
+  register: (username: string, password: string) => Promise<string | null>;
   logout: () => Promise<void>;
   updateAccount: (body: AccountUpdate) => Promise<string | null>;
 }
@@ -54,8 +56,8 @@ function apiMissing(res: Response) {
   return res.status === 404 || res.status >= 500;
 }
 
-function asUser(value: { id: string; name: string; username: string }): LocalUser {
-  return { id: value.id, name: value.name, username: value.username };
+function asUser(value: { id: string; name: string; username: string; avatar?: string }): LocalUser {
+  return { id: value.id, name: value.name, username: value.username, avatar: value.avatar ?? "" };
 }
 
 async function syncPendingAccounts() {
@@ -158,20 +160,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {
       const local = await matchLocalAccount(normalized, password);
       if (!local) return "Username or password is incorrect.";
-      const next = { id: local.id, name: local.name, username: local.username };
+      const next = { id: local.id, name: local.name, username: local.username, avatar: local.avatar ?? "" };
       writeLocalSession(next, remember);
       setUser(next);
       return null;
     }
   };
 
-  const register = async (name: string, username: string, password: string) => {
+  const register = async (username: string, password: string) => {
     const normalized = username.trim().toLowerCase();
-    if (!name.trim()) return "Enter your name.";
     if (!normalized) return "Enter a username.";
     if (password.length < 8) return "Password must be at least 8 characters.";
     const id = newLocalId();
-    const draft = { id, name: name.trim(), username: normalized };
+    // The display name starts as the username; it can be changed later in Account.
+    const draft = { id, name: normalized, username: normalized, avatar: "" };
     try {
       const res = await fetch("/api/auth/register", {
         method: "POST",

@@ -7,6 +7,7 @@ import type { CustomColumn, CustomColumnTable } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { NumberInput } from "@/components/NumberInput";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import type { Column } from "./DataTable";
 
@@ -52,13 +53,21 @@ export function CustomFieldInputs({
       {columns.map((column) => (
         <div key={column.id} className="space-y-1">
           <Label htmlFor={`custom-${column.id}`}>{column.label}</Label>
-          <Input
-            id={`custom-${column.id}`}
-            type={column.type === "text" ? "text" : column.type}
-            step={column.type === "number" ? "any" : undefined}
-            value={values[column.id] ?? ""}
-            onChange={(event) => onChange({ ...values, [column.id]: event.target.value })}
-          />
+          {column.type === "number" ? (
+            <NumberInput
+              id={`custom-${column.id}`}
+              negative
+              value={values[column.id] ?? ""}
+              onChange={(event) => onChange({ ...values, [column.id]: event.target.value })}
+            />
+          ) : (
+            <Input
+              id={`custom-${column.id}`}
+              type={column.type}
+              value={values[column.id] ?? ""}
+              onChange={(event) => onChange({ ...values, [column.id]: event.target.value })}
+            />
+          )}
         </div>
       ))}
     </div>

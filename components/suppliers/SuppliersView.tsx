@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DeleteButton, ExportButton } from "@/components/data-table/bulk";
 import { DataTable, type Column } from "@/components/data-table/DataTable";
-import { FilterSelect, ResetFiltersButton, SearchBox, StatTile, Toolbar, matches } from "@/components/data-table/controls";
+import { FilterSelect, ResetFiltersButton, SearchBox, StatTile, FilterBar, ViewBySelect, matches, useViewMode } from "@/components/data-table/controls";
 import { ColumnManager, customColumnDefs, customFieldRows, customText } from "@/components/data-table/custom-columns";
 import { DetailPanel, Fields, PanelSection, SplitView } from "@/components/data-table/DetailPanel";
 import { SupplierDialog } from "./SupplierDialog";
@@ -26,6 +26,7 @@ export function SuppliersView() {
   const { suppliers, movements, expenses, columnsFor, deleteSupplier, ready } = useOps();
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("all");
+  const [view, setView] = useViewMode("suppliers", "cards");
   const [target, setTarget] = useState<Supplier | "new" | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const currency = activeTenant?.currency ?? "PHP";
@@ -117,6 +118,7 @@ export function SuppliersView() {
     >
       <Fields
         rows={[
+          ["ID", <span key="supplier-id" className="break-all font-mono text-xs">{selected.id}</span>],
           ["Contact", selected.contactPerson || "—"],
           ["Phone", selected.phone ? <a className="underline-offset-4 hover:underline" href={`tel:${selected.phone}`}>{selected.phone}</a> : "—"],
           ["Email", selected.email ? <a className="underline-offset-4 hover:underline" href={`mailto:${selected.email}`}>{selected.email}</a> : "—"],
@@ -168,19 +170,26 @@ export function SuppliersView() {
         <StatTile label="Active" value={suppliers.filter((s) => s.active).length} />
         <StatTile label="Paid to suppliers this month" value={money(currency, paidThisMonth)} />
       </div>
-      <Toolbar>
+      <FilterBar
+        active={filtersActive}
+        actions={
+          <>
+            <ColumnManager table="suppliers" />
+            <Button onClick={() => setTarget("new")}>Add supplier</Button>
+          </>
+        }
+      >
         <SearchBox value={query} onChange={setQuery} placeholder="Search name, contact, phone…" />
         <FilterSelect label="Status" value={status} onChange={setStatus} options={STATUS} />
+        <ViewBySelect value={view} onChange={setView} />
         {filtersActive ? <ResetFiltersButton onClick={resetFilters} /> : null}
-        <div className="ml-auto flex gap-2">
-          <ColumnManager table="suppliers" />
-          <Button onClick={() => setTarget("new")}>Add supplier</Button>
-        </div>
-      </Toolbar>
+      </FilterBar>
       <DataTable
         rows={rows}
         columns={columns}
         rowKey={(s) => s.id}
+        view={view}
+        cardValue="spent"
         onRowClick={(s, checked) => setSelectedId((current) => (checked ? s.id : current === s.id ? null : current))}
         selectedKey={selectedId}
         bulkActions={(chosen, clear) => (

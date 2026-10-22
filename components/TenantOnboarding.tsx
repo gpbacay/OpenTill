@@ -5,6 +5,8 @@ import { Tenant } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { FieldError, check, clearError, invalid } from "@/components/FieldError";
+import { collect, maxLength, required, type FieldErrors } from "@/lib/validation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -51,14 +53,21 @@ export function TenantOnboarding({
   const [name, setName] = useState("");
   const [businessType, setBusinessType] = useState("Retail");
   const [currency, setCurrency] = useState("PHP");
-  const [error, setError] = useState("");
+  const [errors, setErrors] = useState<FieldErrors>({});
 
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
-    if (!name.trim()) {
-      setError("Enter a store name.");
-      return;
-    }
+    const taken = tenants.some((tenant) => tenant.name.trim().toLowerCase() === name.trim().toLowerCase());
+    const ok = check(
+      collect({
+        "store-name":
+          required(name, "Enter a store name.") ??
+          maxLength(name, 60, "The store name") ??
+          (taken ? `You already have a store called ${name.trim()}.` : undefined),
+      }),
+      setErrors
+    );
+    if (!ok) return;
     onAddTenant({
       id: `tenant-${Date.now()}`,
       name: name.trim(),
@@ -69,16 +78,24 @@ export function TenantOnboarding({
       active: true,
     });
     setName("");
-    setError("");
+    setErrors({});
   };
 
   return (
     <div className={`grid gap-4 ${tenants.length > 0 ? "lg:grid-cols-2" : ""} h-full overflow-y-auto`}>
-      <form onSubmit={handleSubmit} className="space-y-3">
-        {error ? <p className="text-sm text-destructive">{error}</p> : null}
+      <form onSubmit={handleSubmit} noValidate className="space-y-3">
         <div className="space-y-1">
-          <Label htmlFor="store-name">Store name</Label>
-          <Input id="store-name" value={name} onChange={(event) => setName(event.target.value)} />
+          <Label htmlFor="store-name" required>Store name</Label>
+          <Input
+            id="store-name"
+            {...invalid(errors, "store-name")}
+            value={name}
+            onChange={(event) => {
+              clearError(setErrors, "store-name");
+              setName(event.target.value);
+            }}
+          />
+          <FieldError errors={errors} id="store-name" />
         </div>
         <div className="grid grid-cols-2 gap-2">
           <div className="space-y-1">

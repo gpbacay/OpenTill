@@ -3,18 +3,18 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { FullScreenIcon, MinimizeScreenIcon, Notification03Icon } from "@hugeicons/core-free-icons";
+import { FullScreenIcon, Menu01Icon, MinimizeScreenIcon, Notification03Icon } from "@hugeicons/core-free-icons";
 import { usePos } from "@/contexts/pos-context";
 import { useRecentActivity } from "@/hooks/use-recent-activity";
 import { Button } from "@/components/ui/button";
-import { SidebarTrigger } from "@/components/ui/sidebar";
-import { StoreMenu } from "@/components/layout/Sidebar";
+import { SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
 import { Breadcrumbs } from "@/components/layout/Breadcrumbs";
 
 export default function Header() {
   const { isOnline, offlineQueue, isSyncing, triggerOfflineSync, activeTenant } = usePos();
   const [isFullscreen, setIsFullscreen] = useState(false);
   const { unreadCount } = useRecentActivity();
+  const { setOpenMobile } = useSidebar();
   const queued = offlineQueue.filter((entry) => entry.order.tenantId === activeTenant?.id).length;
 
   useEffect(() => {
@@ -34,6 +34,9 @@ export default function Header() {
   return (
     <header className="flex h-14 shrink-0 items-center gap-2 px-3 sm:gap-3 sm:px-4">
       <SidebarTrigger className="hidden md:inline-flex" />
+      <Button size="icon" variant="ghost" className="md:hidden" onClick={() => setOpenMobile(true)} aria-label="Open menu">
+        <HugeiconsIcon icon={Menu01Icon} size={20} />
+      </Button>
       <Breadcrumbs />
       <div className="flex shrink-0 items-center gap-1 sm:gap-2">
         {!isOnline ? (
@@ -66,9 +69,6 @@ export default function Header() {
         >
           <HugeiconsIcon icon={isFullscreen ? MinimizeScreenIcon : FullScreenIcon} size={16} />
         </Button>
-        <div className="md:hidden">
-          <StoreMenu compact />
-        </div>
       </div>
     </header>
   );

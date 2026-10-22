@@ -115,7 +115,9 @@ function DialogFooter({
       {children}
       {showCloseButton && (
         <DialogPrimitive.Close asChild>
-          <Button variant="outline">Close</Button>
+          <Button variant="outline" size="icon" aria-label="Close" title="Close">
+            <HugeiconsIcon icon={Cancel01Icon} size={16} />
+          </Button>
         </DialogPrimitive.Close>
       )}
     </div>

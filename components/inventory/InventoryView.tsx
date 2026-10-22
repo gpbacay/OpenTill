@@ -1,6 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { ImageAdd01Icon } from "@hugeicons/core-free-icons";
 import { useOps } from "@/contexts/ops-context";
 import { usePos } from "@/contexts/pos-context";
 import { money } from "@/lib/money";
@@ -12,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DeleteButton, ExportButton } from "@/components/data-table/bulk";
 import { DataTable, type Column } from "@/components/data-table/DataTable";
-import { FilterSelect, ResetFiltersButton, SearchBox, StatTile, Toolbar, matches } from "@/components/data-table/controls";
+import { FilterSelect, ResetFiltersButton, SearchBox, StatTile, FilterBar, ViewBySelect, matches, useViewMode } from "@/components/data-table/controls";
 import { ColumnManager, customColumnDefs, customFieldRows, customText } from "@/components/data-table/custom-columns";
 import { DetailPanel, Fields, PanelSection, SplitView } from "@/components/data-table/DetailPanel";
 import { ProductDialog } from "./ProductDialog";
@@ -51,6 +53,8 @@ export function InventoryView() {
   const [productTarget, setProductTarget] = useState<Product | "new" | null>(null);
   const [stockAction, setStockAction] = useState<StockAction | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [stockView, setStockView] = useViewMode("inventory", "cards");
+  const [historyView, setHistoryView] = useViewMode("stock-history", "table");
 
   const tenantId = activeTenant?.id;
   const catalog = useMemo(() => products.filter((p) => p.tenantId === tenantId), [products, tenantId]);
@@ -125,7 +129,7 @@ export function InventoryView() {
   ];
 
   const historyColumns: Column<StockMovement>[] = [
-    { id: "date", header: "When", cell: (m) => <span className="whitespace-nowrap">{new Date(m.date).toLocaleString()}</span> },
+    { id: "date", header: "Date", cell: (m) => <span className="whitespace-nowrap">{new Date(m.date).toLocaleString()}</span> },
     { id: "product", header: "Product", cell: (m) => m.productName },
     { id: "type", header: "Type", cell: (m) => <Badge variant="secondary">{TYPE_LABEL[m.type] ?? m.type}</Badge> },
     {
@@ -161,6 +165,18 @@ export function InventoryView() {
         </>
       }
     >
+      {selected.image ? (
+        <img src={selected.image} alt={selected.name} className="aspect-[4/3] w-full rounded-xl border border-border object-cover" />
+      ) : (
+        <button
+          type="button"
+          onClick={() => setProductTarget(selected)}
+          className="flex aspect-[4/3] w-full flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border bg-muted/30 text-sm text-muted-foreground hover:text-foreground"
+        >
+          <HugeiconsIcon icon={ImageAdd01Icon} size={28} />
+          Add a photo
+        </button>
+      )}
       <div className="flex items-baseline gap-2">
         <span className="text-3xl font-bold tabular-nums">{selected.stock}</span>
         <span className="text-sm text-muted-foreground">in stock</span>
@@ -225,19 +241,31 @@ export function InventoryView() {
         <StatTile label="Out of stock" value={stats.out} />
       </div>
 
-      <Toolbar>
-        <Tabs
-          value={tab}
-          onValueChange={(v) => {
-            setTab(v as "stock" | "history");
-            setSelectedId(null);
-          }}
-        >
-          <TabsList>
-            <TabsTrigger value="stock">Stock</TabsTrigger>
-            <TabsTrigger value="history">History</TabsTrigger>
-          </TabsList>
-        </Tabs>
+      <FilterBar
+        active={filtersActive}
+        leading={
+          <Tabs
+            value={tab}
+            onValueChange={(v) => {
+              setTab(v as "stock" | "history");
+              setSelectedId(null);
+            }}
+          >
+            <TabsList>
+              <TabsTrigger value="stock">Stock</TabsTrigger>
+              <TabsTrigger value="history">History</TabsTrigger>
+            </TabsList>
+          </Tabs>
+        }
+        actions={
+          tab === "stock" ? (
+            <>
+              <ColumnManager table="products" />
+              <Button onClick={() => setProductTarget("new")}>Add product</Button>
+            </>
+          ) : null
+        }
+      >
         <SearchBox value={query} onChange={setQuery} placeholder={tab === "stock" ? "Search name, SKU, brand…" : "Search history"} />
         {tab === "stock" ? (
           <>
@@ -253,20 +281,18 @@ export function InventoryView() {
         ) : (
           <FilterSelect label="Change type" value={type} onChange={setType} options={TYPE_OPTIONS} />
         )}
+        <ViewBySelect value={tab === "stock" ? stockView : historyView} onChange={tab === "stock" ? setStockView : setHistoryView} />
         {filtersActive ? <ResetFiltersButton onClick={resetFilters} /> : null}
-        {tab === "stock" ? (
-          <div className="ml-auto flex gap-2">
-            <ColumnManager table="products" />
-            <Button onClick={() => setProductTarget("new")}>Add product</Button>
-          </div>
-        ) : null}
-      </Toolbar>
+      </FilterBar>
 
       {tab === "stock" ? (
         <DataTable
           rows={stockRows}
           columns={stockColumns}
           rowKey={(p) => p.id}
+          view={stockView}
+          cardValue="price"
+          image={(p) => p.image}
           onRowClick={(p, checked) => setSelectedId((current) => (checked ? p.id : current === p.id ? null : current))}
           selectedKey={selectedId}
           resetKey={filtered}
@@ -295,11 +321,13 @@ export function InventoryView() {
           rows={historyRows}
           columns={historyColumns}
           rowKey={(m) => m.id}
+          view={historyView}
+          cardValue="qty"
           resetKey={filtered}
           bulkActions={(chosen) => (
             <ExportButton
               filename="stock-history.csv"
-              headers={["ID", "When", "Product", "Type", "Change", "Cost each", "Supplier", "Note"]}
+              headers={["ID", "Date", "Product", "Type", "Change", "Cost each", "Supplier", "Note"]}
               rows={chosen.map((m) => [m.id, new Date(m.date).toLocaleString(), m.productName, TYPE_LABEL[m.type] ?? m.type, m.quantity, m.unitCost, supplierName(m.supplierId), m.note])}
             />
           )}

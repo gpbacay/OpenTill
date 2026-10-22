@@ -6,8 +6,10 @@ import { Label as LabelPrimitive } from "radix-ui"
 
 function Label({
   className,
+  required = false,
+  children,
   ...props
-}: React.ComponentProps<typeof LabelPrimitive.Root>) {
+}: React.ComponentProps<typeof LabelPrimitive.Root> & { required?: boolean }) {
   return (
     <LabelPrimitive.Root
       data-slot="label"
@@ -16,7 +18,15 @@ function Label({
         className
       )}
       {...props}
-    />
+    >
+      {children}
+      {required ? (
+        <span className="-ml-1.5 text-destructive">
+          <span aria-hidden="true">*</span>
+          <span className="sr-only">(required)</span>
+        </span>
+      ) : null}
+    </LabelPrimitive.Root>
   )
 }
 

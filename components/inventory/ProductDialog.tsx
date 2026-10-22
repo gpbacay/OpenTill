@@ -8,9 +8,13 @@ import { Product } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { NumberInput } from "@/components/NumberInput";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { CustomFieldInputs } from "@/components/data-table/custom-columns";
+import { ImagePicker } from "@/components/ImagePicker";
+import { FieldError, check, clearError, invalid } from "@/components/FieldError";
+import { collect, maxLength, numberError, required, type FieldErrors } from "@/lib/validation";
 
 interface Props {
   /** null = closed, "new" = add form, Product = edit form */
@@ -25,15 +29,17 @@ export function ProductDialog({ target, onClose }: Props) {
   const { suppliers, columnsFor, recordMovement } = useOps();
   const [form, setForm] = useState(blank);
   const [custom, setCustom] = useState<Record<string, string>>({});
-  const [error, setError] = useState("");
+  const [image, setImage] = useState("");
+  const [errors, setErrors] = useState<FieldErrors>({});
   const editing = target && target !== "new" ? target : null;
 
   useEffect(() => {
     if (!target) return;
-    setError("");
+    setErrors({});
     if (target === "new") {
       setForm(blank);
       setCustom({});
+      setImage("");
       return;
     }
     setForm({
@@ -48,33 +54,47 @@ export function ProductDialog({ target, onClose }: Props) {
       description: target.description,
     });
     setCustom(target.custom ?? {});
+    setImage(target.image ?? "");
   }, [target]);
 
   if (!activeTenant) return null;
-  const set = (field: keyof typeof blank) => (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
+  const set = (field: keyof typeof blank) => (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    clearError(setErrors, event.target.id);
     setForm((prev) => ({ ...prev, [field]: event.target.value }));
+  };
   const categories = [...new Set(products.filter((p) => p.tenantId === activeTenant.id).map((p) => p.category))].sort();
 
   const submit = (event: React.FormEvent) => {
     event.preventDefault();
+    const sku = form.sku.trim();
+    const clash = products.find(
+      (p) => p.tenantId === activeTenant.id && p.sku.toLowerCase() === sku.toLowerCase() && p.id !== editing?.id
+    );
+    const ok = check(
+      collect({
+        "p-name": required(form.name, "Enter the product name.") ?? maxLength(form.name, 80, "Name"),
+        "p-sku":
+          required(sku, "Enter a SKU.") ??
+          (/\s/.test(sku) ? "A SKU can't contain spaces." : clash ? `${sku.toUpperCase()} is already used by ${clash.name}.` : undefined),
+        "p-category": required(form.category, "Pick or type a category.") ?? maxLength(form.category, 40, "Category"),
+        "p-cost": numberError(form.costPrice, "the cost", { min: 0 }),
+        "p-price": numberError(form.price, "the selling price", { required: true, min: 0 }),
+        "p-stock": editing ? undefined : numberError(form.stock, "starting stock", { min: 0, integer: true }),
+        "p-reorder": numberError(form.reorderLevel, "the warning level", { min: 0, integer: true }),
+      }),
+      setErrors
+    );
+    if (!ok) return;
     const price = parseFloat(form.price);
     const costPrice = parseFloat(form.costPrice || "0");
     const stock = parseInt(form.stock || "0", 10);
     const reorderLevel = parseInt(form.reorderLevel || "0", 10);
-    if (!form.name.trim() || !form.category.trim() || !form.sku.trim()) return setError("Name, category and SKU are required.");
-    if ([price, costPrice, stock, reorderLevel].some((n) => Number.isNaN(n) || n < 0)) {
-      return setError("Prices, stock and reorder level can't be negative.");
-    }
-    const clash = products.find(
-      (p) => p.tenantId === activeTenant.id && p.sku.toLowerCase() === form.sku.trim().toLowerCase() && p.id !== editing?.id
-    );
-    if (clash) return setError(`SKU ${form.sku.trim()} is already used by ${clash.name}.`);
 
     const next: Product = {
       id: editing?.id ?? uid("prod"),
       tenantId: activeTenant.id,
       name: form.name.trim(),
-      sku: form.sku.trim().toUpperCase(),
+      sku: sku.toUpperCase(),
       category: form.category.trim(),
       supplierId: form.supplierId || null,
       costPrice,
@@ -83,6 +103,7 @@ export function ProductDialog({ target, onClose }: Props) {
       description: form.description.trim(),
       stock: editing?.stock ?? 0,
       custom,
+      image,
     };
     if (editing) {
       handleUpdateProduct(next);
@@ -112,20 +133,24 @@ export function ProductDialog({ target, onClose }: Props) {
         <DialogHeader>
           <DialogTitle>{editing ? "Edit product" : "Add product"}</DialogTitle>
         </DialogHeader>
-        <form onSubmit={submit} className="space-y-3">
-          {error ? <p className="text-sm text-destructive">{error}</p> : null}
+        <form onSubmit={submit} noValidate className="space-y-3">
+          {/* ponytail: photos live inline on the product (~20 KB each, cached in localStorage); move to file storage if catalogs get large. */}
+          <ImagePicker label="Product photo (optional)" value={image} onChange={setImage} max={320} />
           <div className="space-y-1">
-            <Label htmlFor="p-name">Name</Label>
-            <Input id="p-name" value={form.name} onChange={set("name")} autoFocus />
+            <Label htmlFor="p-name" required>Name</Label>
+            <Input id="p-name" {...invalid(errors, "p-name")} value={form.name} onChange={set("name")} autoFocus />
+            <FieldError errors={errors} id="p-name" />
           </div>
           <div className="grid grid-cols-2 gap-2">
             <div className="space-y-1">
-              <Label htmlFor="p-sku">SKU</Label>
-              <Input id="p-sku" value={form.sku} onChange={set("sku")} />
+              <Label htmlFor="p-sku" required>SKU</Label>
+              <Input id="p-sku" {...invalid(errors, "p-sku")} value={form.sku} onChange={set("sku")} />
+              <FieldError errors={errors} id="p-sku" />
             </div>
             <div className="space-y-1">
-              <Label htmlFor="p-category">Category</Label>
-              <Input id="p-category" list="p-categories" value={form.category} onChange={set("category")} />
+              <Label htmlFor="p-category" required>Category</Label>
+              <Input id="p-category" {...invalid(errors, "p-category")} list="p-categories" value={form.category} onChange={set("category")} />
+              <FieldError errors={errors} id="p-category" />
               <datalist id="p-categories">
                 {categories.map((category) => (
                   <option key={category} value={category} />
@@ -136,11 +161,13 @@ export function ProductDialog({ target, onClose }: Props) {
           <div className="grid grid-cols-2 gap-2">
             <div className="space-y-1">
               <Label htmlFor="p-cost">Cost</Label>
-              <Input id="p-cost" type="number" min={0} step="0.01" value={form.costPrice} onChange={set("costPrice")} />
+              <NumberInput id="p-cost" {...invalid(errors, "p-cost")} value={form.costPrice} onChange={set("costPrice")} />
+              <FieldError errors={errors} id="p-cost" />
             </div>
             <div className="space-y-1">
-              <Label htmlFor="p-price">Selling price</Label>
-              <Input id="p-price" type="number" min={0} step="0.01" value={form.price} onChange={set("price")} />
+              <Label htmlFor="p-price" required>Selling price</Label>
+              <NumberInput id="p-price" {...invalid(errors, "p-price")} value={form.price} onChange={set("price")} />
+              <FieldError errors={errors} id="p-price" />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-2">
@@ -152,12 +179,14 @@ export function ProductDialog({ target, onClose }: Props) {
             ) : (
               <div className="space-y-1">
                 <Label htmlFor="p-stock">Starting stock</Label>
-                <Input id="p-stock" type="number" min={0} value={form.stock} onChange={set("stock")} />
+                <NumberInput id="p-stock" {...invalid(errors, "p-stock")} decimals={false} value={form.stock} onChange={set("stock")} />
+                <FieldError errors={errors} id="p-stock" />
               </div>
             )}
             <div className="space-y-1">
               <Label htmlFor="p-reorder">Warn me at</Label>
-              <Input id="p-reorder" type="number" min={0} value={form.reorderLevel} onChange={set("reorderLevel")} />
+              <NumberInput id="p-reorder" {...invalid(errors, "p-reorder")} decimals={false} value={form.reorderLevel} onChange={set("reorderLevel")} />
+              <FieldError errors={errors} id="p-reorder" />
             </div>
           </div>
           <div className="space-y-1">

@@ -1,5 +1,6 @@
 import { ForbiddenException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { encodeCustom, parseCustom } from "../common/custom-fields";
+import { cleanImage } from "../common/images";
 import { DatabaseService } from "../database/database.service";
 import { RealtimeService } from "../realtime/realtime.service";
 import { TenantsService } from "../tenants/tenants.service";
@@ -17,6 +18,7 @@ export interface Product {
   reorderLevel: number;
   supplierId: string | null;
   custom: Record<string, string>;
+  image: string;
 }
 
 const fromRow = (row: any): Product => ({ ...row, custom: parseCustom(row.custom) });
@@ -81,6 +83,7 @@ export class ProductsService {
       reorderLevel: body.reorderLevel !== undefined ? Math.max(0, parseInt(body.reorderLevel as any) || 0) : undefined,
       supplierId: body.supplierId === undefined ? undefined : body.supplierId || null,
       custom: body.custom === undefined ? undefined : parseCustom(body.custom),
+      image: body.image === undefined ? undefined : cleanImage(body.image),
     };
   }
 
@@ -102,6 +105,7 @@ export class ProductsService {
       reorderLevel: edit.reorderLevel ?? 5,
       supplierId: edit.supplierId ?? null,
       custom: edit.custom ?? {},
+      image: edit.image ?? "",
     };
 
     let saved = false;

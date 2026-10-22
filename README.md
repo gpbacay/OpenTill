@@ -6,15 +6,17 @@ A multi-tenant, offline-first Point of Sale system for retail operations: regist
 
 - **Register:** Ring up sales from a product catalog. Leave "Cash received" empty for an exact payment and the cashier defaults to the signed-in user. Held sales and receipt printing included
 - **Dashboard:** Pick a date range (presets or exact From / To dates) and the sales, expenses, trend chart, recent sales and deliveries all follow it. Each card has an arrow in its corner that opens that page with the same dates
-- **Inventory:** Stock levels with low and out-of-stock warnings, restocks from suppliers, stock adjustments (damage, count corrections) and a full stock history. Stock only moves through logged changes, so the numbers always add up
+- **Inventory:** Optional product photos (shown on cards and as table thumbnails), stock levels with low and out-of-stock warnings, restocks from suppliers, stock adjustments (damage, count corrections) and a full stock history. Stock only moves through logged changes, so the numbers always add up
 - **Sales:** Searchable, filterable sales table (period, status, payment, cashier) with receipts and a Reports tab
+- **Reports:** Monthly and yearly reports (sales, product sales, expenses, profit and loss, restocks) in a searchable table filtered by type and date. Open one in the app, save it as a PDF (print dialog) or Excel file (CSV), or copy a share link. The link holds a copy of the report itself, so whoever opens it doesn't need to sign in
 - **Suppliers:** Contacts, what you bought from each and when they last delivered
 - **Expenses:** Track rent, bills and restocks, filter by period, category and supplier, and see what is left after expenses
 - **Custom columns:** Add your own columns (for example "Brand" on products) to the Inventory, Suppliers and Expenses tables with the **Columns** button. They appear in the table, the add/edit form and search
 - **Realtime:** Changes show up on every open tab and device within a moment
 - **Offline-first:** Keep working without a connection. Everything is saved on the device and syncs when the API is reachable again
-- **Tables:** Sticky headers, pagination, search and filters everywhere. Tick rows (a checkbox appears when you hover a row) to export them as CSV or delete them in bulk; phone layout with a bottom navigation bar
+- **Tables:** Sticky headers, pagination, search and filters everywhere. Switch any list between a table and cards with **View by** (Inventory, Suppliers, Reports and the Register start as cards; the choice is remembered on the device). Tick rows (a checkbox appears when you hover a row) to export them as CSV or delete them in bulk; phone layout with a bottom navigation bar
 - **Multi-tenant:** Onboard and switch between stores
+- **Settings, Help center and About:** Searchable settings (theme, stores, sync status, account), a searchable help center with answers for every page, and an About page
 
 ## Tech Stack
 

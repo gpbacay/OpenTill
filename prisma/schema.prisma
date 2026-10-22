@@ -13,6 +13,7 @@ model User {
   name         String
   email        String    @unique
   passwordHash String
+  avatar       String    @default("") // small image data URL, "" for none
   createdAt    DateTime  @default(now())
   sessions     Session[]
   tenants      Tenant[]
@@ -53,6 +54,7 @@ model Product {
   reorderLevel Int     @default(5)
   supplierId   String?
   custom       String  @default("{}") // JSON {customColumnId: value}
+  image        String  @default("") // small image data URL, "" for none
   tenant       Tenant  @relation(fields: [tenantId], references: [id])
 }
 

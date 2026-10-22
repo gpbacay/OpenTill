@@ -71,7 +71,6 @@ export function ActivityView() {
     <div className="flex min-h-0 flex-1 flex-col gap-4 py-1">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-sm text-muted-foreground">Sales, inventory, expenses, and supplier updates in one place.</p>
           <p className="mt-1 text-xs text-muted-foreground">{unreadCount} unread</p>
         </div>
         {unreadCount > 0 ? (

@@ -14,7 +14,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DeleteButton, ExportButton } from "@/components/data-table/bulk";
 import { DataTable, type Column } from "@/components/data-table/DataTable";
 import { DateRangeFilter } from "@/components/data-table/DateRangeFilter";
-import { FilterSelect, ResetFiltersButton, SearchBox, StatTile, Toolbar, matches } from "@/components/data-table/controls";
+import { FilterSelect, ResetFiltersButton, SearchBox, StatTile, FilterBar, Toolbar, ViewBySelect, matches, useViewMode } from "@/components/data-table/controls";
 
 const STATUS = [
   { value: "all", label: "All sales" },
@@ -38,6 +38,7 @@ export function SalesView() {
   const [status, setStatus] = useState("all");
   const [payment, setPayment] = useState("all");
   const [cashier, setCashier] = useState("all");
+  const [view, setView] = useViewMode("sales", "table");
   const [range, setRange] = useState(() => rangeFromParams(params, "month"));
   const [selectedId, setSelectedId] = useState<string | null>(() => params.get("sale"));
   const currency = activeTenant?.currency ?? "PHP";
@@ -79,7 +80,7 @@ export function SalesView() {
   };
 
   const columns: Column<Order>[] = [
-    { id: "date", header: "When", cell: (o) => <span className="whitespace-nowrap">{new Date(o.date).toLocaleString()}</span> },
+    { id: "date", header: "Date", cell: (o) => <span className="whitespace-nowrap">{new Date(o.date).toLocaleString()}</span> },
     { id: "receipt", header: "Receipt", cell: (o) => <span className="text-xs text-muted-foreground">{o.id.slice(-8)}</span> },
     { id: "customer", header: "Customer", cell: (o) => o.customerName || "Walk-in" },
     { id: "cashier", header: "Cashier", cell: (o) => o.cashierName || "—" },
@@ -107,6 +108,7 @@ export function SalesView() {
       >
         <Fields
           rows={[
+            ["ID", <span key="sale-id" className="break-all font-mono text-xs">{selected.id}</span>],
             ["Customer", selected.customerName || "Walk-in"],
             ["Cashier", selected.cashierName || "—"],
             ["Payment", PAY_LABEL[selected.paymentMethod] ?? selected.paymentMethod],
@@ -152,18 +154,21 @@ export function SalesView() {
             <StatTile label="Orders" value={totals.count} />
             <StatTile label="Average sale" value={money(currency, totals.avg)} />
           </div>
-          <Toolbar>
+          <FilterBar active={filtersActive}>
             <SearchBox value={query} onChange={setQuery} placeholder="Search customer, cashier, item…" />
             <DateRangeFilter value={range} onChange={setRange} />
             <FilterSelect label="Status" value={status} onChange={setStatus} options={STATUS} />
             <FilterSelect label="Payment" value={payment} onChange={setPayment} options={PAYMENT} />
             <FilterSelect label="Cashier" value={cashier} onChange={setCashier} options={[{ value: "all", label: "All cashiers" }, ...cashiers.map((c) => ({ value: c, label: c }))]} />
+            <ViewBySelect value={view} onChange={setView} />
             {filtersActive ? <ResetFiltersButton onClick={resetFilters} /> : null}
-          </Toolbar>
+          </FilterBar>
           <DataTable
             rows={rows}
             columns={columns}
             rowKey={(o) => o.id}
+            view={view}
+            cardValue="total"
             onRowClick={(o, checked) => setSelectedId((current) => (checked ? o.id : current === o.id ? null : current))}
             selectedKey={selectedId}
             bulkActions={(chosen) => (
@@ -171,7 +176,7 @@ export function SalesView() {
                 <span className="text-muted-foreground">Total {money(currency, chosen.filter((o) => o.status !== "FAILED").reduce((sum, o) => sum + o.total, 0))}</span>
                 <ExportButton
                   filename="sales.csv"
-                  headers={["When", "ID", "Customer", "Cashier", "Payment", "Discount", "Total", "Status"]}
+                  headers={["Date", "ID", "Customer", "Cashier", "Payment", "Discount", "Total", "Status"]}
                   rows={chosen.map((o) => [new Date(o.date).toLocaleString(), o.id, o.customerName ?? "Walk-in", o.cashierName ?? "", PAY_LABEL[o.paymentMethod] ?? o.paymentMethod, o.discountAmount ?? 0, o.total, o.status])}
                 />
               </>

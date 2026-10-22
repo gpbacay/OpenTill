@@ -7,7 +7,7 @@ import { money } from "@/lib/money";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { DataTable, type Column } from "@/components/data-table/DataTable";
-import { FilterSelect, ResetFiltersButton } from "@/components/data-table/controls";
+import { FilterBar, FilterSelect, ResetFiltersButton, ViewBySelect, useViewMode } from "@/components/data-table/controls";
 
 interface RegisterCatalogProps {
   products: Product[];
@@ -18,6 +18,7 @@ interface RegisterCatalogProps {
 export function RegisterCatalog({ products, activeTenant, onAddToSale }: RegisterCatalogProps) {
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
+  const [view, setView] = useViewMode("register", "cards");
   const [message, setMessage] = useState("");
 
   const tenantProducts = useMemo(
@@ -116,19 +117,24 @@ export function RegisterCatalog({ products, activeTenant, onAddToSale }: Registe
 
   return (
     <div className="flex h-full flex-col gap-3">
-      <div className="flex flex-wrap gap-2">
-        <form onSubmit={addMatch} className="min-w-0 flex-1">
-          <Input
-            data-register-action="product-search"
-            value={search}
-            onChange={(event) => {
-              setSearch(event.target.value);
-              setMessage("");
-            }}
-            placeholder="Search or scan a SKU"
-            aria-label="Search or scan a SKU"
-          />
-        </form>
+      <FilterBar
+        label="Filters"
+        active={selectedCategory !== "All"}
+        leading={
+          <form onSubmit={addMatch} className="min-w-0 flex-1">
+            <Input
+              data-register-action="product-search"
+              value={search}
+              onChange={(event) => {
+                setSearch(event.target.value);
+                setMessage("");
+              }}
+              placeholder="Search or scan a SKU"
+              aria-label="Search or scan a SKU"
+            />
+          </form>
+        }
+      >
         <FilterSelect
           label="Category"
           value={selectedCategory}
@@ -141,8 +147,9 @@ export function RegisterCatalog({ products, activeTenant, onAddToSale }: Registe
             label: category === "All" ? "All categories" : category,
           }))}
         />
+        <ViewBySelect value={view} onChange={setView} />
         {filtersActive ? <ResetFiltersButton onClick={resetFilters} /> : null}
-      </div>
+      </FilterBar>
       {match && match.stock <= 0 ? (
         <p className="text-sm text-muted-foreground" aria-live="polite">{match.name} is out of stock.</p>
       ) : message ? (
@@ -153,6 +160,9 @@ export function RegisterCatalog({ products, activeTenant, onAddToSale }: Registe
         rows={filteredProducts}
         columns={columns}
         rowKey={(product) => product.id}
+        view={view}
+        cardValue="price"
+        image={(product) => product.image}
         isRowDisabled={(product) => product.stock <= 0}
         resetKey={`${activeTenant.id}|${search}|${selectedCategory}`}
         bulkActions={(selected, clear) => (

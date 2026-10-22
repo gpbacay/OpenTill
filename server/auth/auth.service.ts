@@ -8,6 +8,7 @@ import {
 import { createHash, randomBytes, scrypt as scryptCallback, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
 import { DatabaseService } from "../database/database.service";
+import { cleanImage } from "../common/images";
 
 const scrypt = promisify(scryptCallback);
 const KEY_LENGTH = 64;
@@ -19,6 +20,7 @@ export interface AuthUser {
   id: string;
   name: string;
   username: string;
+  avatar: string;
 }
 
 interface StoredUser {
@@ -26,6 +28,7 @@ interface StoredUser {
   name: string;
   email: string;
   passwordHash: string;
+  avatar: string;
 }
 
 interface MemorySession {
@@ -40,6 +43,7 @@ export interface AccountUpdate {
   username?: string;
   currentPassword?: string;
   newPassword?: string;
+  avatar?: string;
 }
 
 function hashToken(token: string) {
@@ -96,8 +100,8 @@ function readCookie(header: string | undefined, name: string) {
   return null;
 }
 
-function publicUser(user: { id: string; name: string; email: string }): AuthUser {
-  return { id: user.id, name: user.name, username: user.email };
+function publicUser(user: { id: string; name: string; email: string; avatar?: string }): AuthUser {
+  return { id: user.id, name: user.name, username: user.email, avatar: user.avatar ?? "" };
 }
 
 @Injectable()
@@ -108,8 +112,9 @@ export class AuthService {
   constructor(@Inject(DatabaseService) private readonly dbService: DatabaseService) {}
 
   async register(body: { id?: string; name?: string; username?: string; password?: string }) {
-    const name = requireName(body.name);
     const email = requireUsername(body.username);
+    // Sign-up only asks for a username; the display name starts as the username and can be changed in Account.
+    const name = typeof body.name === "string" && body.name.trim() ? body.name.trim() : email;
     const password = requirePassword(body.password);
     const passwordHash = await hashPassword(password);
     const id = chooseId(body.id);
@@ -141,7 +146,7 @@ export class AuthService {
     if (this.memoryUsers.some((user) => user.email === email)) {
       throw new ConflictException("That username is already in use.");
     }
-    const user = { id, name, email, passwordHash };
+    const user = { id, name, email, passwordHash, avatar: "" };
     this.memoryUsers.push(user);
     const token = await this.createSession(id);
     return { user: publicUser(user), token };
@@ -234,13 +239,15 @@ export class AuthService {
     }
 
     const passwordHash = nextPassword ? await hashPassword(nextPassword) : current.passwordHash;
+    const avatar = body.avatar === undefined ? current.avatar : cleanImage(body.avatar);
     if (client) {
       const updated = await client.user.update({
         where: { id: userId },
-        data: { name, email, passwordHash },
+        data: { name, email, passwordHash, avatar },
       });
       return publicUser(updated);
     }
+    current.avatar = avatar;
     current.name = name;
     current.email = email;
     current.passwordHash = passwordHash;
