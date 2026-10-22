@@ -14,6 +14,18 @@ const ACCOUNTS_KEY = "opentill_local_accounts";
 const SESSION_KEY = "opentill_local_session";
 const ITERATIONS = 100_000;
 
+function readSession(storage: Storage): LocalUser | null {
+  try {
+    const saved = storage.getItem(SESSION_KEY);
+    if (!saved) return null;
+    const user = JSON.parse(saved) as LocalUser;
+    if (!user?.id || !user.username) return null;
+    return { id: user.id, name: user.name, username: user.username };
+  } catch {
+    return null;
+  }
+}
+
 function readAccounts(): LocalAccount[] {
   try {
     const saved = localStorage.getItem(ACCOUNTS_KEY);
@@ -30,23 +42,27 @@ function writeAccounts(accounts: LocalAccount[]) {
 }
 
 export function readLocalSession(): LocalUser | null {
-  try {
-    const saved = localStorage.getItem(SESSION_KEY);
-    if (!saved) return null;
-    const user = JSON.parse(saved) as LocalUser;
-    if (!user?.id || !user.username) return null;
-    return { id: user.id, name: user.name, username: user.username };
-  } catch {
-    return null;
+  return readSession(sessionStorage) ?? readSession(localStorage);
+}
+
+export function writeLocalSession(user: LocalUser | null, remember = false) {
+  if (!user) {
+    localStorage.removeItem(SESSION_KEY);
+    sessionStorage.removeItem(SESSION_KEY);
+    return;
+  }
+  const value = JSON.stringify(user);
+  if (remember) {
+    localStorage.setItem(SESSION_KEY, value);
+    sessionStorage.removeItem(SESSION_KEY);
+  } else {
+    sessionStorage.setItem(SESSION_KEY, value);
+    localStorage.removeItem(SESSION_KEY);
   }
 }
 
-export function writeLocalSession(user: LocalUser | null) {
-  if (!user) {
-    localStorage.removeItem(SESSION_KEY);
-    return;
-  }
-  localStorage.setItem(SESSION_KEY, JSON.stringify(user));
+export function refreshLocalSession(user: LocalUser) {
+  writeLocalSession(user, readSession(localStorage) !== null);
 }
 
 function bytesToHex(bytes: Uint8Array) {

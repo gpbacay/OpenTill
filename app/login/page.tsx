@@ -16,6 +16,7 @@ export default function LoginPage() {
   const [name, setName] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [remember, setRemember] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
@@ -30,7 +31,7 @@ export default function LoginPage() {
     setError("");
     const message = creating
       ? await register(name, username, password)
-      : await login(username, password);
+      : await login(username, password, remember);
     setPending(false);
     if (message) {
       setError(message);
@@ -92,6 +93,20 @@ export default function LoginPage() {
               </button>
             </div>
           </div>
+          {!creating ? (
+            <div className="flex items-center gap-2">
+              <input
+                id="remember-me"
+                type="checkbox"
+                checked={remember}
+                className="size-4 cursor-pointer accent-primary"
+                onChange={(event) => setRemember(event.target.checked)}
+              />
+              <Label htmlFor="remember-me" className="cursor-pointer font-normal">
+                Remember me
+              </Label>
+            </div>
+          ) : null}
           {error ? <p className="text-sm text-destructive">{error}</p> : null}
           <Button type="submit" disabled={pending}>
             {pending ? "Please wait" : creating ? "Create account" : "Sign in"}

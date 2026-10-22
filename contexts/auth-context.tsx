@@ -14,6 +14,7 @@ import {
   newLocalId,
   pendingAccounts,
   readLocalSession,
+  refreshLocalSession,
   rememberLocalAccount,
   touchLocalAccount,
   updateLocalAccount,
@@ -31,7 +32,7 @@ interface AccountUpdate {
 interface AuthContextValue {
   user: LocalUser | null;
   ready: boolean;
-  login: (username: string, password: string) => Promise<string | null>;
+  login: (username: string, password: string, remember: boolean) => Promise<string | null>;
   register: (name: string, username: string, password: string) => Promise<string | null>;
   logout: () => Promise<void>;
   updateAccount: (body: AccountUpdate) => Promise<string | null>;
@@ -86,8 +87,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const local = readLocalSession();
-    if (local) setUser(local);
-    setReady(true);
+    if (local) {
+      setUser(local);
+      setReady(true);
+    }
     let cancelled = false;
     fetch("/api/auth/me")
       .then(async (res) => {
@@ -96,7 +99,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const next = asUser(await res.json());
           touchLocalAccount(next);
           setUser(next);
-          writeLocalSession(next);
+          refreshLocalSession(next);
           return;
         }
         if (res.status === 401 && !local) {
@@ -104,7 +107,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setUser(null);
         }
       })
-      .catch(() => undefined);
+      .catch(() => undefined)
+      .finally(() => {
+        if (!cancelled) setReady(true);
+      });
     void syncPendingAccounts();
     window.addEventListener("online", syncPendingAccounts);
     return () => {
@@ -113,19 +119,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const login = async (username: string, password: string) => {
+  const login = async (username: string, password: string, remember: boolean) => {
     const normalized = username.trim().toLowerCase();
     try {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: normalized, password }),
+        body: JSON.stringify({ username: normalized, password, remember }),
       });
       if (apiMissing(res)) throw new Error("api");
       if (res.ok) {
         const next = asUser(await res.json());
         await rememberLocalAccount(next, password);
-        writeLocalSession(next);
+        writeLocalSession(next, remember);
         setUser(next);
         return null;
       }
@@ -140,19 +146,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           name: local.name,
           username: local.username,
           password,
+          remember,
         }),
       });
       if (!registered.ok) return errorMessage(registered);
       const next = asUser(await registered.json());
       await rememberLocalAccount(next, password);
-      writeLocalSession(next);
+      writeLocalSession(next, remember);
       setUser(next);
       return null;
     } catch {
       const local = await matchLocalAccount(normalized, password);
       if (!local) return "Username or password is incorrect.";
       const next = { id: local.id, name: local.name, username: local.username };
-      writeLocalSession(next);
+      writeLocalSession(next, remember);
       setUser(next);
       return null;
     }
@@ -175,12 +182,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!res.ok) return errorMessage(res);
       const next = asUser(await res.json());
       await rememberLocalAccount(next, password);
-      writeLocalSession(next);
+      writeLocalSession(next, true);
       setUser(next);
       return null;
     } catch {
       await rememberLocalAccount(draft, password, password);
-      writeLocalSession(draft);
+      writeLocalSession(draft, true);
       setUser(draft);
       return null;
     }
@@ -219,14 +226,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (body.newPassword) await rememberLocalAccount(next, body.newPassword);
       else if (body.currentPassword) await rememberLocalAccount(next, body.currentPassword);
       else touchLocalAccount(next);
-      writeLocalSession(next);
+      refreshLocalSession(next);
       setUser(next);
       return null;
     } catch {
       if (!user) return "Sign in on this device first.";
       const updated = await updateLocalAccount(user.id, body);
       if (typeof updated === "string") return updated;
-      writeLocalSession(updated);
+      refreshLocalSession(updated);
       setUser(updated);
       return null;
     }

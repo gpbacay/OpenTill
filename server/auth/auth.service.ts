@@ -262,7 +262,8 @@ export class AuthService {
   }
 }
 
-export function sessionCookie(token: string, maxAge: number) {
+export function sessionCookie(token: string, maxAge?: number) {
   const value = encodeURIComponent(token);
-  return `${SESSION_COOKIE}=${value}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${maxAge}`;
+  const lifetime = maxAge === undefined ? "" : `; Max-Age=${maxAge}`;
+  return `${SESSION_COOKIE}=${value}; HttpOnly; Path=/; SameSite=Lax${lifetime}`;
 }

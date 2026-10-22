@@ -12,11 +12,20 @@ export class AuthController {
   @Public()
   @Post("register")
   async register(
-    @Body() body: { id?: string; name?: string; username?: string; password?: string },
+    @Body() body: {
+      id?: string;
+      name?: string;
+      username?: string;
+      password?: string;
+      remember?: boolean;
+    },
     @Res({ passthrough: true }) res: Response
   ) {
     const { user, token } = await this.authService.register(body);
-    res.setHeader("Set-Cookie", sessionCookie(token, SESSION_MAX_AGE));
+    res.setHeader(
+      "Set-Cookie",
+      sessionCookie(token, body.remember === false ? undefined : SESSION_MAX_AGE)
+    );
     return user;
   }
 
@@ -24,11 +33,14 @@ export class AuthController {
   @Post("login")
   @HttpCode(200)
   async login(
-    @Body() body: { username?: string; password?: string },
+    @Body() body: { username?: string; password?: string; remember?: boolean },
     @Res({ passthrough: true }) res: Response
   ) {
     const { user, token } = await this.authService.login(body);
-    res.setHeader("Set-Cookie", sessionCookie(token, SESSION_MAX_AGE));
+    res.setHeader(
+      "Set-Cookie",
+      sessionCookie(token, body.remember === false ? undefined : SESSION_MAX_AGE)
+    );
     return user;
   }
 
