@@ -124,8 +124,21 @@ export function TenantOnboarding({
             return (
               <Card
                 key={tenant.id}
-                className={`cursor-pointer border-0 shadow-none ${current ? "bg-accent" : ""}`}
-                onClick={() => onSwitchTenant(tenant.id)}
+                role={current ? undefined : "button"}
+                tabIndex={current ? undefined : 0}
+                aria-current={current ? "true" : undefined}
+                className={`border-0 shadow-none ${current ? "bg-accent" : "cursor-pointer hover:bg-accent"}`}
+                onClick={current ? undefined : () => onSwitchTenant(tenant.id)}
+                onKeyDown={
+                  current
+                    ? undefined
+                    : (event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          onSwitchTenant(tenant.id);
+                        }
+                      }
+                }
               >
                 <CardContent className="flex items-center gap-3 p-3">
                   <Avatar className="size-9">

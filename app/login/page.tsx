@@ -115,16 +115,19 @@ export default function LoginPage() {
             {pending ? "Please wait" : creating ? "Create account" : "Sign in"}
           </Button>
         </form>
-        <button
-          type="button"
-          className="mt-4 text-sm text-muted-foreground hover:text-foreground"
-          onClick={() => {
-            setCreating((value) => !value);
-            setError("");
-          }}
-        >
-          {creating ? "Already have an account? Sign in" : "New here? Create an account"}
-        </button>
+        <p className="mt-4 text-sm text-muted-foreground">
+          {creating ? "Already have an account?" : "New here?"}{" "}
+          <button
+            type="button"
+            className="cursor-pointer font-medium text-foreground underline-offset-4 hover:underline focus-visible:underline focus-visible:outline-none"
+            onClick={() => {
+              setCreating((value) => !value);
+              setError("");
+            }}
+          >
+            {creating ? "Sign in" : "Create an account"}
+          </button>
+        </p>
       </div>
     </main>
   );

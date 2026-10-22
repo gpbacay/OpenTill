@@ -5,13 +5,13 @@ import { useOps } from "@/contexts/ops-context";
 import { usePos } from "@/contexts/pos-context";
 import { money } from "@/lib/money";
 import { useSearchParams } from "next/navigation";
-import { inPeriod, inRange, rangeFromParams } from "@/lib/periods";
+import { inPeriod, inRange, presetRange, rangeFromParams } from "@/lib/periods";
 import { Expense } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { DeleteButton, ExportButton } from "@/components/data-table/bulk";
 import { DataTable, type Column } from "@/components/data-table/DataTable";
 import { DateRangeFilter } from "@/components/data-table/DateRangeFilter";
-import { FilterSelect, SearchBox, StatTile, Toolbar, matches } from "@/components/data-table/controls";
+import { FilterSelect, ResetFiltersButton, SearchBox, StatTile, Toolbar, matches } from "@/components/data-table/controls";
 import { ColumnManager, customColumnDefs, customFieldRows, customText } from "@/components/data-table/custom-columns";
 import { DetailPanel, Fields, SplitView } from "@/components/data-table/DetailPanel";
 import { ExpenseDialog } from "./ExpenseDialog";
@@ -70,6 +70,14 @@ export function ExpensesView() {
   if (!activeTenant) return null;
   const net = month.salesTotal - month.spentTotal;
   const shown = rows.reduce((sum, e) => sum + e.amount, 0);
+  const filtersActive = query.trim() !== "" || category !== "all" || supplier !== "all" || range.preset !== "month";
+  const resetFilters = () => {
+    setQuery("");
+    setCategory("all");
+    setSupplier("all");
+    setRange(presetRange("month"));
+    setSelectedId(null);
+  };
 
   const selected = expenses.find((e) => e.id === selectedId) ?? null;
   const panel = selected ? (
@@ -115,6 +123,7 @@ export function ExpensesView() {
           onChange={setSupplier}
           options={[{ value: "all", label: "All suppliers" }, { value: "none", label: "No supplier" }, ...suppliers.map((s) => ({ value: s.id, label: s.name }))]}
         />
+        {filtersActive ? <ResetFiltersButton onClick={resetFilters} /> : null}
         <span className="text-sm text-muted-foreground">Showing {money(currency, shown)}</span>
         <div className="ml-auto flex gap-2">
           <ColumnManager table="expenses" />

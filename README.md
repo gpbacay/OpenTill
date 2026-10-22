@@ -4,7 +4,7 @@ A multi-tenant, offline-first Point of Sale system for retail operations: regist
 
 ## Features
 
-- **Register:** Ring up sales from a product catalog. Leave "Cash received" empty for an exact payment and the cashier defaults to the signed-in user. Held carts and receipt printing included
+- **Register:** Ring up sales from a product catalog. Leave "Cash received" empty for an exact payment and the cashier defaults to the signed-in user. Held sales and receipt printing included
 - **Dashboard:** Pick a date range (presets or exact From / To dates) and the sales, expenses, trend chart, recent sales and deliveries all follow it. Each card has an arrow in its corner that opens that page with the same dates
 - **Inventory:** Stock levels with low and out-of-stock warnings, restocks from suppliers, stock adjustments (damage, count corrections) and a full stock history. Stock only moves through logged changes, so the numbers always add up
 - **Sales:** Searchable, filterable sales table (period, status, payment, cashier) with receipts and a Reports tab

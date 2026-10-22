@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { usePos } from "@/contexts/pos-context";
 import { money } from "@/lib/money";
-import { inRange, rangeFromParams } from "@/lib/periods";
+import { inRange, presetRange, rangeFromParams } from "@/lib/periods";
 import { useSearchParams } from "next/navigation";
 import { Order } from "@/lib/types";
 import { DetailPanel, Fields, SplitView } from "@/components/data-table/DetailPanel";
@@ -14,7 +14,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DeleteButton, ExportButton } from "@/components/data-table/bulk";
 import { DataTable, type Column } from "@/components/data-table/DataTable";
 import { DateRangeFilter } from "@/components/data-table/DateRangeFilter";
-import { FilterSelect, SearchBox, StatTile, Toolbar, matches } from "@/components/data-table/controls";
+import { FilterSelect, ResetFiltersButton, SearchBox, StatTile, Toolbar, matches } from "@/components/data-table/controls";
 
 const STATUS = [
   { value: "all", label: "All sales" },
@@ -39,7 +39,7 @@ export function SalesView() {
   const [payment, setPayment] = useState("all");
   const [cashier, setCashier] = useState("all");
   const [range, setRange] = useState(() => rangeFromParams(params, "month"));
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(() => params.get("sale"));
   const currency = activeTenant?.currency ?? "PHP";
 
   const cashiers = useMemo(
@@ -67,6 +67,16 @@ export function SalesView() {
     const sum = counted.reduce((s, o) => s + o.total, 0);
     return { sum, count: counted.length, avg: counted.length ? sum / counted.length : 0 };
   }, [rows]);
+
+  const filtersActive = query.trim() !== "" || status !== "all" || payment !== "all" || cashier !== "all" || range.preset !== "month";
+  const resetFilters = () => {
+    setQuery("");
+    setStatus("all");
+    setPayment("all");
+    setCashier("all");
+    setRange(presetRange("month"));
+    setSelectedId(null);
+  };
 
   const columns: Column<Order>[] = [
     { id: "date", header: "When", cell: (o) => <span className="whitespace-nowrap">{new Date(o.date).toLocaleString()}</span> },
@@ -148,6 +158,7 @@ export function SalesView() {
             <FilterSelect label="Status" value={status} onChange={setStatus} options={STATUS} />
             <FilterSelect label="Payment" value={payment} onChange={setPayment} options={PAYMENT} />
             <FilterSelect label="Cashier" value={cashier} onChange={setCashier} options={[{ value: "all", label: "All cashiers" }, ...cashiers.map((c) => ({ value: c, label: c }))]} />
+            {filtersActive ? <ResetFiltersButton onClick={resetFilters} /> : null}
           </Toolbar>
           <DataTable
             rows={rows}
@@ -166,7 +177,7 @@ export function SalesView() {
               </>
             )}
             resetKey={`${query}|${range.from}|${range.to}|${status}|${payment}|${cashier}`}
-            empty={tenantSyncedOrders.length === 0 ? "Completed checkouts show up here." : "Nothing matches those filters."}
+            empty={tenantSyncedOrders.length === 0 ? "Completed sales show up here." : "Nothing matches those filters."}
           />
         </>
       )}

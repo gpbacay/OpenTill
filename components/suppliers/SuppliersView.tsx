@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DeleteButton, ExportButton } from "@/components/data-table/bulk";
 import { DataTable, type Column } from "@/components/data-table/DataTable";
-import { FilterSelect, SearchBox, StatTile, Toolbar, matches } from "@/components/data-table/controls";
+import { FilterSelect, ResetFiltersButton, SearchBox, StatTile, Toolbar, matches } from "@/components/data-table/controls";
 import { ColumnManager, customColumnDefs, customFieldRows, customText } from "@/components/data-table/custom-columns";
 import { DetailPanel, Fields, PanelSection, SplitView } from "@/components/data-table/DetailPanel";
 import { SupplierDialog } from "./SupplierDialog";
@@ -58,6 +58,12 @@ export function SuppliersView() {
         .sort((a, b) => a.name.localeCompare(b.name)),
     [suppliers, status, query]
   );
+  const filtersActive = query.trim() !== "" || status !== "all";
+  const resetFilters = () => {
+    setQuery("");
+    setStatus("all");
+    setSelectedId(null);
+  };
 
   const columns: Column<Supplier>[] = [
     {
@@ -162,6 +168,7 @@ export function SuppliersView() {
       <Toolbar>
         <SearchBox value={query} onChange={setQuery} placeholder="Search name, contact, phone…" />
         <FilterSelect label="Status" value={status} onChange={setStatus} options={STATUS} />
+        {filtersActive ? <ResetFiltersButton onClick={resetFilters} /> : null}
         <div className="ml-auto flex gap-2">
           <ColumnManager table="suppliers" />
           <Button onClick={() => setTarget("new")}>Add supplier</Button>

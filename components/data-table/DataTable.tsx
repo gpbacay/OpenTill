@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { ArrowDown01Icon } from "@hugeicons/core-free-icons";
 import { Button } from "@/components/ui/button";
 
 export interface Column<T> {
@@ -25,6 +27,8 @@ interface DataTableProps<T> {
   pageSizes?: number[];
   /** Row checkboxes with a selection bar. On by default. */
   selectable?: boolean;
+  /** Prevent selection and row actions for rows that cannot be acted on. */
+  isRowDisabled?: (row: T) => boolean;
   /** Buttons for the selection bar, given the chosen rows and a function that clears the selection. */
   bulkActions?: (chosen: T[], clear: () => void) => ReactNode;
 }
@@ -44,6 +48,7 @@ export function DataTable<T>({
   resetKey,
   pageSizes = [10, 25, 50],
   selectable = true,
+  isRowDisabled,
   bulkActions,
 }: DataTableProps<T>) {
   const [page, setPage] = useState(1);
@@ -58,13 +63,16 @@ export function DataTable<T>({
   const start = (current - 1) * pageSize;
   const visible = rows.slice(start, start + pageSize);
 
-  // Only rows still in the table count, so deleting or filtering rows never leaves a stale selection behind.
-  const chosen = rows.filter((row) => picked.has(rowKey(row)));
+  const available = rows.filter((row) => !isRowDisabled?.(row));
+  const availableOnPage = visible.filter((row) => !isRowDisabled?.(row));
+  // Only actionable rows still in the table count, so filtering or disabling a row never exposes a stale selection.
+  const chosen = available.filter((row) => picked.has(rowKey(row)));
   const anyChosen = chosen.length > 0;
-  const pageChosen = visible.filter((row) => picked.has(rowKey(row))).length;
+  const pageChosen = availableOnPage.filter((row) => picked.has(rowKey(row))).length;
   const clear = () => setPicked(new Set());
 
-  const toggle = (row: T) =>
+  const toggle = (row: T) => {
+    if (isRowDisabled?.(row)) return;
     setPicked((prev) => {
       const next = new Set(prev);
       const key = rowKey(row);
@@ -72,12 +80,13 @@ export function DataTable<T>({
       else next.add(key);
       return next;
     });
+  };
 
   const togglePage = () =>
     setPicked((prev) => {
       const next = new Set(prev);
-      const all = visible.length > 0 && pageChosen === visible.length;
-      visible.forEach((row) => (all ? next.delete(rowKey(row)) : next.add(rowKey(row))));
+      const all = availableOnPage.length > 0 && pageChosen === availableOnPage.length;
+      availableOnPage.forEach((row) => (all ? next.delete(rowKey(row)) : next.add(rowKey(row))));
       return next;
     });
 
@@ -86,9 +95,9 @@ export function DataTable<T>({
       {anyChosen ? (
         <div className="flex shrink-0 flex-wrap items-center gap-2 bg-accent px-3 py-2 text-sm">
           <span className="font-medium">{chosen.length} selected</span>
-          {chosen.length < rows.length ? (
-            <Button size="sm" variant="ghost" onClick={() => setPicked(new Set(rows.map(rowKey)))}>
-              Select all {rows.length}
+          {chosen.length < available.length ? (
+            <Button size="sm" variant="ghost" onClick={() => setPicked(new Set(available.map(rowKey)))}>
+              Select all {available.length}
             </Button>
           ) : null}
           <div className="ml-auto flex flex-wrap items-center gap-2">
@@ -108,10 +117,11 @@ export function DataTable<T>({
                   <input
                     type="checkbox"
                     aria-label="Select all rows on this page"
-                    className="block size-4 cursor-pointer accent-primary"
-                    checked={visible.length > 0 && pageChosen === visible.length}
+                    className="block size-4 cursor-pointer accent-primary disabled:cursor-not-allowed disabled:opacity-50"
+                    checked={availableOnPage.length > 0 && pageChosen === availableOnPage.length}
+                    disabled={availableOnPage.length === 0}
                     ref={(el) => {
-                      if (el) el.indeterminate = pageChosen > 0 && pageChosen < visible.length;
+                      if (el) el.indeterminate = pageChosen > 0 && pageChosen < availableOnPage.length;
                     }}
                     onChange={togglePage}
                   />
@@ -140,12 +150,14 @@ export function DataTable<T>({
             ) : (
               visible.map((row) => {
                 const key = rowKey(row);
-                const checked = picked.has(key);
+                const disabled = isRowDisabled?.(row) ?? false;
+                const checked = !disabled && picked.has(key);
+                const interactive = !disabled && (selectable || Boolean(onRowClick));
                 return (
                   <tr
                     key={key}
                     onClick={
-                      selectable || onRowClick
+                      interactive
                         ? () => {
                             if (selectable) toggle(row);
                             onRowClick?.(row, selectable ? !checked : false);
@@ -153,16 +165,20 @@ export function DataTable<T>({
                         : undefined
                     }
                     aria-selected={selectedKey === key}
+                    aria-disabled={disabled || undefined}
                     data-checked={checked}
-                    className={`group/row cursor-pointer hover:bg-accent/60 aria-selected:bg-accent data-[checked=true]:bg-accent/70`}
+                    className={`group/row aria-selected:bg-accent data-[checked=true]:bg-accent/70 ${
+                      interactive ? "cursor-pointer hover:bg-accent/60" : ""
+                    } ${disabled ? "opacity-50" : ""}`}
                   >
                     {selectable ? (
                       <td className="w-10 py-2.5 pl-3 text-left align-middle">
                         <input
                           type="checkbox"
                           aria-label="Select row"
-                          className={`block size-4 cursor-pointer accent-primary ${anyChosen || checked ? "opacity-100" : REVEAL}`}
+                          className={`block size-4 cursor-pointer accent-primary disabled:cursor-not-allowed ${anyChosen || checked ? "opacity-100" : REVEAL}`}
                           checked={checked}
+                          disabled={disabled}
                           readOnly
                         />
                       </td>
@@ -187,19 +203,26 @@ export function DataTable<T>({
           {rows.length === 0 ? "0 results" : `${start + 1}–${start + visible.length} of ${rows.length}`}
         </span>
         <div className="flex items-center gap-2">
-          <label className="flex items-center gap-1">
-            Rows
-            <select
-              value={pageSize}
-              onChange={(event) => setPageSize(Number(event.target.value))}
-              className="h-7 rounded-md bg-input px-1.5 text-foreground"
-            >
-              {pageSizes.map((size) => (
-                <option key={size} value={size}>
-                  {size}
-                </option>
-              ))}
-            </select>
+          <label className="flex items-center gap-1.5">
+            <span>Rows</span>
+            <span className="relative">
+              <select
+                value={pageSize}
+                onChange={(event) => setPageSize(Number(event.target.value))}
+                className="h-7 appearance-none rounded-md bg-input py-0 pr-8 pl-2.5 text-foreground"
+              >
+                {pageSizes.map((size) => (
+                  <option key={size} value={size}>
+                    {size}
+                  </option>
+                ))}
+              </select>
+              <HugeiconsIcon
+                icon={ArrowDown01Icon}
+                size={14}
+                className="pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2 text-muted-foreground"
+              />
+            </span>
           </label>
           <Button size="sm" variant="secondary" disabled={current <= 1} onClick={() => setPage(current - 1)}>
             Prev

@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { RegisterCatalog } from "@/components/RegisterCatalog";
 import { ActiveCart } from "@/components/ActiveCart";
 import { usePos } from "@/contexts/pos-context";
@@ -26,9 +27,16 @@ export default function OrdersPage() {
     handleDeleteHeldCart,
   } = usePos();
 
+  const [saleOpen, setSaleOpen] = useState(false);
+
   if (!activeTenant) return null;
   const count = cart.reduce((sum, item) => sum + item.quantity, 0);
   const subtotal = cart.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
+  const parked = count > 0 || tenantHeldCarts.length > 0;
+  const closeSale = () => {
+    setSaleOpen(false);
+    setMobileRegisterTab("catalog");
+  };
 
   return (
     <div className="relative flex h-full flex-col overflow-hidden">
@@ -39,45 +47,53 @@ export default function OrdersPage() {
       >
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="catalog">Catalog</TabsTrigger>
-          <TabsTrigger value="cart">Cart{count > 0 ? ` ${count}` : ""}</TabsTrigger>
+          <TabsTrigger value="cart">Sale{count > 0 ? ` ${count}` : ""}</TabsTrigger>
         </TabsList>
       </Tabs>
 
-      <div className="grid h-full min-h-0 grid-cols-1 gap-4 overflow-hidden lg:grid-cols-12">
+      <div className={`grid h-full min-h-0 grid-cols-1 gap-4 overflow-hidden ${saleOpen ? "lg:grid-cols-12" : ""}`}>
         <div
-          className={`${mobileRegisterTab === "catalog" ? "block" : "hidden"} min-h-0 lg:col-span-7 lg:block xl:col-span-8`}
+          className={`${mobileRegisterTab === "catalog" ? "flex" : "hidden"} min-h-0 flex-col lg:flex ${saleOpen ? "lg:col-span-7 xl:col-span-8" : ""}`}
         >
           <RegisterCatalog
             products={products}
             activeTenant={activeTenant}
-            onAddToCart={handleAddToCart}
+            onAddToSale={(product) => {
+              handleAddToCart(product);
+              setSaleOpen(true);
+            }}
           />
         </div>
-        <div
-          className={`${mobileRegisterTab === "cart" ? "block" : "hidden"} min-h-0 lg:col-span-5 lg:block xl:col-span-4`}
-        >
-          <ActiveCart
-            cart={cart}
-            activeTenant={activeTenant}
-            isOnline={isOnline}
-            onUpdateQuantity={handleUpdateQuantity}
-            onRemoveItem={handleRemoveItem}
-            onClearCart={handleClearCart}
-            onCheckout={handleCheckout}
-            heldCarts={tenantHeldCarts}
-            onHoldCart={handleHoldCart}
-            onResumeHeldCart={handleResumeHeldCart}
-            onDeleteHeldCart={handleDeleteHeldCart}
-          />
-        </div>
+        {saleOpen || mobileRegisterTab === "cart" ? (
+          <div className={`${mobileRegisterTab === "cart" ? "flex" : "hidden"} min-h-0 flex-col ${saleOpen ? "lg:col-span-5 lg:flex xl:col-span-4" : "lg:hidden"}`}>
+            <ActiveCart
+              cart={cart}
+              activeTenant={activeTenant}
+              isOnline={isOnline}
+              onUpdateQuantity={handleUpdateQuantity}
+              onRemoveItem={handleRemoveItem}
+              onClearCart={handleClearCart}
+              onCheckout={handleCheckout}
+              heldCarts={tenantHeldCarts}
+              onHoldCart={handleHoldCart}
+              onResumeHeldCart={handleResumeHeldCart}
+              onDeleteHeldCart={handleDeleteHeldCart}
+              onClose={closeSale}
+            />
+          </div>
+        ) : null}
       </div>
 
-      {mobileRegisterTab === "catalog" && cart.length > 0 ? (
+      {parked && mobileRegisterTab === "catalog" ? (
         <Button
-          className="absolute inset-x-0 bottom-2 lg:hidden"
-          onClick={() => setMobileRegisterTab("cart")}
+          data-register-action="open-sale"
+          className={`absolute inset-x-0 bottom-2 ${saleOpen ? "lg:hidden" : ""}`}
+          onClick={() => {
+            setSaleOpen(true);
+            setMobileRegisterTab("cart");
+          }}
         >
-          Cart {money(activeTenant.currency, subtotal)}
+          {count > 0 ? `Sale ${money(activeTenant.currency, subtotal)}` : `${tenantHeldCarts.length} on hold`}
         </Button>
       ) : null}
     </div>

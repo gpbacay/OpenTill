@@ -491,7 +491,7 @@ export function PosProvider({
         router.push("/orders");
         setTimeout(() => {
           const searchInput = document.querySelector(
-            'input[placeholder*="Search by product"]'
+            '[data-register-action="product-search"]'
           ) as HTMLInputElement | null;
           if (searchInput) {
             searchInput.focus();
@@ -504,9 +504,22 @@ export function PosProvider({
         router.push("/orders");
         setTimeout(() => {
           const holdBtn = document.querySelector(
-            'button[title*="Place cart on hold"]'
+            '[data-register-action="hold-sale"]'
           ) as HTMLButtonElement | null;
-          if (holdBtn) holdBtn.click();
+          if (holdBtn) {
+            holdBtn.click();
+            return;
+          }
+          const openSale = document.querySelector(
+            '[data-register-action="open-sale"]'
+          ) as HTMLButtonElement | null;
+          openSale?.click();
+          setTimeout(() => {
+            const revealed = document.querySelector(
+              '[data-register-action="hold-sale"]'
+            ) as HTMLButtonElement | null;
+            revealed?.click();
+          }, 0);
         }, 100);
       }
       if (e.key === "F8") {
@@ -514,9 +527,22 @@ export function PosProvider({
         router.push("/orders");
         setTimeout(() => {
           const checkoutBtn = document.querySelector(
-            'button[type="submit"]'
+            '[data-register-action="charge-sale"]'
           ) as HTMLButtonElement | null;
-          if (checkoutBtn) checkoutBtn.click();
+          if (checkoutBtn) {
+            checkoutBtn.click();
+            return;
+          }
+          const openSale = document.querySelector(
+            '[data-register-action="open-sale"]'
+          ) as HTMLButtonElement | null;
+          openSale?.click();
+          setTimeout(() => {
+            const revealed = document.querySelector(
+              '[data-register-action="charge-sale"]'
+            ) as HTMLButtonElement | null;
+            revealed?.click();
+          }, 0);
         }, 100);
       }
     };

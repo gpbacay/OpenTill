@@ -107,7 +107,11 @@ export function StoreMenu() {
       </DropdownMenuTrigger>
       <DropdownMenuContent side="top" align="start" className="w-56">
         {tenants.map((tenant) => (
-          <DropdownMenuItem key={tenant.id} onClick={() => handleSwitchTenant(tenant.id)}>
+          <DropdownMenuItem
+            key={tenant.id}
+            disabled={tenant.id === activeTenant.id}
+            onClick={() => handleSwitchTenant(tenant.id)}
+          >
             {tenant.id === activeTenant.id ? `${tenant.name} (current)` : tenant.name}
           </DropdownMenuItem>
         ))}

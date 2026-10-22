@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DeleteButton, ExportButton } from "@/components/data-table/bulk";
 import { DataTable, type Column } from "@/components/data-table/DataTable";
-import { FilterSelect, SearchBox, StatTile, Toolbar, matches } from "@/components/data-table/controls";
+import { FilterSelect, ResetFiltersButton, SearchBox, StatTile, Toolbar, matches } from "@/components/data-table/controls";
 import { ColumnManager, customColumnDefs, customFieldRows, customText } from "@/components/data-table/custom-columns";
 import { DetailPanel, Fields, PanelSection, SplitView } from "@/components/data-table/DetailPanel";
 import { ProductDialog } from "./ProductDialog";
@@ -195,6 +195,18 @@ export function InventoryView() {
     </DetailPanel>
   ) : null;
   const filtered = tab === "stock" ? `${query}|${category}|${status}|${supplier}` : `${query}|${type}`;
+  const filtersActive = query.trim() !== "" || (tab === "stock" ? category !== "all" || status !== "all" || supplier !== "all" : type !== "all");
+  const resetFilters = () => {
+    setQuery("");
+    setSelectedId(null);
+    if (tab === "stock") {
+      setCategory("all");
+      setStatus("all");
+      setSupplier("all");
+    } else {
+      setType("all");
+    }
+  };
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -230,14 +242,17 @@ export function InventoryView() {
               onChange={setSupplier}
               options={[{ value: "all", label: "All suppliers" }, { value: "none", label: "No supplier" }, ...suppliers.map((s) => ({ value: s.id, label: s.name }))]}
             />
-            <div className="ml-auto flex gap-2">
-              <ColumnManager table="products" />
-              <Button onClick={() => setProductTarget("new")}>Add product</Button>
-            </div>
           </>
         ) : (
           <FilterSelect label="Change type" value={type} onChange={setType} options={TYPE_OPTIONS} />
         )}
+        {filtersActive ? <ResetFiltersButton onClick={resetFilters} /> : null}
+        {tab === "stock" ? (
+          <div className="ml-auto flex gap-2">
+            <ColumnManager table="products" />
+            <Button onClick={() => setProductTarget("new")}>Add product</Button>
+          </div>
+        ) : null}
       </Toolbar>
 
       {tab === "stock" ? (

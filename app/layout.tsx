@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Figtree } from "next/font/google";
 import { AuthProvider } from "@/contexts/auth-context";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { AutoHideScrollbars } from "@/components/auto-hide-scrollbars";
 import "./globals.css";
 
 const figtree = Figtree({
@@ -28,6 +29,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={`dark ${figtree.variable}`} suppressHydrationWarning>
       <body className="antialiased">
+        <AutoHideScrollbars />
         <TooltipProvider>
           <AuthProvider>{children}</AuthProvider>
         </TooltipProvider>

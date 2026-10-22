@@ -6,19 +6,19 @@ import { Product, Tenant, reorderLevel } from "@/lib/types";
 import { money } from "@/lib/money";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { DataTable, type Column } from "@/components/data-table/DataTable";
+import { FilterSelect, ResetFiltersButton } from "@/components/data-table/controls";
 
 interface RegisterCatalogProps {
   products: Product[];
   activeTenant: Tenant;
-  onAddToCart: (product: Product) => void;
+  onAddToSale: (product: Product) => void;
 }
 
-export function RegisterCatalog({ products, activeTenant, onAddToCart }: RegisterCatalogProps) {
+export function RegisterCatalog({ products, activeTenant, onAddToSale }: RegisterCatalogProps) {
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
-  const [barcodeInput, setBarcodeInput] = useState("");
-  const [scanMessage, setScanMessage] = useState("");
+  const [message, setMessage] = useState("");
 
   const tenantProducts = useMemo(
     () => products.filter((product) => product.tenantId === activeTenant.id),
@@ -43,107 +43,135 @@ export function RegisterCatalog({ products, activeTenant, onAddToCart }: Registe
     });
   }, [tenantProducts, search, selectedCategory]);
 
-  const handleBarcodeSubmit = (event: React.FormEvent) => {
+  const query = search.trim().toLowerCase();
+  const match = useMemo(() => {
+    if (!query) return null;
+    return tenantProducts.find((product) => product.sku.toLowerCase() === query) ?? (filteredProducts.length === 1 ? filteredProducts[0] : null);
+  }, [filteredProducts, query, tenantProducts]);
+
+  const addMatch = (event: React.FormEvent) => {
     event.preventDefault();
-    const sku = barcodeInput.trim().toLowerCase();
-    if (!sku) return;
-    const matched = tenantProducts.find((product) => product.sku.toLowerCase() === sku);
-    if (!matched) {
-      setScanMessage(`No product with SKU ${barcodeInput.trim()}`);
+    if (!query) {
+      setMessage("Type a product name or scan a SKU.");
       return;
     }
-    if (matched.stock <= 0) {
-      setScanMessage(`${matched.name} is out of stock`);
+    if (!match) {
+      setMessage(filteredProducts.length > 1 ? "More than one product matches. Choose one from the list." : "No product matches.");
       return;
     }
-    onAddToCart(matched);
-    setBarcodeInput("");
-    setScanMessage(`Added ${matched.name}`);
+    if (match.stock <= 0) {
+      setMessage(`${match.name} is out of stock.`);
+      return;
+    }
+    onAddToSale(match);
+    setSearch("");
+    setMessage(`Added ${match.name} to the sale.`);
+  };
+
+  const columns: Column<Product>[] = [
+    {
+      id: "name",
+      header: "Product",
+      cell: (product) => <span className="font-medium">{product.name}</span>,
+    },
+    {
+      id: "sku",
+      header: "SKU",
+      cell: (product) => <span className="text-xs text-muted-foreground">{product.sku}</span>,
+    },
+    { id: "category", header: "Category", cell: (product) => product.category || "—" },
+    {
+      id: "stock",
+      header: "Available",
+      align: "right",
+      cell: (product) => {
+        if (product.stock <= 0) return <span className="text-destructive">Out of stock</span>;
+        const low = product.stock <= reorderLevel(product);
+        return <span className={low ? "text-amber-400" : ""}>{product.stock}</span>;
+      },
+    },
+    {
+      id: "price",
+      header: "Price",
+      align: "right",
+      cell: (product) => money(activeTenant.currency, product.price),
+    },
+  ];
+
+  const addSelected = (selected: Product[], clear: () => void) => {
+    selected.forEach(onAddToSale);
+    clear();
+    setMessage(
+      `Added ${selected.length} ${selected.length === 1 ? "product" : "products"} to the sale.`
+    );
+  };
+
+  const filtersActive = search.trim() !== "" || selectedCategory !== "All";
+  const resetFilters = () => {
+    setSearch("");
+    setSelectedCategory("All");
+    setMessage("");
   };
 
   return (
     <div className="flex h-full flex-col gap-3">
-      <div className="grid gap-2 sm:grid-cols-2">
-        <Input
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-          placeholder="Search by product or SKU"
-          aria-label="Search products"
-        />
-        <form onSubmit={handleBarcodeSubmit} className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
+        <form onSubmit={addMatch} className="min-w-0 flex-1">
           <Input
-            value={barcodeInput}
-            onChange={(event) => setBarcodeInput(event.target.value)}
-            placeholder="Scan SKU"
-            aria-label="Scan SKU"
+            data-register-action="product-search"
+            value={search}
+            onChange={(event) => {
+              setSearch(event.target.value);
+              setMessage("");
+            }}
+            placeholder="Search or scan a SKU"
+            aria-label="Search or scan a SKU"
           />
-          <Button type="submit" variant="secondary">
-            Add
-          </Button>
         </form>
+        <FilterSelect
+          label="Category"
+          value={selectedCategory}
+          onChange={(value) => {
+            setSelectedCategory(value);
+            setMessage("");
+          }}
+          options={categories.map((category) => ({
+            value: category,
+            label: category === "All" ? "All categories" : category,
+          }))}
+        />
+        {filtersActive ? <ResetFiltersButton onClick={resetFilters} /> : null}
       </div>
-      {scanMessage ? <p className="text-sm text-muted-foreground">{scanMessage}</p> : null}
+      {match && match.stock <= 0 ? (
+        <p className="text-sm text-muted-foreground" aria-live="polite">{match.name} is out of stock.</p>
+      ) : message ? (
+        <p className="text-sm text-muted-foreground" aria-live="polite">{message}</p>
+      ) : null}
 
-      <div className="flex gap-2 overflow-x-auto">
-        {categories.map((category) => (
-          <button
-            key={category}
-            type="button"
-            onClick={() => setSelectedCategory(category)}
-            className={`shrink-0 rounded-full px-3 py-1 text-sm ${
-              selectedCategory === category
-                ? "bg-foreground text-background"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            {category}
-          </button>
-        ))}
-      </div>
-
-      <ScrollArea className="min-h-0 flex-1">
-        {filteredProducts.length === 0 ? (
-          <p className="py-16 text-center text-sm text-muted-foreground">
-            {tenantProducts.length === 0 ? (
-              <>
-                No products yet.{" "}
-                <Link href="/products" className="text-foreground underline-offset-4 hover:underline">
-                  Add one
-                </Link>
-              </>
-            ) : (
-              "Nothing matches that search."
-            )}
-          </p>
-        ) : (
-          <ul>
-            {filteredProducts.map((product) => {
-              const out = product.stock <= 0;
-              return (
-                <li key={product.id}>
-                  <button
-                    type="button"
-                    disabled={out}
-                    onClick={() => onAddToCart(product)}
-                    className="flex w-full items-center gap-3 rounded-md px-2 py-3 text-left hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-medium">{product.name}</span>
-                      <span className="block text-xs text-muted-foreground">
-                        {product.sku}
-                        {out ? "  Out of stock" : product.stock <= reorderLevel(product) ? `  ${product.stock} left` : ""}
-                      </span>
-                    </span>
-                    <span className="text-sm tabular-nums">
-                      {money(activeTenant.currency, product.price)}
-                    </span>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
+      <DataTable
+        rows={filteredProducts}
+        columns={columns}
+        rowKey={(product) => product.id}
+        isRowDisabled={(product) => product.stock <= 0}
+        resetKey={`${activeTenant.id}|${search}|${selectedCategory}`}
+        bulkActions={(selected, clear) => (
+          <Button size="sm" onClick={() => addSelected(selected, clear)}>
+            Add {selected.length} to sale
+          </Button>
         )}
-      </ScrollArea>
+        empty={
+          tenantProducts.length === 0 ? (
+            <>
+              No products yet.{" "}
+              <Link href="/inventory" className="text-foreground underline-offset-4 hover:underline">
+                Add one
+              </Link>
+            </>
+          ) : (
+            "Nothing matches those filters."
+          )
+        }
+      />
 
       <p className="hidden text-xs text-muted-foreground lg:block">
         F2 search, F4 hold, F8 charge, Esc clear

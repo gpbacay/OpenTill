@@ -41,6 +41,7 @@ interface ActiveCartProps {
   onHoldCart?: (label: string) => void;
   onResumeHeldCart?: (id: string) => void;
   onDeleteHeldCart?: (id: string) => void;
+  onClose?: () => void;
 }
 
 const PAYMENTS: { id: PaymentMethod; label: string }[] = [
@@ -61,6 +62,7 @@ export function ActiveCart({
   onHoldCart,
   onResumeHeldCart,
   onDeleteHeldCart,
+  onClose,
 }: ActiveCartProps) {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("CASH");
   const [cashReceived, setCashReceived] = useState("");
@@ -216,15 +218,21 @@ export function ActiveCart({
             type="button"
             variant="ghost"
             size="sm"
-            disabled={cart.length === 0}
+            disabled={cart.length === 0 || !onHoldCart}
             onClick={() => setShowHoldModal(true)}
-            title="Place cart on hold"
+            data-register-action="hold-sale"
+            title="Hold this sale"
           >
             Hold
           </Button>
           <Button type="button" variant="ghost" size="sm" disabled={cart.length === 0} onClick={onClearCart}>
             Clear
           </Button>
+          {onClose ? (
+            <Button type="button" variant="ghost" size="sm" onClick={onClose}>
+              Close
+            </Button>
+          ) : null}
         </div>
       </div>
 
@@ -232,10 +240,21 @@ export function ActiveCart({
         <div className="space-y-1">
           {heldCarts.map((held) => (
             <div key={held.id} className="flex items-center justify-between rounded-md px-2 py-1.5 hover:bg-accent">
-              <button type="button" className="text-sm" onClick={() => onResumeHeldCart?.(held.id)}>
+              <button
+                type="button"
+                disabled={!onResumeHeldCart}
+                className="text-sm disabled:cursor-not-allowed disabled:opacity-50"
+                onClick={() => onResumeHeldCart?.(held.id)}
+              >
                 {held.label}
               </button>
-              <Button type="button" variant="ghost" size="sm" onClick={() => onDeleteHeldCart?.(held.id)}>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                disabled={!onDeleteHeldCart}
+                onClick={() => onDeleteHeldCart?.(held.id)}
+              >
                 Remove
               </Button>
             </div>
@@ -245,7 +264,7 @@ export function ActiveCart({
 
       <ScrollArea className="min-h-0 flex-1">
         {cart.length === 0 ? (
-          <p className="py-10 text-center text-sm text-muted-foreground">Cart is empty</p>
+          <p className="py-10 text-center text-sm text-muted-foreground">Nothing on this sale</p>
         ) : (
           <ul>
             {cart.map((item) => (
@@ -261,7 +280,7 @@ export function ActiveCart({
                     −
                   </Button>
                   <span className="w-5 text-center text-sm tabular-nums">{item.quantity}</span>
-                  <Button type="button" variant="ghost" size="icon" className="size-7" onClick={() => onUpdateQuantity(item.product.id, "add")}>
+                  <Button type="button" variant="ghost" size="icon" className="size-7" disabled={item.quantity >= item.product.stock} onClick={() => onUpdateQuantity(item.product.id, "add")}>
                     +
                   </Button>
                 </div>
@@ -360,7 +379,12 @@ export function ActiveCart({
           <p className="text-2xl font-bold tabular-nums">{money(activeTenant.currency, total)}</p>
         </div>
         {checkoutError ? <p className="text-sm text-destructive">{checkoutError}</p> : null}
-        <Button type="submit" size="lg" disabled={cart.length === 0}>
+        <Button
+          type="submit"
+          size="lg"
+          disabled={cart.length === 0}
+          data-register-action="charge-sale"
+        >
           Charge
         </Button>
       </div>
@@ -381,7 +405,7 @@ export function ActiveCart({
               />
             </div>
             <DialogFooter>
-              <Button type="submit" disabled={!holdLabel.trim()}>
+              <Button type="submit" disabled={!holdLabel.trim() || !onHoldCart}>
                 Hold sale
               </Button>
             </DialogFooter>
