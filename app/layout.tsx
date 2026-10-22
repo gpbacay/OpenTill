@@ -12,6 +12,12 @@ const figtree = Figtree({
 export const metadata: Metadata = {
   title: "OpenTill",
   description: "Point of sale",
+  icons: {
+    icon: [
+      { url: "/icon-light.png", type: "image/png", media: "(prefers-color-scheme: light)" },
+      { url: "/icon-dark.png", type: "image/png", media: "(prefers-color-scheme: dark)" },
+    ],
+  },
 };
 
 export default function RootLayout({

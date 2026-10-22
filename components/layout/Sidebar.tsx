@@ -135,7 +135,8 @@ export default function AppSidebar() {
   return (
     <Sidebar variant="inset" collapsible="offcanvas">
       <SidebarHeader className="px-4 py-5">
-        <Link href="/" className="text-lg font-bold tracking-tight text-foreground">
+        <Link href="/" className="flex items-center gap-2 text-lg font-bold tracking-tight text-foreground">
+          <img src="/icon-light.png" alt="" width={24} height={24} className="size-6 dark:invert" />
           OpenTill
         </Link>
       </SidebarHeader>

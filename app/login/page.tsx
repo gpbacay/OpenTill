@@ -47,7 +47,10 @@ export default function LoginPage() {
   return (
     <main className="flex min-h-screen items-center justify-center bg-background px-6">
       <div className="w-full max-w-sm">
-        <h1 className="text-3xl font-bold">OpenTill</h1>
+        <h1 className="flex items-center gap-2 text-3xl font-bold">
+          <img src="/icon-light.png" alt="" width={32} height={32} className="size-8 dark:invert" />
+          OpenTill
+        </h1>
         <p className="mt-1 mb-6 text-sm text-muted-foreground">
           {creating ? "Create an account on this device." : "Sign in on this device."}
         </p>
