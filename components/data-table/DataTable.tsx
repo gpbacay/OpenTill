@@ -127,6 +127,12 @@ export function DataTable<T>({
                   />
                 </th>
               ) : null}
+              <th
+                scope="col"
+                className="sticky top-0 z-10 whitespace-nowrap bg-card px-3 py-2.5 text-left text-xs font-medium text-muted-foreground shadow-[0_1px_0_var(--input)]"
+              >
+                ID
+              </th>
               {columns.map((column) => (
                 <th
                   key={column.id}
@@ -143,7 +149,7 @@ export function DataTable<T>({
           <tbody>
             {visible.length === 0 ? (
               <tr>
-                <td colSpan={columns.length + (selectable ? 1 : 0)} className="px-3 py-16 text-center text-sm text-muted-foreground">
+                <td colSpan={columns.length + (selectable ? 2 : 1)} className="px-3 py-16 text-center text-sm text-muted-foreground">
                   {empty}
                 </td>
               </tr>
@@ -183,6 +189,11 @@ export function DataTable<T>({
                         />
                       </td>
                     ) : null}
+                    <td className="px-3 py-2.5 align-middle">
+                      <span title={key} className="select-all whitespace-nowrap font-mono text-xs text-muted-foreground">
+                        {key}
+                      </span>
+                    </td>
                     {columns.map((column) => (
                       <td
                         key={column.id}

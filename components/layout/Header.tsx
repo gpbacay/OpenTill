@@ -1,18 +1,20 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { usePathname } from "next/navigation";
+import Link from "next/link";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { FullScreenIcon, MinimizeScreenIcon } from "@hugeicons/core-free-icons";
+import { FullScreenIcon, MinimizeScreenIcon, Notification03Icon } from "@hugeicons/core-free-icons";
 import { usePos } from "@/contexts/pos-context";
+import { useRecentActivity } from "@/hooks/use-recent-activity";
 import { Button } from "@/components/ui/button";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import { StoreMenu, titleFromPath } from "@/components/layout/Sidebar";
+import { StoreMenu } from "@/components/layout/Sidebar";
+import { Breadcrumbs } from "@/components/layout/Breadcrumbs";
 
 export default function Header() {
-  const pathname = usePathname();
   const { isOnline, offlineQueue, isSyncing, triggerOfflineSync, activeTenant } = usePos();
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const { unreadCount } = useRecentActivity();
   const queued = offlineQueue.filter((entry) => entry.order.tenantId === activeTenant?.id).length;
 
   useEffect(() => {
@@ -30,12 +32,12 @@ export default function Header() {
   };
 
   return (
-    <header className="flex h-14 shrink-0 items-center gap-3 px-4">
+    <header className="flex h-14 shrink-0 items-center gap-2 px-3 sm:gap-3 sm:px-4">
       <SidebarTrigger className="hidden md:inline-flex" />
-      <h1 className="text-lg font-semibold">{titleFromPath(pathname)}</h1>
-      <div className="ml-auto flex items-center gap-2">
+      <Breadcrumbs />
+      <div className="flex shrink-0 items-center gap-1 sm:gap-2">
         {!isOnline ? (
-          <span className="text-sm text-amber-400">Offline: changes are saved on this device</span>
+          <span className="hidden text-sm text-amber-400 sm:inline">Offline: changes are saved on this device</span>
         ) : null}
         {queued > 0 ? (
           <Button
@@ -47,16 +49,25 @@ export default function Header() {
             {isSyncing ? "Saving" : `Save ${queued}`}
           </Button>
         ) : null}
+        <Button asChild size="icon" variant="ghost" className="relative">
+          <Link href="/activity" aria-label={`Recent activity${unreadCount ? `, ${unreadCount} unread` : ""}`} title="Recent activity">
+            <HugeiconsIcon icon={Notification03Icon} size={17} />
+            {unreadCount > 0 ? (
+              <span className="absolute top-1 right-1 size-2 rounded-full bg-primary ring-2 ring-background" />
+            ) : null}
+          </Link>
+        </Button>
         <Button
           size="icon"
           variant="ghost"
+          className="hidden sm:inline-flex"
           onClick={toggleFullscreen}
           aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
         >
           <HugeiconsIcon icon={isFullscreen ? MinimizeScreenIcon : FullScreenIcon} size={16} />
         </Button>
         <div className="md:hidden">
-          <StoreMenu />
+          <StoreMenu compact />
         </div>
       </div>
     </header>

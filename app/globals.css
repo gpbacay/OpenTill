@@ -73,7 +73,7 @@
   --chart-4: #b3b3b3;
   --chart-5: #efefef;
   --radius: 0.5rem;
-  --sidebar: #f6f6f6;
+  --sidebar: var(--background);
   --sidebar-foreground: #5c5c5c;
   --sidebar-primary: #1db954;
   --sidebar-primary-foreground: #000000;
@@ -108,7 +108,7 @@
   --chart-3: #b3b3b3;
   --chart-4: #535353;
   --chart-5: #282828;
-  --sidebar: #000000;
+  --sidebar: var(--background);
   --sidebar-foreground: #b3b3b3;
   --sidebar-primary: #1ed760;
   --sidebar-primary-foreground: #000000;

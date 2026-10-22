@@ -21,8 +21,16 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
 
+  const continueToRequestedPage = () => {
+    const next = sessionStorage.getItem("opentill_after_login") ?? "/";
+    sessionStorage.removeItem("opentill_after_login");
+    return next.startsWith("/") && !next.startsWith("//") ? next : "/";
+  };
+
   useEffect(() => {
-    if (ready && user) router.replace("/");
+    if (ready && user) router.replace(continueToRequestedPage());
+    // This redirect only follows auth readiness; the helper reads session storage at that moment.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, user, router]);
 
   const submit = async (event: React.FormEvent) => {
@@ -37,7 +45,7 @@ export default function LoginPage() {
       setError(message);
       return;
     }
-    router.replace("/");
+    router.replace(continueToRequestedPage());
   };
 
   if (!ready || user) {

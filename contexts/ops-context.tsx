@@ -11,6 +11,12 @@ interface OpsValue {
   expenses: Expense[];
   movements: StockMovement[];
   columns: CustomColumn[];
+  ready: {
+    suppliers: boolean;
+    expenses: boolean;
+    movements: boolean;
+    columns: boolean;
+  };
   pending: number;
   saveSupplier: (supplier: Supplier) => void;
   deleteSupplier: (id: string) => void;
@@ -43,6 +49,12 @@ export function OpsProvider({ userId, children }: { userId: string; children: Re
         expenses: mine(expenses.items),
         movements: mine(movements.items),
         columns: tenantColumns,
+        ready: {
+          suppliers: suppliers.ready,
+          expenses: expenses.ready,
+          movements: movements.ready,
+          columns: columns.ready,
+        },
         pending: suppliers.pending + expenses.pending + movements.pending + columns.pending,
         saveSupplier: suppliers.upsert,
         deleteSupplier: suppliers.remove,
@@ -58,7 +70,7 @@ export function OpsProvider({ userId, children }: { userId: string; children: Re
       };
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [tenantId, suppliers.items, expenses.items, movements.items, columns.items, suppliers.pending, expenses.pending, movements.pending, columns.pending]
+    [tenantId, suppliers.items, expenses.items, movements.items, columns.items, suppliers.ready, expenses.ready, movements.ready, columns.ready, suppliers.pending, expenses.pending, movements.pending, columns.pending]
   );
 
   return <OpsContext.Provider value={value}>{children}</OpsContext.Provider>;

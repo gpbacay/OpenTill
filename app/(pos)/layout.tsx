@@ -12,6 +12,7 @@ import Header from "@/components/layout/Header";
 import { TenantOnboarding } from "@/components/TenantOnboarding";
 import { Button } from "@/components/ui/button";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
+import { AppShellSkeleton } from "@/components/loading/PageSkeletons";
 
 function PosShell({ children }: { children: React.ReactNode }) {
   const {
@@ -27,7 +28,7 @@ function PosShell({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
 
   if (!hydrated) {
-    return <div className="min-h-screen bg-background" />;
+    return <AppShellSkeleton />;
   }
 
   if (!activeTenant && pathname === "/account") {
@@ -76,10 +77,10 @@ function PosShell({ children }: { children: React.ReactNode }) {
             />
           </div>
         ) : null}
-        <main className="flex min-h-0 flex-1 flex-col overflow-hidden px-4 pb-16 md:pb-4">
+        <main className="flex min-h-0 flex-1 flex-col overflow-hidden px-3 pb-20 sm:px-4 md:pb-4">
           {children}
         </main>
-        <nav className="fixed inset-x-2 bottom-2 z-40 grid grid-cols-5 rounded-xl bg-card p-1 md:hidden">
+        <nav className="fixed inset-x-2 bottom-[max(0.5rem,env(safe-area-inset-bottom))] z-40 grid grid-cols-5 rounded-xl bg-card p-1 shadow-lg ring-1 ring-border/50 md:hidden">
           {MENU_ITEMS.filter((item) => item.primary).map((item) => {
             const active =
               item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
@@ -108,11 +109,14 @@ export default function PosLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
 
   useEffect(() => {
-    if (ready && !user) router.replace("/login");
+    if (ready && !user) {
+      sessionStorage.setItem("opentill_after_login", `${window.location.pathname}${window.location.search}`);
+      router.replace("/login");
+    }
   }, [ready, user, router]);
 
   if (!ready || !user) {
-    return <div className="min-h-screen bg-background" />;
+    return <AppShellSkeleton />;
   }
 
   return (

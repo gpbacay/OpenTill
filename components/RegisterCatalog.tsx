@@ -35,6 +35,7 @@ export function RegisterCatalog({ products, activeTenant, onAddToSale }: Registe
     return tenantProducts.filter((product) => {
       const matchesQuery =
         !query ||
+        product.id.toLowerCase().includes(query) ||
         product.name.toLowerCase().includes(query) ||
         product.sku.toLowerCase().includes(query) ||
         Object.values(product.custom ?? {}).some((value) => value.toLowerCase().includes(query));

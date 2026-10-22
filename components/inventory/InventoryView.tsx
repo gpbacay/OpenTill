@@ -17,6 +17,8 @@ import { ColumnManager, customColumnDefs, customFieldRows, customText } from "@/
 import { DetailPanel, Fields, PanelSection, SplitView } from "@/components/data-table/DetailPanel";
 import { ProductDialog } from "./ProductDialog";
 import { StockDialog, type StockAction } from "./StockDialog";
+import { ProductQrCode } from "./ProductQrCode";
+import { TablePageSkeleton } from "@/components/loading/PageSkeletons";
 
 const STATUS_OPTIONS = [
   { value: "all", label: "All stock" },
@@ -38,7 +40,7 @@ const TYPE_LABEL: Record<string, string> = { RESTOCK: "Restock", SALE: "Sale", A
 
 export function InventoryView() {
   const { products, activeTenant, handleDeleteProduct } = usePos();
-  const { suppliers, movements, columnsFor } = useOps();
+  const { suppliers, movements, columnsFor, ready } = useOps();
   const params = useSearchParams();
   const [tab, setTab] = useState<"stock" | "history">("stock");
   const [query, setQuery] = useState("");
@@ -74,7 +76,7 @@ export function InventoryView() {
             (category === "all" || p.category === category) &&
             (status === "all" || (status === "restock" ? stockState(p) !== "ok" : stockState(p) === status)) &&
             (supplier === "all" || (p.supplierId ?? "") === (supplier === "none" ? "" : supplier)) &&
-            matches(query, p.name, p.sku, p.category, supplierName(p.supplierId), customText(p))
+            matches(query, p.id, p.name, p.sku, p.category, supplierName(p.supplierId), customText(p))
         )
         .sort((a, b) => a.name.localeCompare(b.name)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -84,7 +86,7 @@ export function InventoryView() {
   const historyRows = useMemo(
     () =>
       movements
-        .filter((m) => (type === "all" || m.type === type) && matches(query, m.productName, m.note, supplierName(m.supplierId)))
+        .filter((m) => (type === "all" || m.type === type) && matches(query, m.id, m.productName, m.note, supplierName(m.supplierId)))
         .sort((a, b) => b.date.localeCompare(a.date)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [movements, type, query, suppliers]
@@ -166,6 +168,7 @@ export function InventoryView() {
       </div>
       <Fields
         rows={[
+          ["ID", <span key="product-id" className="break-all font-mono text-xs">{selected.id}</span>],
           ["Category", selected.category],
           ["Supplier", supplierName(selected.supplierId)],
           ["Cost", money(currency, selected.costPrice ?? 0)],
@@ -176,6 +179,9 @@ export function InventoryView() {
         ]}
       />
       {selected.description ? <p className="text-sm text-muted-foreground">{selected.description}</p> : null}
+      <PanelSection title="Product QR code">
+        <ProductQrCode product={selected} tenant={activeTenant} />
+      </PanelSection>
       <PanelSection title="Recent stock changes">
         {recent.length === 0 ? (
           <p className="text-sm text-muted-foreground">Nothing yet.</p>
@@ -194,6 +200,7 @@ export function InventoryView() {
       </PanelSection>
     </DetailPanel>
   ) : null;
+  if (!ready.suppliers || !ready.movements || !ready.columns) return <TablePageSkeleton stats={4} />;
   const filtered = tab === "stock" ? `${query}|${category}|${status}|${supplier}` : `${query}|${type}`;
   const filtersActive = query.trim() !== "" || (tab === "stock" ? category !== "all" || status !== "all" || supplier !== "all" : type !== "all");
   const resetFilters = () => {
@@ -267,8 +274,8 @@ export function InventoryView() {
             <>
               <ExportButton
                 filename="products.csv"
-                headers={["Name", "SKU", "Category", "Supplier", "Cost", "Price", "In stock", "Warn at", ...customColumns.map((c) => c.label)]}
-                rows={chosen.map((p) => [p.name, p.sku, p.category, supplierName(p.supplierId), p.costPrice ?? 0, p.price, p.stock, reorderLevel(p), ...customColumns.map((c) => p.custom?.[c.id] ?? "")])}
+                headers={["ID", "Name", "SKU", "Category", "Supplier", "Cost", "Price", "In stock", "Warn at", ...customColumns.map((c) => c.label)]}
+                rows={chosen.map((p) => [p.id, p.name, p.sku, p.category, supplierName(p.supplierId), p.costPrice ?? 0, p.price, p.stock, reorderLevel(p), ...customColumns.map((c) => p.custom?.[c.id] ?? "")])}
               />
               <DeleteButton
                 count={chosen.length}
@@ -292,8 +299,8 @@ export function InventoryView() {
           bulkActions={(chosen) => (
             <ExportButton
               filename="stock-history.csv"
-              headers={["When", "Product", "Type", "Change", "Cost each", "Supplier", "Note"]}
-              rows={chosen.map((m) => [new Date(m.date).toLocaleString(), m.productName, TYPE_LABEL[m.type] ?? m.type, m.quantity, m.unitCost, supplierName(m.supplierId), m.note])}
+              headers={["ID", "When", "Product", "Type", "Change", "Cost each", "Supplier", "Note"]}
+              rows={chosen.map((m) => [m.id, new Date(m.date).toLocaleString(), m.productName, TYPE_LABEL[m.type] ?? m.type, m.quantity, m.unitCost, supplierName(m.supplierId), m.note])}
             />
           )}
           empty="No stock changes yet."

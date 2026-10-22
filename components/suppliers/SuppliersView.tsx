@@ -13,6 +13,7 @@ import { FilterSelect, ResetFiltersButton, SearchBox, StatTile, Toolbar, matches
 import { ColumnManager, customColumnDefs, customFieldRows, customText } from "@/components/data-table/custom-columns";
 import { DetailPanel, Fields, PanelSection, SplitView } from "@/components/data-table/DetailPanel";
 import { SupplierDialog } from "./SupplierDialog";
+import { TablePageSkeleton } from "@/components/loading/PageSkeletons";
 
 const STATUS = [
   { value: "all", label: "All suppliers" },
@@ -22,7 +23,7 @@ const STATUS = [
 
 export function SuppliersView() {
   const { products, activeTenant } = usePos();
-  const { suppliers, movements, expenses, columnsFor, deleteSupplier } = useOps();
+  const { suppliers, movements, expenses, columnsFor, deleteSupplier, ready } = useOps();
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("all");
   const [target, setTarget] = useState<Supplier | "new" | null>(null);
@@ -53,7 +54,7 @@ export function SuppliersView() {
         .filter(
           (s) =>
             (status === "all" || (status === "active") === s.active) &&
-            matches(query, s.name, s.contactPerson, s.phone, s.email, s.address, customText(s))
+            matches(query, s.id, s.name, s.contactPerson, s.phone, s.email, s.address, customText(s))
         )
         .sort((a, b) => a.name.localeCompare(b.name)),
     [suppliers, status, query]
@@ -157,6 +158,8 @@ export function SuppliersView() {
     </DetailPanel>
   ) : null;
 
+  if (!ready.suppliers || !ready.movements || !ready.expenses || !ready.columns) return <TablePageSkeleton />;
+
   return (
     <div className="flex h-full min-h-0 flex-col">
       <SplitView panel={panel}>
@@ -184,8 +187,8 @@ export function SuppliersView() {
           <>
             <ExportButton
               filename="suppliers.csv"
-              headers={["Name", "Contact", "Phone", "Email", "Address", "Status", ...columnsFor("suppliers").map((c) => c.label)]}
-              rows={chosen.map((s) => [s.name, s.contactPerson, s.phone, s.email, s.address, s.active ? "Active" : "Inactive", ...columnsFor("suppliers").map((c) => s.custom?.[c.id] ?? "")])}
+              headers={["ID", "Name", "Contact", "Phone", "Email", "Address", "Status", ...columnsFor("suppliers").map((c) => c.label)]}
+              rows={chosen.map((s) => [s.id, s.name, s.contactPerson, s.phone, s.email, s.address, s.active ? "Active" : "Inactive", ...columnsFor("suppliers").map((c) => s.custom?.[c.id] ?? "")])}
             />
             <DeleteButton
               count={chosen.length}

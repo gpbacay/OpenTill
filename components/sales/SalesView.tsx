@@ -171,7 +171,7 @@ export function SalesView() {
                 <span className="text-muted-foreground">Total {money(currency, chosen.filter((o) => o.status !== "FAILED").reduce((sum, o) => sum + o.total, 0))}</span>
                 <ExportButton
                   filename="sales.csv"
-                  headers={["When", "Receipt", "Customer", "Cashier", "Payment", "Discount", "Total", "Status"]}
+                  headers={["When", "ID", "Customer", "Cashier", "Payment", "Discount", "Total", "Status"]}
                   rows={chosen.map((o) => [new Date(o.date).toLocaleString(), o.id, o.customerName ?? "Walk-in", o.cashierName ?? "", PAY_LABEL[o.paymentMethod] ?? o.paymentMethod, o.discountAmount ?? 0, o.total, o.status])}
                 />
               </>

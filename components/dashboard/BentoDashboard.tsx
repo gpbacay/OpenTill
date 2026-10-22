@@ -21,6 +21,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DateRangeFilter } from "@/components/data-table/DateRangeFilter";
 import { ResetFiltersButton } from "@/components/data-table/controls";
 import { ProductDialog } from "@/components/inventory/ProductDialog";
+import { DashboardPageSkeleton } from "@/components/loading/PageSkeletons";
 import {
   ChartContainer,
   ChartTooltip,
@@ -80,7 +81,7 @@ export default function BentoDashboard({
   activeTenant,
 }: BentoDashboardProps) {
   const router = useRouter();
-  const { expenses, suppliers, movements } = useOps();
+  const { expenses, suppliers, movements, ready } = useOps();
   const [range, setRange] = useState<DateRange>(() => presetRange("month"));
   const [addingProduct, setAddingProduct] = useState(false);
   const currency = activeTenant.currency;
@@ -149,6 +150,8 @@ export default function BentoDashboard({
     [movements, range]
   );
   const supplierName = (id: string | null) => suppliers.find((s) => s.id === id)?.name ?? "Supplier";
+
+  if (!ready.expenses || !ready.suppliers || !ready.movements) return <DashboardPageSkeleton />;
 
   return (
     <div className="flex h-full flex-col gap-4 overflow-y-auto pb-2">

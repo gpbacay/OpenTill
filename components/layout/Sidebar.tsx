@@ -6,6 +6,8 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import {
   Home01Icon,
   Invoice01Icon,
+  Logout01Icon,
+  Notification03Icon,
   Package01Icon,
   Settings01Icon,
   ShoppingCart01Icon,
@@ -15,7 +17,9 @@ import {
 import { useAuth } from "@/contexts/auth-context";
 import { usePos } from "@/contexts/pos-context";
 import { useRealtimeStatus } from "@/lib/realtime";
+import { useRecentActivity } from "@/hooks/use-recent-activity";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -42,6 +46,7 @@ export const MENU_ITEMS = [
   { id: "records", href: "/records", label: "Sales", icon: Invoice01Icon, primary: true },
   { id: "inventory", href: "/inventory", label: "Inventory", icon: Package01Icon, primary: true },
   { id: "expenses", href: "/expenses", label: "Expenses", icon: Wallet01Icon, primary: true },
+  { id: "activity", href: "/activity", label: "Recent activity", icon: Notification03Icon, primary: false },
   { id: "suppliers", href: "/suppliers", label: "Suppliers", icon: TruckDeliveryIcon, primary: false },
   { id: "settings", href: "/settings", label: "Settings", icon: Settings01Icon, primary: false },
 ] as const;
@@ -66,7 +71,7 @@ function initials(name: string) {
   return letters.join("") || "OT";
 }
 
-export function StoreMenu() {
+export function StoreMenu({ compact = false }: { compact?: boolean }) {
   const router = useRouter();
   const { user } = useAuth();
   const { activeTenant, tenants, handleSwitchTenant } = usePos();
@@ -81,7 +86,10 @@ export function StoreMenu() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button className="flex w-full items-center gap-3 rounded-md px-2 py-2 text-left hover:bg-sidebar-accent">
+        <button
+          aria-label={compact ? "Open store menu" : undefined}
+          className={`flex items-center gap-3 rounded-md px-2 py-2 text-left hover:bg-sidebar-accent ${compact ? "w-auto" : "w-full"}`}
+        >
           <span className="relative shrink-0">
             <Avatar className="size-8">
               <AvatarFallback className="bg-primary text-xs font-semibold text-primary-foreground">
@@ -95,7 +103,7 @@ export function StoreMenu() {
               className={`absolute -top-0.5 -right-0.5 size-3 rounded-full ring-2 ring-sidebar ${dot.color}`}
             />
           </span>
-          <span className="min-w-0">
+          <span className={compact ? "sr-only" : "min-w-0"}>
             <span className="block truncate text-sm font-medium text-foreground">
               {user.name}
             </span>
@@ -133,6 +141,8 @@ export default function AppSidebar() {
   const pathname = usePathname();
   const activeSection = sectionFromPath(pathname);
   const { activeTenant, offlineQueue } = usePos();
+  const { logout } = useAuth();
+  const { unreadCount } = useRecentActivity();
   if (!activeTenant) return null;
   const queued = offlineQueue.filter((entry) => entry.order.tenantId === activeTenant.id).length;
 
@@ -159,6 +169,11 @@ export default function AppSidebar() {
                         {item.id === "records" && queued > 0 ? (
                           <span className="ml-auto text-xs text-primary">{queued}</span>
                         ) : null}
+                        {item.id === "activity" && unreadCount > 0 ? (
+                          <span className="ml-auto min-w-5 rounded-full bg-primary px-1.5 text-center text-[10px] font-semibold text-primary-foreground">
+                            {unreadCount > 99 ? "99+" : unreadCount}
+                          </span>
+                        ) : null}
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
@@ -169,7 +184,20 @@ export default function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
       <SidebarFooter className="p-3">
-        <StoreMenu />
+        <div className="flex items-center gap-1">
+          <div className="min-w-0 flex-1"><StoreMenu /></div>
+          <Button
+            type="button"
+            size="icon"
+            variant="ghost"
+            onClick={() => void logout()}
+            aria-label="Log out"
+            title="Log out"
+            className="text-muted-foreground hover:text-foreground"
+          >
+            <HugeiconsIcon icon={Logout01Icon} size={17} />
+          </Button>
+        </div>
       </SidebarFooter>
     </Sidebar>
   );

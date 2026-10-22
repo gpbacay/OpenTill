@@ -15,12 +15,13 @@ import { FilterSelect, ResetFiltersButton, SearchBox, StatTile, Toolbar, matches
 import { ColumnManager, customColumnDefs, customFieldRows, customText } from "@/components/data-table/custom-columns";
 import { DetailPanel, Fields, SplitView } from "@/components/data-table/DetailPanel";
 import { ExpenseDialog } from "./ExpenseDialog";
+import { TablePageSkeleton } from "@/components/loading/PageSkeletons";
 
 const PAY_LABEL = { CASH: "Cash", CARD: "Card", MOBILE_WALLET: "Wallet" } as const;
 
 export function ExpensesView() {
   const { activeTenant, tenantSyncedOrders } = usePos();
-  const { expenses, suppliers, columnsFor, deleteExpense } = useOps();
+  const { expenses, suppliers, columnsFor, deleteExpense, ready } = useOps();
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("all");
   const params = useSearchParams();
@@ -40,7 +41,7 @@ export function ExpensesView() {
             inRange(e.date, range) &&
             (category === "all" || e.category === category) &&
             (supplier === "all" || (e.supplierId ?? "") === (supplier === "none" ? "" : supplier)) &&
-            matches(query, e.description, e.category, supplierName(e.supplierId), customText(e))
+            matches(query, e.id, e.description, e.category, supplierName(e.supplierId), customText(e))
         )
         .sort((a, b) => b.date.localeCompare(a.date)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -68,6 +69,7 @@ export function ExpensesView() {
   ];
 
   if (!activeTenant) return null;
+  if (!ready.expenses || !ready.suppliers || !ready.columns) return <TablePageSkeleton stats={4} />;
   const net = month.salesTotal - month.spentTotal;
   const shown = rows.reduce((sum, e) => sum + e.amount, 0);
   const filtersActive = query.trim() !== "" || category !== "all" || supplier !== "all" || range.preset !== "month";
@@ -141,8 +143,8 @@ export function ExpensesView() {
             <span className="text-muted-foreground">Total {money(currency, chosen.reduce((sum, e) => sum + e.amount, 0))}</span>
             <ExportButton
               filename="expenses.csv"
-              headers={["Date", "Category", "Description", "Supplier", "Paid with", "Amount", ...columnsFor("expenses").map((c) => c.label)]}
-              rows={chosen.map((e) => [new Date(e.date).toLocaleDateString(), e.category, e.description, supplierName(e.supplierId), PAY_LABEL[e.paymentMethod] ?? e.paymentMethod, e.amount, ...columnsFor("expenses").map((c) => e.custom?.[c.id] ?? "")])}
+              headers={["ID", "Date", "Category", "Description", "Supplier", "Paid with", "Amount", ...columnsFor("expenses").map((c) => c.label)]}
+              rows={chosen.map((e) => [e.id, new Date(e.date).toLocaleDateString(), e.category, e.description, supplierName(e.supplierId), PAY_LABEL[e.paymentMethod] ?? e.paymentMethod, e.amount, ...columnsFor("expenses").map((c) => e.custom?.[c.id] ?? "")])}
             />
             <DeleteButton
               count={chosen.length}

@@ -297,14 +297,12 @@ export function PosProvider({
         offlineQueueRef.current = [];
       }
 
-      const [tenantsRes, productsRes, ordersRes] = await Promise.all([
-        api("/api/tenants"),
-        api("/api/products"),
-        api("/api/orders"),
-      ]);
-
-      if (tenantsRes.ok) {
-        const server = await tenantsRes.json();
+      // Commit each collection as soon as its own request finishes. A slow orders request, for
+      // example, should never hold back a fresh product catalogue or tenant switcher.
+      const refreshTenants = async () => {
+        const response = await api("/api/tenants");
+        if (!response.ok) return;
+        const server = await response.json();
         if (Array.isArray(server) && server.length > 0) {
           const dirty = new Set(outboxRef.current.tenantUpserts);
           setTenants((local) => {
@@ -324,10 +322,12 @@ export function PosProvider({
             return available[0]?.id ?? "";
           });
         }
-      }
+      };
 
-      if (productsRes.ok) {
-        const server = await productsRes.json();
+      const refreshProducts = async () => {
+        const response = await api("/api/products");
+        if (!response.ok) return;
+        const server = await response.json();
         if (Array.isArray(server) && server.length > 0) {
           const dirty = new Set(outboxRef.current.productUpserts);
           const deleted = new Set(outboxRef.current.productDeletes);
@@ -355,10 +355,12 @@ export function PosProvider({
             ];
           });
         }
-      }
+      };
 
-      if (ordersRes.ok) {
-        const server = await ordersRes.json();
+      const refreshOrders = async () => {
+        const response = await api("/api/orders");
+        if (!response.ok) return;
+        const server = await response.json();
         if (Array.isArray(server)) {
           const mapped: Order[] = server.map((o: Order) => ({
             id: o.id,
@@ -384,7 +386,9 @@ export function PosProvider({
             return [...local.filter((o) => !ids.has(o.id)), ...mapped];
           });
         }
-      }
+      };
+
+      await Promise.allSettled([refreshTenants(), refreshProducts(), refreshOrders()]);
       if (hasWork) setSyncProgress(100);
     } catch (err) {
       console.warn(
