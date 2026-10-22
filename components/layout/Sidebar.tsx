@@ -25,6 +25,7 @@ import { useRealtimeStatus } from "@/lib/realtime";
 import { useRecentActivity } from "@/hooks/use-recent-activity";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { LogoutButton } from "@/components/LogoutButton";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -145,7 +146,6 @@ export default function AppSidebar() {
   const pathname = usePathname();
   const activeSection = sectionFromPath(pathname);
   const { activeTenant, offlineQueue } = usePos();
-  const { logout } = useAuth();
   const { unreadCount } = useRecentActivity();
   const { setOpenMobile } = useSidebar();
   // Close the phone menu after navigating.
@@ -203,17 +203,18 @@ export default function AppSidebar() {
       <SidebarFooter className="p-3">
         <div className="flex items-center gap-1">
           <div className="min-w-0 flex-1"><StoreMenu /></div>
-          <Button
-            type="button"
-            size="icon"
-            variant="ghost"
-            onClick={() => void logout()}
-            aria-label="Log out"
-            title="Log out"
-            className="text-muted-foreground hover:text-foreground"
-          >
-            <HugeiconsIcon icon={Logout01Icon} size={17} />
-          </Button>
+          <LogoutButton>
+            <Button
+              type="button"
+              size="icon"
+              variant="ghost"
+              aria-label="Log out"
+              title="Log out"
+              className="text-muted-foreground hover:text-foreground"
+            >
+              <HugeiconsIcon icon={Logout01Icon} size={17} />
+            </Button>
+          </LogoutButton>
         </div>
       </SidebarFooter>
     </Sidebar>

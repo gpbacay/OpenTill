@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useAuth } from "@/contexts/auth-context";
 import { ImagePicker } from "@/components/ImagePicker";
+import { LogoutButton } from "@/components/LogoutButton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,7 +20,7 @@ function initials(name: string) {
 }
 
 export default function AccountPage() {
-  const { user, updateAccount, logout } = useAuth();
+  const { user, updateAccount } = useAuth();
   const [name, setName] = useState(user?.name ?? "");
   const [username, setUsername] = useState(user?.username ?? "");
   const [currentPassword, setCurrentPassword] = useState("");
@@ -156,9 +157,11 @@ export default function AccountPage() {
           {pending ? "Saving" : "Save"}
         </Button>
       </form>
-      <Button variant="ghost" className="self-start" onClick={() => void logout()}>
-        Log out
-      </Button>
+      <LogoutButton>
+        <Button variant="ghost" className="self-start">
+          Log out
+        </Button>
+      </LogoutButton>
     </div>
   );
 }

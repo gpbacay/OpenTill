@@ -12,7 +12,7 @@ import { money } from "@/lib/money";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DateRangeFilter } from "@/components/data-table/DateRangeFilter";
-import { ResetFiltersButton } from "@/components/data-table/controls";
+import { FilterBar, ResetFiltersButton } from "@/components/data-table/controls";
 import { AddMenu } from "@/components/layout/AddMenu";
 import { DashboardPageSkeleton } from "@/components/loading/PageSkeletons";
 import {
@@ -146,14 +146,21 @@ export default function BentoDashboard({
 
   return (
     <div className="flex h-full flex-col gap-4 overflow-y-auto pb-2">
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <h2 className="text-lg font-semibold">{activeTenant.name}</h2>
-        <AddMenu />
-        <div className="ml-auto flex items-center gap-2">
+      <FilterBar
+        label="Filters"
+        active={range.preset !== "month"}
+        leading={
+          <>
+            <h2 className="mr-2 text-lg font-semibold">{activeTenant.name}</h2>
+            <AddMenu />
+          </>
+        }
+      >
+        <div className="flex flex-wrap items-center gap-2 md:ml-auto">
           <DateRangeFilter value={range} onChange={setRange} />
           {range.preset !== "month" ? <ResetFiltersButton onClick={() => setRange(presetRange("month"))} /> : null}
         </div>
-      </div>
+      </FilterBar>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <DashCard title="Sales" href={`/records?${query}`} open="Open sales for this date range">

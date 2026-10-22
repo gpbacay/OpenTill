@@ -11,6 +11,7 @@ import AppSidebar, { MENU_ITEMS } from "@/components/layout/Sidebar";
 import Header from "@/components/layout/Header";
 import { AddMenu } from "@/components/layout/AddMenu";
 import { TenantOnboarding } from "@/components/TenantOnboarding";
+import { LogoutButton } from "@/components/LogoutButton";
 import { Button } from "@/components/ui/button";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { AppShellSkeleton } from "@/components/loading/PageSkeletons";
@@ -40,7 +41,7 @@ function PosShell({ children }: { children: React.ReactNode }) {
   } = usePos();
   const pathname = usePathname();
   const router = useRouter();
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const isMobile = useIsMobile();
   const swipeStart = useRef<{ x: number; y: number } | null>(null);
   const tabIndex = TABS.findIndex((item) => item.href === pathname);
@@ -94,9 +95,9 @@ function PosShell({ children }: { children: React.ReactNode }) {
             <Button variant="ghost" asChild>
               <Link href="/account">Account</Link>
             </Button>
-            <Button variant="ghost" onClick={() => void logout()}>
-              Log out
-            </Button>
+            <LogoutButton>
+              <Button variant="ghost">Log out</Button>
+            </LogoutButton>
           </div>
           <TenantOnboarding
             tenants={tenants}
