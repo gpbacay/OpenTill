@@ -2,13 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { HugeiconsIcon } from "@hugeicons/react";
-import { EyeIcon, EyeOffIcon } from "@hugeicons/core-free-icons";
 import { useAuth } from "@/contexts/auth-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { FieldError, check, clearError, invalid } from "@/components/FieldError";
+import { PasswordInput } from "@/components/PasswordInput";
 import { collect, passwordError, required, usernameError, type FieldErrors } from "@/lib/validation";
 
 export default function LoginPage() {
@@ -18,7 +17,6 @@ export default function LoginPage() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [errors, setErrors] = useState<FieldErrors>({});
   const [pending, setPending] = useState(false);
@@ -90,28 +88,16 @@ export default function LoginPage() {
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="password" required>Password</Label>
-            <div className="relative">
-              <Input
-                id="password"
-                {...invalid(errors, "password")}
-                type={showPassword ? "text" : "password"}
-                autoComplete={creating ? "new-password" : "current-password"}
-                className="pr-8"
-                value={password}
-                onChange={(event) => {
-                  clearError(setErrors, "password");
-                  setPassword(event.target.value);
-                }}
-              />
-              <button
-                type="button"
-                className="absolute top-1/2 right-1.5 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                aria-label={showPassword ? "Hide password" : "Show password"}
-                onClick={() => setShowPassword((value) => !value)}
-              >
-                <HugeiconsIcon icon={showPassword ? EyeOffIcon : EyeIcon} size={16} />
-              </button>
-            </div>
+            <PasswordInput
+              id="password"
+              {...invalid(errors, "password")}
+              autoComplete={creating ? "new-password" : "current-password"}
+              value={password}
+              onChange={(event) => {
+                clearError(setErrors, "password");
+                setPassword(event.target.value);
+              }}
+            />
             <FieldError errors={errors} id="password" />
           </div>
           {!creating ? (

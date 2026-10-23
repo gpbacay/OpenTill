@@ -27,7 +27,7 @@ export function CashiersView() {
     () =>
       (cashiers ?? [])
         .filter((c) => (store === "all" || c.tenantId === store) && matches(query, c.id, c.name, c.username, storeName(c.tenantId)))
-        .sort((a, b) => a.name.localeCompare(b.name)),
+        .sort((a, b) => a.username.localeCompare(b.username)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [cashiers, store, query, tenants]
   );
@@ -58,8 +58,8 @@ export function CashiersView() {
       header: "Cashier",
       cell: (c) => (
         <div className="min-w-40">
-          <p className="font-medium">{c.name}</p>
-          <p className="text-xs text-muted-foreground">@{c.username}</p>
+          <p className="font-medium">{c.username}</p>
+          {c.name !== c.username ? <p className="text-xs text-muted-foreground">{c.name}</p> : null}
         </div>
       ),
     },
@@ -70,8 +70,8 @@ export function CashiersView() {
   const selected = cashiers.find((c) => c.id === selectedId) ?? null;
   const panel = selected ? (
     <DetailPanel
-      title={selected.name}
-      subtitle={`@${selected.username}`}
+      title={selected.username}
+      subtitle={selected.name !== selected.username ? selected.name : undefined}
       onClose={() => setSelectedId(null)}
       actions={
         <>
@@ -80,7 +80,7 @@ export function CashiersView() {
             variant="ghost"
             className="text-destructive"
             onClick={() => {
-              if (window.confirm(`Delete ${selected.name}? They will be signed out and can no longer log in.`)) void deleteMany([selected]);
+              if (window.confirm(`Delete ${selected.username}? They will be signed out and can no longer log in.`)) void deleteMany([selected]);
             }}
           >
             Delete
@@ -90,7 +90,6 @@ export function CashiersView() {
     >
       <Fields
         rows={[
-          ["Username", selected.username],
           ["Store", storeName(selected.tenantId)],
           ["Access", "Register only"],
           ["Added", new Date(selected.createdAt).toLocaleDateString()],

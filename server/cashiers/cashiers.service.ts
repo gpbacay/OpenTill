@@ -88,7 +88,8 @@ export class CashiersService {
     const email = body.username === undefined ? current.email : requireUsername(body.username);
     const data: Record<string, string> = {
       email,
-      name: body.name === undefined ? current.name : requireName(body.name),
+      // A name that was just the username (the default) follows a username change.
+      name: body.name !== undefined ? requireName(body.name) : current.name === current.email ? email : current.name,
     };
     if (email !== current.email) await this.requireFreeUsername(email, id);
     if (body.tenantId !== undefined) data.tenantId = await this.requireStore(adminId, body.tenantId);
