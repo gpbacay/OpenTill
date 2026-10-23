@@ -14,7 +14,7 @@ import { CashierInviteDialog } from "./CashierInviteDialog";
 import { useCashiers, type CashierInvite } from "./use-cashiers";
 
 export function CashiersView() {
-  const { tenants } = usePos();
+  const { tenants, handleUpdateTenant } = usePos();
   const { cashiers, error, create, update, remove, invite, resetLink } = useCashiers();
   const [query, setQuery] = useState("");
   const [store, setStore] = useState("all");
@@ -161,6 +161,10 @@ export function CashiersView() {
         target={target}
         onClose={() => setTarget(null)}
         onSave={async (id, input) => {
+          // Stores are kept on the device first and uploaded in the background. A cashier needs the store on the
+          // server, so send it now (saving by id is safe to repeat).
+          const store = tenants.find((t) => t.id === input.tenantId);
+          if (store) await handleUpdateTenant(store);
           if (id) return update(id, input);
           const { error: message, data } = await create(input);
           if (data) setSharing(data);

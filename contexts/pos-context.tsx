@@ -276,8 +276,10 @@ export function PosProvider({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(tenant),
         });
-        // A 4xx will never succeed on retry (e.g. the store was deleted elsewhere), so drop it from the queue.
-        if (res.ok || (res.status >= 400 && res.status < 500 && res.status !== 401)) remember("tenantUpserts", id, false);
+        // A 4xx from the API will never succeed on retry (e.g. the store was deleted elsewhere), so drop it from the queue.
+        // A 404/5xx page from the host (API not deployed, or down) says nothing about the store: keep it queued.
+        const fromApi = (res.headers.get("content-type") ?? "").includes("json");
+        if (res.ok || (fromApi && res.status >= 400 && res.status < 500 && res.status !== 401)) remember("tenantUpserts", id, false);
       }
 
       const queue = offlineQueueRef.current;
