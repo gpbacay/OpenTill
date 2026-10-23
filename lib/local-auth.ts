@@ -185,6 +185,9 @@ export async function updateLocalAccount(
   }
   const passwordChanged = Boolean(body.newPassword);
   const usernameChanged = username !== current.username;
+  if (current.role === "CASHIER" && (passwordChanged || usernameChanged)) {
+    return "Your admin manages your username and password. Ask them to change it.";
+  }
   if (usernameChanged || passwordChanged) {
     if (!body.currentPassword) return "Current password is incorrect.";
     const hash = await hashPassword(body.currentPassword, current.salt);

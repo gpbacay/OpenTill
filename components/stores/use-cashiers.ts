@@ -8,7 +8,12 @@ export interface CashierInput {
   username?: string;
   password?: string;
   tenantId?: string;
+  /** How many devices the sign-in link may sign in. */
+  maxUses?: number;
 }
+
+/** A cashier plus the sign-in link token the server returns when it makes a link (shown once). */
+export type CashierInvite = Cashier & { inviteToken: string };
 
 async function failure(res: Response) {
   const message = (await res.json().catch(() => null))?.message;
@@ -36,28 +41,34 @@ export function useCashiers() {
     void load();
   }, [load]);
 
-  /** Resolves to an error message, or null on success. */
-  const send = async (url: string, method: string, body?: CashierInput) => {
+  /** `error` is a message, or null on success. */
+  const send = async <T = unknown>(url: string, method: string, body?: CashierInput): Promise<{ error: string | null; data?: T }> => {
     try {
       const res = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
         body: body ? JSON.stringify(body) : undefined,
       });
-      if (!res.ok) return await failure(res);
+      if (!res.ok) return { error: await failure(res) };
+      const data = (await res.json().catch(() => undefined)) as T;
       await load();
-      return null;
+      return { error: null, data };
     } catch {
-      return "Couldn't reach the server. Cashier accounts need a connection.";
+      return { error: "Couldn't reach the server. Cashier accounts need a connection." };
     }
   };
+  const message = async (request: Promise<{ error: string | null }>) => (await request).error;
 
   return {
     cashiers,
     error,
     reload: load,
-    create: (body: CashierInput) => send("/api/cashiers", "POST", body),
-    update: (id: string, body: CashierInput) => send(`/api/cashiers/${id}`, "PATCH", body),
-    remove: (id: string) => send(`/api/cashiers/${id}`, "DELETE"),
+    create: (body: CashierInput) => send<CashierInvite>("/api/cashiers", "POST", body),
+    update: (id: string, body: CashierInput) => message(send(`/api/cashiers/${id}`, "PATCH", body)),
+    remove: (id: string) => message(send(`/api/cashiers/${id}`, "DELETE")),
+    /** Same link, usage back to zero; the cashier is signed out everywhere. */
+    resetLink: (id: string) => message(send(`/api/cashiers/${id}/reset-link`, "POST")),
+    /** A brand-new sign-in link for an existing cashier; the old link stops working and usage starts again. */
+    invite: (id: string) => send<CashierInvite>(`/api/cashiers/${id}/invite`, "POST"),
   };
 }

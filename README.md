@@ -25,7 +25,7 @@ A multi-tenant, offline-first Point of Sale system for retail operations: regist
 | **Language** | TypeScript |
 | **Frontend** | React 19, Next.js 15 (App Router), Tailwind CSS 4, Lucide React, Motion, Recharts |
 | **Backend** | NestJS (modular monolith), Express (`@nestjs/platform-express`) |
-| **Data store** | SQLite file on this machine (`data/opentill.db`) |
+| **Data store** | SQLite file on this machine (`data/opentill.db`); Turso (hosted SQLite) on Vercel |
 | **ORM** | Prisma |
 | **Runtime / tooling** | Node.js, Next.js, tsx (API dev), esbuild (Nest prod bundle), dotenv |
 
@@ -55,6 +55,20 @@ A multi-tenant, offline-first Point of Sale system for retail operations: regist
    `npm run dev`
 5. Optional, load sample data into a store you already have (see below):
    `npm run db:seed`
+
+## Deploy on Vercel (one project, no separate server)
+
+The web app and the API both run on Vercel: `api/[...path].ts` serves the whole Nest API as one Vercel Function, and everything under `/api/*` goes to it.
+
+1. Create a [Turso](https://turso.tech) database (SQLite over the network; it is in the Vercel Marketplace too).
+2. In the Vercel project, set `TURSO_DATABASE_URL` (`libsql://…`) and `TURSO_AUTH_TOKEN`. Leave `API_URL` unset.
+3. Deploy. The build runs `prisma generate`, applies any new `prisma/migrations` to Turso (`scripts/migrate-remote.ts`) and builds the app.
+
+Notes: live updates (`/api/events`) are switched off on Vercel because serverless instances don't share memory, so the app refreshes by polling every 20 seconds instead.
+
+### Cashier sign-in links
+
+The admin sets every cashier's password; cashiers can't change it (or their username). Adding a cashier also makes a sign-in link and QR code that signs them in with one tap, so they don't have to type it. The admin picks how many devices the link works on (default 1, no expiry). The first devices to open it are remembered with a cookie: they can use the link again after logging out, other devices are refused once the limit is reached. In a cashier's details the admin can see "1 of 1 device used", **Reset link usage** (forgets the devices and signs the cashier out everywhere, in case someone used the link first), **Share access** (a brand-new link, same reset) and **Edit** (change the password or the device limit). The link only governs link sign-in: the password still works on any device.
 
 ### Database migrations and sample data
 

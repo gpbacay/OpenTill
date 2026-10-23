@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   Inject,
@@ -9,7 +10,7 @@ import {
 import { randomBytes } from "node:crypto";
 import { DatabaseService } from "../database/database.service";
 import { TenantsService } from "../tenants/tenants.service";
-import { hashPassword, requireName, requirePassword, requireUsername } from "../auth/auth.service";
+import { hashPassword, newInvite, requireName, requirePassword, requireUsername } from "../auth/auth.service";
 
 export interface Cashier {
   id: string;
@@ -17,17 +18,55 @@ export interface Cashier {
   username: string;
   tenantId: string;
   createdAt: string;
+  /** The sign-in link: does one exist, on how many devices has it been used, and how many may use it. */
+  hasLink: boolean;
+  linkUses: number;
+  linkMaxUses: number;
 }
+
+/** What creating or re-linking returns: the cashier plus the sign-in link token (shown once, only its hash is stored). */
+export type CashierInvite = Cashier & { inviteToken: string };
 
 export interface CashierInput {
   name?: string;
   username?: string;
   password?: string;
   tenantId?: string;
+  /** How many devices the sign-in link may sign in (1 to 20). */
+  maxUses?: number;
 }
 
-function toCashier(row: { id: string; name: string; email: string; tenantId: string | null; createdAt: Date }): Cashier {
-  return { id: row.id, name: row.name, username: row.email, tenantId: row.tenantId ?? "", createdAt: row.createdAt.toISOString() };
+const MAX_DEVICES = 20;
+const withUses = { _count: { select: { inviteDevices: true } } } as const;
+
+function requireMaxUses(value: unknown, fallback: number) {
+  if (value === undefined) return fallback;
+  if (typeof value !== "number" || !Number.isInteger(value) || value < 1 || value > MAX_DEVICES) {
+    throw new BadRequestException(`The link's devices must be a whole number from 1 to ${MAX_DEVICES}.`);
+  }
+  return value;
+}
+
+function toCashier(row: {
+  id: string;
+  name: string;
+  email: string;
+  tenantId: string | null;
+  createdAt: Date;
+  inviteHash: string | null;
+  inviteMaxUses: number;
+  _count: { inviteDevices: number };
+}): Cashier {
+  return {
+    id: row.id,
+    name: row.name,
+    username: row.email,
+    tenantId: row.tenantId ?? "",
+    createdAt: row.createdAt.toISOString(),
+    hasLink: row.inviteHash !== null,
+    linkUses: row._count.inviteDevices,
+    linkMaxUses: row.inviteMaxUses,
+  };
 }
 
 /** Cashier accounts an admin creates for their stores. Needs the database: the in-memory fallback has no cashier support. */
@@ -67,26 +106,63 @@ export class CashiersService {
     const rows = await this.client.user.findMany({
       where: { createdById: adminId, role: "CASHIER" },
       orderBy: { createdAt: "asc" },
+      include: withUses,
     });
     return rows.map(toCashier);
   }
 
-  async create(adminId: string, body: CashierInput): Promise<Cashier> {
+  /** The admin sets the password. The cashier also gets a sign-in link so they can start without typing it. */
+  async create(adminId: string, body: CashierInput): Promise<CashierInvite> {
     const email = requireUsername(body.username);
     const name = body.name?.trim() ? requireName(body.name) : email;
     const passwordHash = await hashPassword(requirePassword(body.password));
+    const maxUses = requireMaxUses(body.maxUses, 1);
     const tenantId = await this.requireStore(adminId, body.tenantId);
     await this.requireFreeUsername(email);
+    const invite = newInvite();
     const row = await this.client.user.create({
-      data: { id: randomBytes(16).toString("hex"), name, email, passwordHash, role: "CASHIER", tenantId, createdById: adminId },
+      data: {
+        id: randomBytes(16).toString("hex"),
+        name,
+        email,
+        passwordHash,
+        role: "CASHIER",
+        tenantId,
+        createdById: adminId,
+        inviteHash: invite.hash,
+        inviteMaxUses: maxUses,
+      },
+      include: withUses,
     });
-    return toCashier(row);
+    return { ...toCashier(row), inviteToken: invite.token };
+  }
+
+  /** Forget the devices that used the link and sign the cashier out everywhere (someone else may have got in first). */
+  private async clearLinkUse(id: string) {
+    await this.client.inviteDevice.deleteMany({ where: { userId: id } });
+    await this.client.session.deleteMany({ where: { userId: id } });
+  }
+
+  /** A brand-new sign-in link. The old one stops working and its usage starts again from zero. */
+  async invite(adminId: string, id: string): Promise<CashierInvite> {
+    await this.mine(adminId, id);
+    const invite = newInvite();
+    await this.clearLinkUse(id);
+    const row = await this.client.user.update({ where: { id }, data: { inviteHash: invite.hash }, include: withUses });
+    return { ...toCashier(row), inviteToken: invite.token };
+  }
+
+  /** Same link, usage back to zero: the devices it remembered are forgotten and the cashier is signed out everywhere. */
+  async resetLink(adminId: string, id: string): Promise<Cashier> {
+    await this.mine(adminId, id);
+    await this.clearLinkUse(id);
+    return toCashier(await this.client.user.findUniqueOrThrow({ where: { id }, include: withUses }));
   }
 
   async update(adminId: string, id: string, body: CashierInput): Promise<Cashier> {
     const current = await this.mine(adminId, id);
     const email = body.username === undefined ? current.email : requireUsername(body.username);
-    const data: Record<string, string> = {
+    const data: Record<string, string | number> = {
       email,
       // A name that was just the username (the default) follows a username change.
       name: body.name !== undefined ? requireName(body.name) : current.name === current.email ? email : current.name,
@@ -95,7 +171,8 @@ export class CashiersService {
     if (body.tenantId !== undefined) data.tenantId = await this.requireStore(adminId, body.tenantId);
     const resetPassword = typeof body.password === "string" && body.password.length > 0;
     if (resetPassword) data.passwordHash = await hashPassword(requirePassword(body.password));
-    const row = await this.client.user.update({ where: { id }, data });
+    if (body.maxUses !== undefined) data.inviteMaxUses = requireMaxUses(body.maxUses, 1);
+    const row = await this.client.user.update({ where: { id }, data, include: withUses });
     // A new password signs the cashier out of every device.
     if (resetPassword) await this.client.session.deleteMany({ where: { userId: id } });
     return toCashier(row);

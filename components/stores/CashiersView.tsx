@@ -10,17 +10,19 @@ import { DeleteButton } from "@/components/data-table/bulk";
 import { FilterBar, FilterSelect, ResetFiltersButton, SearchBox, StatTile, ViewBySelect, matches, useViewMode } from "@/components/data-table/controls";
 import { TablePageSkeleton } from "@/components/loading/PageSkeletons";
 import { CashierDialog } from "./CashierDialog";
-import { useCashiers } from "./use-cashiers";
+import { CashierInviteDialog } from "./CashierInviteDialog";
+import { useCashiers, type CashierInvite } from "./use-cashiers";
 
 export function CashiersView() {
   const { tenants } = usePos();
-  const { cashiers, error, create, update, remove } = useCashiers();
+  const { cashiers, error, create, update, remove, invite, resetLink } = useCashiers();
   const [query, setQuery] = useState("");
   const [store, setStore] = useState("all");
   const [view, setView] = useViewMode("cashiers", "table");
   const [target, setTarget] = useState<Cashier | "new" | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [actionError, setActionError] = useState("");
+  const [sharing, setSharing] = useState<CashierInvite | null>(null);
   const storeName = (id: string) => tenants.find((t) => t.id === id)?.name ?? "Unknown store";
 
   const rows = useMemo(
@@ -52,6 +54,18 @@ export function CashiersView() {
     setSelectedId((current) => (chosen.some((c) => c.id === current) ? null : current));
   };
 
+  const shareAccess = async (cashier: Cashier) => {
+    if (cashier.linkUses > 0 && !window.confirm(`Make a new link for ${cashier.username}? The old link stops working and they are signed out everywhere.`)) return;
+    const { error: message, data } = await invite(cashier.id);
+    setActionError(message ?? "");
+    if (data) setSharing(data);
+  };
+
+  const resetUsage = async (cashier: Cashier) => {
+    if (!window.confirm(`Reset the link for ${cashier.username}? The devices that used it are forgotten and they are signed out everywhere. The same link works again.`)) return;
+    setActionError((await resetLink(cashier.id)) ?? "");
+  };
+
   const columns: Column<Cashier>[] = [
     {
       id: "name",
@@ -75,7 +89,11 @@ export function CashiersView() {
       onClose={() => setSelectedId(null)}
       actions={
         <>
-          <Button onClick={() => setTarget(selected)}>Edit</Button>
+          <Button onClick={() => void shareAccess(selected)}>Share access</Button>
+          {selected.linkUses > 0 ? (
+            <Button variant="secondary" onClick={() => void resetUsage(selected)}>Reset link usage</Button>
+          ) : null}
+          <Button variant="secondary" onClick={() => setTarget(selected)}>Edit</Button>
           <Button
             variant="ghost"
             className="text-destructive"
@@ -92,6 +110,7 @@ export function CashiersView() {
         rows={[
           ["Store", storeName(selected.tenantId)],
           ["Access", "Register only"],
+          ["Sign-in link", selected.hasLink ? `${selected.linkUses} of ${selected.linkMaxUses} device${selected.linkMaxUses === 1 ? "" : "s"} used` : "None"],
           ["Added", new Date(selected.createdAt).toLocaleDateString()],
         ]}
       />
@@ -141,8 +160,14 @@ export function CashiersView() {
       <CashierDialog
         target={target}
         onClose={() => setTarget(null)}
-        onSave={(id, input) => (id ? update(id, input) : create(input))}
+        onSave={async (id, input) => {
+          if (id) return update(id, input);
+          const { error: message, data } = await create(input);
+          if (data) setSharing(data);
+          return message;
+        }}
       />
+      <CashierInviteDialog invite={sharing} onClose={() => setSharing(null)} />
     </div>
   );
 }

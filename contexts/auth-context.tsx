@@ -36,6 +36,8 @@ interface AuthContextValue {
   ready: boolean;
   login: (username: string, password: string, remember: boolean) => Promise<string | null>;
   register: (username: string, password: string) => Promise<string | null>;
+  /** A cashier opens the sign-in link their admin shared. */
+  join: (token: string) => Promise<string | null>;
   logout: () => Promise<void>;
   updateAccount: (body: AccountUpdate) => Promise<string | null>;
 }
@@ -202,6 +204,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const join = async (token: string) => {
+    try {
+      const res = await fetch("/api/auth/join", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token }),
+      });
+      if (apiMissing(res)) return "Couldn't reach the server. Connect to the internet and try again.";
+      if (!res.ok) return errorMessage(res);
+      const next = asUser(await res.json());
+      writeLocalSession(next, true);
+      setUser(next);
+      return null;
+    } catch {
+      return "Couldn't reach the server. Connect to the internet and try again.";
+    }
+  };
+
   const logout = async () => {
     try {
       await fetch("/api/auth/logout", { method: "POST" });
@@ -249,7 +269,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, ready, login, register, logout, updateAccount }}>
+    <AuthContext.Provider value={{ user, ready, login, register, join, logout, updateAccount }}>
       {children}
     </AuthContext.Provider>
   );

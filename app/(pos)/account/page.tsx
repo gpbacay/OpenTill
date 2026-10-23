@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useAuth } from "@/contexts/auth-context";
+import { isCashier } from "@/lib/local-auth";
 import { ImagePicker } from "@/components/ImagePicker";
 import { LogoutButton } from "@/components/LogoutButton";
 import { Button } from "@/components/ui/button";
@@ -33,6 +34,8 @@ export default function AccountPage() {
   const [photoPending, setPhotoPending] = useState(false);
 
   if (!user) return null;
+  // A cashier's username and password belong to their admin.
+  const locked = isCashier(user);
 
   const changePhoto = async (avatar: string) => {
     setPhotoPending(true);
@@ -113,6 +116,7 @@ export default function AccountPage() {
             id="account-username"
             {...invalid(errors, "account-username")}
             autoComplete="username"
+            readOnly={locked}
             value={username}
             onChange={(event) => {
               clearError(setErrors, "account-username");
@@ -121,36 +125,42 @@ export default function AccountPage() {
           />
           <FieldError errors={errors} id="account-username" />
         </div>
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="current-password">Current password</Label>
-          <Input
-            id="current-password"
-            {...invalid(errors, "current-password")}
-            type="password"
-            autoComplete="current-password"
-            value={currentPassword}
-            onChange={(event) => {
-              clearError(setErrors, "current-password");
-              setCurrentPassword(event.target.value);
-            }}
-          />
-          <FieldError errors={errors} id="current-password" />
-        </div>
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="new-password">New password</Label>
-          <Input
-            id="new-password"
-            {...invalid(errors, "new-password")}
-            type="password"
-            autoComplete="new-password"
-            value={newPassword}
-            onChange={(event) => {
-              clearError(setErrors, "new-password");
-              setNewPassword(event.target.value);
-            }}
-          />
-          <FieldError errors={errors} id="new-password" />
-        </div>
+        {locked ? (
+          <p className="text-sm text-muted-foreground">Your admin manages your username and password. Ask them to change either.</p>
+        ) : (
+          <>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="current-password">Current password</Label>
+              <Input
+                id="current-password"
+                {...invalid(errors, "current-password")}
+                type="password"
+                autoComplete="current-password"
+                value={currentPassword}
+                onChange={(event) => {
+                  clearError(setErrors, "current-password");
+                  setCurrentPassword(event.target.value);
+                }}
+              />
+              <FieldError errors={errors} id="current-password" />
+            </div>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="new-password">New password</Label>
+              <Input
+                id="new-password"
+                {...invalid(errors, "new-password")}
+                type="password"
+                autoComplete="new-password"
+                value={newPassword}
+                onChange={(event) => {
+                  clearError(setErrors, "new-password");
+                  setNewPassword(event.target.value);
+                }}
+              />
+              <FieldError errors={errors} id="new-password" />
+            </div>
+          </>
+        )}
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
         {saved ? <p className="text-sm text-muted-foreground">Saved.</p> : null}
         <Button type="submit" disabled={pending}>

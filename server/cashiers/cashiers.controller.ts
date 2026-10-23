@@ -18,6 +18,16 @@ export class CashiersController {
     return this.cashiers.create(req.user!.id, body);
   }
 
+  @Post(":id/invite")
+  invite(@Req() req: AuthedRequest, @Param("id") id: string) {
+    return this.cashiers.invite(req.user!.id, id);
+  }
+
+  @Post(":id/reset-link")
+  resetLink(@Req() req: AuthedRequest, @Param("id") id: string) {
+    return this.cashiers.resetLink(req.user!.id, id);
+  }
+
   @Patch(":id")
   update(@Req() req: AuthedRequest, @Param("id") id: string, @Body() body: CashierInput) {
     return this.cashiers.update(req.user!.id, id, body);

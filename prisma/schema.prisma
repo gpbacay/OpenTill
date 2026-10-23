@@ -5,24 +5,39 @@ datasource db {
 }
 
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"] // lets the Vercel API talk to Turso (hosted SQLite)
 }
 
 model User {
-  id           String    @id
-  name         String
-  email        String    @unique
-  passwordHash String
-  avatar       String    @default("") // small image data URL, "" for none
-  role         String    @default("ADMIN") // "ADMIN" owns stores | "CASHIER" works the register of one store
-  tenantId     String? // the store a CASHIER belongs to
-  createdById  String? // the admin who created a CASHIER
-  createdAt    DateTime  @default(now())
-  sessions     Session[]
-  tenants      Tenant[]  @relation("StoreOwner")
-  store        Tenant?   @relation("StoreCashiers", fields: [tenantId], references: [id], onDelete: Cascade)
+  id            String         @id
+  name          String
+  email         String         @unique
+  passwordHash  String
+  avatar        String         @default("") // small image data URL, "" for none
+  role          String         @default("ADMIN") // "ADMIN" owns stores | "CASHIER" works the register of one store
+  tenantId      String? // the store a CASHIER belongs to
+  createdById   String? // the admin who created a CASHIER
+  inviteHash    String?        @unique // sha256 of the cashier's sign-in link token
+  inviteMaxUses Int            @default(1) // how many devices the link may sign in
+  inviteDevices InviteDevice[]
+  createdAt     DateTime       @default(now())
+  sessions      Session[]
+  tenants       Tenant[]       @relation("StoreOwner")
+  store         Tenant?        @relation("StoreCashiers", fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([createdById])
+}
+
+// A browser that signed in with a cashier's link. Only a hash of its device cookie is kept.
+model InviteDevice {
+  id         String   @id
+  userId     String
+  deviceHash String
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, deviceHash])
 }
 
 model Session {

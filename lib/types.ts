@@ -19,6 +19,10 @@ export interface Cashier {
   username: string;
   tenantId: string;
   createdAt: string;
+  /** The sign-in link: does one exist, how many devices used it, how many may. */
+  hasLink: boolean;
+  linkUses: number;
+  linkMaxUses: number;
 }
 
 export interface Product {

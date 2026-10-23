@@ -1,6 +1,6 @@
-import { Body, Controller, Get, HttpCode, Inject, Patch, Post, Req, Res } from "@nestjs/common";
+import { Body, Controller, Get, HttpCode, Inject, Param, Patch, Post, Req, Res } from "@nestjs/common";
 import type { Response } from "express";
-import { AuthService, SESSION_MAX_AGE, sessionCookie } from "./auth.service";
+import { AuthService, SESSION_MAX_AGE, deviceCookie, sessionCookie } from "./auth.service";
 import type { AccountUpdate } from "./auth.service";
 import { Public } from "./auth.guard";
 import type { AuthedRequest } from "./auth.guard";
@@ -41,6 +41,21 @@ export class AuthController {
       "Set-Cookie",
       sessionCookie(token, body.remember === false ? undefined : SESSION_MAX_AGE)
     );
+    return user;
+  }
+
+  @Public()
+  @Get("invite/:token")
+  invite(@Param("token") token: string, @Req() req: AuthedRequest) {
+    return this.authService.inviteInfo(token, req.headers.cookie);
+  }
+
+  @Public()
+  @Post("join")
+  @HttpCode(200)
+  async join(@Body() body: { token?: string }, @Req() req: AuthedRequest, @Res({ passthrough: true }) res: Response) {
+    const { user, token, device } = await this.authService.join(body, req.headers.cookie);
+    res.setHeader("Set-Cookie", [sessionCookie(token, SESSION_MAX_AGE), deviceCookie(device)]);
     return user;
   }
 

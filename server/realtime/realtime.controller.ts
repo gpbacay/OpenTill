@@ -1,4 +1,4 @@
-import { Controller, Inject, MessageEvent, Req, Sse } from "@nestjs/common";
+import { Controller, Inject, MessageEvent, NotFoundException, Req, Sse } from "@nestjs/common";
 import { Observable, filter, interval, map, merge, mergeMap } from "rxjs";
 import type { AuthedRequest } from "../auth/auth.guard";
 import { TenantsService } from "../tenants/tenants.service";
@@ -14,6 +14,9 @@ export class RealtimeController {
   // Clients only see changes to stores they own. The heartbeat keeps proxies from closing an idle stream.
   @Sse()
   stream(@Req() req: AuthedRequest): Observable<MessageEvent> {
+    // Serverless instances don't share memory, so a stream here would miss other instances' changes. A failed
+    // stream makes the browser poll instead (lib/realtime.ts).
+    if (process.env.VERCEL) throw new NotFoundException("Live updates are off here; the app polls instead.");
     const userId = req.user!.id;
     const changes = this.realtime.changes.pipe(
       mergeMap(async (event) => ((await this.tenants.owns(userId, event.tenantId)) ? event : null)),

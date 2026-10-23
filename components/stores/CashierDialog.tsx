@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FieldError, check, clearError, invalid } from "@/components/FieldError";
 import { PasswordInput } from "@/components/PasswordInput";
-import { collect, passwordError, required, usernameError, type FieldErrors } from "@/lib/validation";
+import { collect, numberError, numericInput, passwordError, required, usernameError, type FieldErrors } from "@/lib/validation";
 import type { CashierInput } from "./use-cashiers";
 
 export function CashierDialog({
@@ -28,6 +28,7 @@ export function CashierDialog({
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [tenantId, setTenantId] = useState("");
+  const [maxUses, setMaxUses] = useState("1");
   const [errors, setErrors] = useState<FieldErrors>({});
   const [serverError, setServerError] = useState("");
   const [pending, setPending] = useState(false);
@@ -38,6 +39,7 @@ export function CashierDialog({
     setServerError("");
     setPassword("");
     setUsername(editing?.username ?? "");
+    setMaxUses(String(editing?.linkMaxUses ?? 1));
     setTenantId(editing?.tenantId ?? activeTenant?.id ?? tenants[0]?.id ?? "");
   }, [target]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -49,6 +51,7 @@ export function CashierDialog({
         // Optional when editing: leaving it empty keeps the current password.
         "cashier-password": editing && !password ? undefined : passwordError(password),
         "cashier-store": required(tenantId, "Pick a store for this cashier."),
+        "cashier-uses": numberError(maxUses, "the number of devices", { required: true, integer: true, min: 1, max: 20 }),
       }),
       setErrors
     );
@@ -59,6 +62,7 @@ export function CashierDialog({
     const message = await onSave(editing?.id ?? null, {
       username: username.trim().toLowerCase(),
       tenantId,
+      maxUses: Number(maxUses),
       ...(password ? { password } : {}),
     });
     setPending(false);
@@ -73,7 +77,7 @@ export function CashierDialog({
           <DialogTitle>{editing ? "Edit cashier" : "Add cashier"}</DialogTitle>
         </DialogHeader>
         <p className="text-sm text-muted-foreground">
-          Cashiers sign in with this username and password and can only use the Register of their store.
+          Cashiers can only use the Register of their store. You set their password; they can't change it.
         </p>
         <form onSubmit={submit} noValidate className="space-y-3">
           <div className="space-y-1">
@@ -129,6 +133,23 @@ export function CashierDialog({
               </SelectContent>
             </Select>
             <FieldError errors={errors} id="cashier-store" />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="cashier-uses" required>Devices the sign-in link works on</Label>
+            <Input
+              id="cashier-uses"
+              {...invalid(errors, "cashier-uses")}
+              inputMode="numeric"
+              value={maxUses}
+              onChange={(e) => {
+                clearError(setErrors, "cashier-uses");
+                setMaxUses(numericInput(e.target.value, { decimals: false }));
+              }}
+            />
+            <FieldError errors={errors} id="cashier-uses" />
+            <p className="text-xs text-muted-foreground">
+              1 means one phone or computer: the first one to open the link. It can use it again, but other devices can't.
+            </p>
           </div>
           {serverError ? <p role="alert" className="text-sm text-destructive">{serverError}</p> : null}
           <DialogFooter>
