@@ -10,7 +10,7 @@ import {
 import { randomBytes } from "node:crypto";
 import { DatabaseService } from "../database/database.service";
 import { TenantsService } from "../tenants/tenants.service";
-import { hashPassword, newInvite, requireName, requirePassword, requireUsername } from "../auth/auth.service";
+import { hashPassword, newInvite, requireName, requirePassword, requireUsername, verifyPassword } from "../auth/auth.service";
 
 export interface Cashier {
   id: string;
@@ -31,6 +31,8 @@ export interface CashierInput {
   name?: string;
   username?: string;
   password?: string;
+  /** The cashier's current password: required when an admin sets a new one. */
+  currentPassword?: string;
   tenantId?: string;
   /** How many devices the sign-in link may sign in (1 to 20). */
   maxUses?: number;
@@ -170,7 +172,11 @@ export class CashiersService {
     if (email !== current.email) await this.requireFreeUsername(email, id);
     if (body.tenantId !== undefined) data.tenantId = await this.requireStore(adminId, body.tenantId);
     const resetPassword = typeof body.password === "string" && body.password.length > 0;
-    if (resetPassword) data.passwordHash = await hashPassword(requirePassword(body.password));
+    if (resetPassword) {
+      const known = typeof body.currentPassword === "string" && (await verifyPassword(body.currentPassword, current.passwordHash));
+      if (!known) throw new BadRequestException("The cashier's current password is incorrect.");
+      data.passwordHash = await hashPassword(requirePassword(body.password));
+    }
     if (body.maxUses !== undefined) data.inviteMaxUses = requireMaxUses(body.maxUses, 1);
     const row = await this.client.user.update({ where: { id }, data, include: withUses });
     // A new password signs the cashier out of every device.

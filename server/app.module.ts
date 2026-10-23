@@ -11,7 +11,7 @@ import { InventoryModule } from "./inventory/inventory.module";
 import { SuppliersModule } from "./suppliers/suppliers.module";
 import { ExpensesModule } from "./expenses/expenses.module";
 import { ColumnsModule } from "./columns/columns.module";
-import { RealtimeModule } from "./realtime/realtime.module";
+import { EventsModule } from "./realtime/events.module";
 
 @Module({
   imports: [
@@ -25,7 +25,7 @@ import { RealtimeModule } from "./realtime/realtime.module";
     SuppliersModule,
     ExpensesModule,
     ColumnsModule,
-    RealtimeModule,
+    EventsModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: AuthGuard }],
 })

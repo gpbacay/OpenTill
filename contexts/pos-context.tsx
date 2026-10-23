@@ -417,7 +417,7 @@ export function PosProvider({
   useEffect(() => {
     if (!hydrated || !isOnline) return;
     void flushRef.current();
-    return subscribe(["products", "orders"], () => void flushRef.current());
+    return subscribe(["products", "orders", "tenants"], () => void flushRef.current());
   }, [hydrated, isOnline]);
 
   const triggerOfflineSync = async () => {

@@ -80,7 +80,7 @@ export async function hashPassword(password: string) {
   return `${salt}:${derived.toString("hex")}`;
 }
 
-async function verifyPassword(password: string, stored: string) {
+export async function verifyPassword(password: string, stored: string) {
   const [salt, hex] = stored.split(":");
   if (!salt || !hex) return false;
   const derived = (await scrypt(password, salt, KEY_LENGTH)) as Buffer;

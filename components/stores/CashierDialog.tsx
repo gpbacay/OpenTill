@@ -27,6 +27,7 @@ export function CashierDialog({
   const editing = target && target !== "new" ? target : null;
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [currentPassword, setCurrentPassword] = useState("");
   const [tenantId, setTenantId] = useState("");
   const [maxUses, setMaxUses] = useState("1");
   const [errors, setErrors] = useState<FieldErrors>({});
@@ -38,6 +39,7 @@ export function CashierDialog({
     setErrors({});
     setServerError("");
     setPassword("");
+    setCurrentPassword("");
     setUsername(editing?.username ?? "");
     setMaxUses(String(editing?.linkMaxUses ?? 1));
     setTenantId(editing?.tenantId ?? activeTenant?.id ?? tenants[0]?.id ?? "");
@@ -50,6 +52,7 @@ export function CashierDialog({
         "cashier-username": usernameError(username),
         // Optional when editing: leaving it empty keeps the current password.
         "cashier-password": editing && !password ? undefined : passwordError(password),
+        "cashier-current": editing && password && !currentPassword ? "Enter the cashier's current password to set a new one." : undefined,
         "cashier-store": required(tenantId, "Pick a store for this cashier."),
         "cashier-uses": numberError(maxUses, "the number of devices", { required: true, integer: true, min: 1, max: 20 }),
       }),
@@ -63,7 +66,7 @@ export function CashierDialog({
       username: username.trim().toLowerCase(),
       tenantId,
       maxUses: Number(maxUses),
-      ...(password ? { password } : {}),
+      ...(password ? { password, currentPassword } : {}),
     });
     setPending(false);
     if (message) setServerError(message);
@@ -96,6 +99,23 @@ export function CashierDialog({
             />
             <FieldError errors={errors} id="cashier-username" />
           </div>
+          {editing ? (
+            <div className="space-y-1">
+              <Label htmlFor="cashier-current" required={Boolean(password)}>Current password</Label>
+              <PasswordInput
+                id="cashier-current"
+                {...invalid(errors, "cashier-current")}
+                autoComplete="off"
+                value={currentPassword}
+                placeholder="Needed only to set a new password"
+                onChange={(e) => {
+                  clearError(setErrors, "cashier-current");
+                  setCurrentPassword(e.target.value);
+                }}
+              />
+              <FieldError errors={errors} id="cashier-current" />
+            </div>
+          ) : null}
           <div className="space-y-1">
             <Label htmlFor="cashier-password" required={!editing}>{editing ? "New password" : "Password"}</Label>
             <PasswordInput

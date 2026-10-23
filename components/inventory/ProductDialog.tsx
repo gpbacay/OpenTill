@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { InformationCircleIcon } from "@hugeicons/core-free-icons";
 import { useOps } from "@/contexts/ops-context";
 import { usePos } from "@/contexts/pos-context";
 import { uid } from "@/lib/ids";
@@ -10,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NumberInput } from "@/components/NumberInput";
 import { Textarea } from "@/components/ui/textarea";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { CustomFieldInputs } from "@/components/data-table/custom-columns";
 import { ImagePicker } from "@/components/ImagePicker";
@@ -28,6 +31,7 @@ export function ProductDialog({ target, onClose }: Props) {
   const { products, activeTenant, handleAddProduct, handleUpdateProduct, handleDeleteProduct } = usePos();
   const { suppliers, columnsFor, recordMovement } = useOps();
   const [form, setForm] = useState(blank);
+  const [skuHelp, setSkuHelp] = useState(false);
   const [custom, setCustom] = useState<Record<string, string>>({});
   const [image, setImage] = useState("");
   const [errors, setErrors] = useState<FieldErrors>({});
@@ -143,7 +147,27 @@ export function ProductDialog({ target, onClose }: Props) {
           </div>
           <div className="grid grid-cols-2 gap-2">
             <div className="space-y-1">
-              <Label htmlFor="p-sku" required>SKU</Label>
+              <div className="flex items-center gap-1.5">
+                <Label htmlFor="p-sku" required>SKU</Label>
+                {/* Controlled so a tap opens it on phones, where there is no hover. */}
+                <Tooltip open={skuHelp} onOpenChange={setSkuHelp}>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      aria-label="What is a SKU?"
+                      className="-m-1 rounded-full p-1 text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                      onClick={() => setSkuHelp((open) => !open)}
+                      onBlur={() => setSkuHelp(false)}
+                    >
+                      <HugeiconsIcon icon={InformationCircleIcon} size={14} />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="block">
+                    SKU (Stock Keeping Unit) is a short, unique code you give each product, like COLA-500ML or BRK-PAD-01.
+                    It tells similar items apart and makes them quick to find. No spaces, and no two products can share one.
+                  </TooltipContent>
+                </Tooltip>
+              </div>
               <Input id="p-sku" {...invalid(errors, "p-sku")} value={form.sku} onChange={set("sku")} />
               <FieldError errors={errors} id="p-sku" />
             </div>

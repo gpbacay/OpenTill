@@ -7,13 +7,16 @@ import { useSyncExternalStore } from "react";
  */
 export type RealtimeStatus = "live" | "polling" | "offline";
 
-const POLL_MS = 20_000;
+const POLL_MS = 3_000; // how often to look for changes while there is no live stream
+const FULL_REFRESH_EVERY = 10; // every Nth poll refreshes everything, as a safety net
 
 const handlers = new Map<string, Set<() => void>>();
 const listeners = new Set<() => void>();
 let source: EventSource | null = null;
 let timer: ReturnType<typeof setInterval> | null = null;
 let connected = false;
+let seen: Record<string, number> | null = null;
+let polls = 0;
 
 const notifyStatus = () => listeners.forEach((fn) => fn());
 
@@ -23,6 +26,25 @@ function run(topic: string) {
 
 function runAll() {
   handlers.forEach((set) => set.forEach((fn) => fn()));
+}
+
+/** No live stream (serverless hosting): ask the server which topics changed since last time and refresh only those. */
+async function poll() {
+  if (connected || !navigator.onLine || document.visibilityState !== "visible") return;
+  polls += 1;
+  if (polls % FULL_REFRESH_EVERY === 0) return runAll();
+  try {
+    const res = await fetch("/api/changes");
+    if (!res.ok) return;
+    const now: Record<string, number> = await res.json();
+    const before = seen;
+    seen = now;
+    if (!before) return;
+    const topics = new Set(Object.keys(now).filter((id) => now[id] !== before[id]).map((id) => id.slice(id.indexOf(":") + 1)));
+    topics.forEach(run);
+  } catch {
+    /* offline or API down: the next poll tries again */
+  }
 }
 
 function open() {
@@ -45,14 +67,13 @@ function open() {
     connected = false;
     notifyStatus(); // EventSource retries on its own
   };
-  timer = setInterval(() => {
-    if (!connected && navigator.onLine && document.visibilityState === "visible") runAll();
-  }, POLL_MS);
+  timer = setInterval(() => void poll(), POLL_MS);
 }
 
 function close() {
   source?.close();
   source = null;
+  seen = null;
   if (timer) clearInterval(timer);
   timer = null;
   connected = false;

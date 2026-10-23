@@ -7,6 +7,7 @@ export interface CashierInput {
   name?: string;
   username?: string;
   password?: string;
+  currentPassword?: string;
   tenantId?: string;
   /** How many devices the sign-in link may sign in. */
   maxUses?: number;

@@ -24,7 +24,7 @@ export interface AuthedRequest {
 // Cashiers can only ring up sales: read their store and its products, post orders, and edit their own account.
 // Everything not listed here is admin-only, so new endpoints are closed to cashiers by default.
 const CASHIER_ROUTES: [method: string, path: RegExp][] = [
-  ["GET", /^\/api\/(auth\/me|tenants|products|events)$/],
+  ["GET", /^\/api\/(auth\/me|tenants|products|events|changes)$/],
   ["PATCH", /^\/api\/auth\/account$/],
   ["POST", /^\/api\/orders\/sync$/],
 ];

@@ -4,19 +4,20 @@ import "reflect-metadata";
 import { NestFactory } from "@nestjs/core";
 import inject from "light-my-request";
 import { AppModule } from "../../../server/app.module";
+import { RealtimeService } from "../../../server/realtime/realtime.service";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 
 type Dispatch = Parameters<typeof inject>[0];
-let ready: Promise<Dispatch> | undefined;
+let ready: Promise<{ dispatch: Dispatch; realtime: RealtimeService }> | undefined;
 
 // Built once per warm instance.
 function boot() {
   ready ??= NestFactory.create(AppModule, { logger: ["error", "warn"] }).then(async (app) => {
     await app.init();
-    return app.getHttpAdapter().getInstance() as Dispatch;
+    return { dispatch: app.getHttpAdapter().getInstance() as Dispatch, realtime: app.get(RealtimeService) };
   });
   return ready;
 }
@@ -28,12 +29,14 @@ async function handle(request: Request) {
   // A failed stream makes the browser poll instead (lib/realtime.ts).
   if (url.pathname === "/api/events") return Response.json({ message: "Live updates are off here; the app polls instead." }, { status: 404 });
   const hasBody = request.method !== "GET" && request.method !== "HEAD";
-  const answer = await inject(await boot(), {
+  const { dispatch, realtime } = await boot();
+  const answer = await inject(dispatch, {
     method: request.method as "GET",
     url: url.pathname + url.search,
     headers: Object.fromEntries(request.headers),
     payload: hasBody ? Buffer.from(await request.arrayBuffer()) : undefined,
   });
+  await realtime.idle(); // the function may freeze once it answers, so finish recording changes first
   const headers = new Headers();
   for (const [name, value] of Object.entries(answer.headers)) {
     if (Array.isArray(value)) value.forEach((entry) => headers.append(name, entry));

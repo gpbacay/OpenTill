@@ -40,6 +40,17 @@ model InviteDevice {
   @@unique([userId, deviceHash])
 }
 
+// Per store and topic, a counter that goes up with every change. Serverless hosting can't keep a live stream open,
+// so browsers poll these counters (GET /api/changes) and re-fetch only what moved.
+model Change {
+  id       String @id // "<tenantId>:<topic>"
+  tenantId String
+  topic    String
+  version  Int    @default(0)
+
+  @@index([tenantId])
+}
+
 model Session {
   id        String   @id
   userId    String

@@ -76,6 +76,28 @@ async function main() {
   assert(r.json.length === 1 && r.json[0].id === "t1", "cashier sees only their store");
   r = await call(cashier, "GET", "/api/products");
   assert(r.status === 200 && r.json.length === 1, "cashier reads products");
+
+  // change counters: what the cashier's browser polls when there is no live stream
+  const versionsOf = async (cookie: string) => (await call(cookie, "GET", "/api/changes")).json as Record<string, number>;
+  const until = async (cookie: string, key: string, above: number) => {
+    for (let i = 0; i < 40; i++) {
+      const v = await versionsOf(cookie);
+      if ((v[key] ?? 0) > above) return v[key];
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    return -1;
+  };
+  const before = (await versionsOf(admin))["t1:products"] ?? 0;
+  assert(before >= 1, "admin's product add is counted in /api/changes");
+  assert((await versionsOf(cashier))["t1:products"] === before, "cashier sees the same counter for their store");
+  r = await call(admin, "PUT", "/api/products/p1", { id: "p1", tenantId: "t1", name: "Cola", category: "Drinks", sku: "C1", price: 12, stock: 5, description: "" });
+  assert(r.status === 200, "admin edits the product");
+  assert((await until(cashier, "t1:products", before)) > before, "the cashier's counter moves after the admin's edit");
+  assert(Object.keys(await versionsOf(other)).length === 0, "another admin sees none of this store's changes");
+  r = await call(admin, "PUT", "/api/tenants/t1", { name: "Main", businessType: "Retail", taxRate: 0.1, currency: "PHP" });
+  assert((await until(cashier, "t1:tenants", 0)) >= 1, "a store change (tax rate) reaches the cashier's counter too");
+  r = await call("", "GET", "/api/changes");
+  assert(r.status === 401, "counters need a sign-in");
   const order = { id: "o1", tenantId: "t1", status: "COMPLETED", subtotal: 10, tax: 0, total: 10, paymentMethod: "CASH", isOffline: false, date: new Date().toISOString(), cashierName: "Cathy" };
   r = await call(cashier, "POST", "/api/orders/sync", { orders: [order], items: [{ id: "i1", orderId: "o1", productId: "p1", name: "Cola", price: 10, quantity: 1 }] });
   assert(r.status === 201 || r.status === 200, "cashier rings a sale");
@@ -180,7 +202,13 @@ async function main() {
 
   // admin changes a cashier's password; the link is separate
   r = await call(admin, "PATCH", "/api/cashiers/" + jo.id, { password: "newjopass123" });
-  assert(r.status === 200, "admin changes a cashier's password");
+  assert(r.status === 400, "changing a cashier's password needs their current password");
+  r = await call(admin, "PATCH", "/api/cashiers/" + jo.id, { password: "newjopass123", currentPassword: "wrong-password" });
+  assert(r.status === 400 && /current password is incorrect/.test(r.json.message), "wrong current password is rejected");
+  r = await call("", "POST", "/api/auth/login", { username: "jo", password: "jopass1234" });
+  assert(r.status === 200, "password unchanged after the rejected attempts");
+  r = await call(admin, "PATCH", "/api/cashiers/" + jo.id, { password: "newjopass123", currentPassword: "jopass1234" });
+  assert(r.status === 200, "admin changes a cashier's password with the right current one");
   r = await call("", "POST", "/api/auth/login", { username: "jo", password: "jopass1234" });
   assert(r.status === 401, "old password no longer works");
   r = await call("", "POST", "/api/auth/login", { username: "jo", password: "newjopass123" });
@@ -206,7 +234,7 @@ async function main() {
   assert(r.status === 200, "password unchanged after the blocked attempts");
 
   // update cashier: move store, reset password → old session dies
-  r = await call(admin, "PATCH", "/api/cashiers/" + cid, { tenantId: "t2", password: "newpassword1" });
+  r = await call(admin, "PATCH", "/api/cashiers/" + cid, { tenantId: "t2", password: "newpassword1", currentPassword: "cashier123" });
   assert(r.status === 200 && r.json.tenantId === "t2", "admin moves cashier + resets password");
   r = await call(cashier, "GET", "/api/auth/me");
   assert(r.status === 401, "password reset signs the cashier out");
