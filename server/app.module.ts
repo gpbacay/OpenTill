@@ -11,6 +11,7 @@ import { InventoryModule } from "./inventory/inventory.module";
 import { SuppliersModule } from "./suppliers/suppliers.module";
 import { ExpensesModule } from "./expenses/expenses.module";
 import { ColumnsModule } from "./columns/columns.module";
+import { CategoriesModule } from "./categories/categories.module";
 import { EventsModule } from "./realtime/events.module";
 
 @Module({
@@ -25,6 +26,7 @@ import { EventsModule } from "./realtime/events.module";
     SuppliersModule,
     ExpensesModule,
     ColumnsModule,
+    CategoriesModule,
     EventsModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: AuthGuard }],

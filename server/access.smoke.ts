@@ -77,6 +77,29 @@ async function main() {
   r = await call(cashier, "GET", "/api/products");
   assert(r.status === 200 && r.json.length === 1, "cashier reads products");
 
+  // categories: per store, renaming one renames it on the store's products
+  r = await call(admin, "PUT", "/api/categories/c1", { tenantId: "t1", name: "  Drinks  " });
+  assert(r.status === 200 && r.json.name === "Drinks", "admin adds a category (trimmed)");
+  r = await call(other, "PUT", "/api/categories/c2", { tenantId: "t1", name: "Sneaky" });
+  assert(r.status === 403, "other admin can't add categories to my store");
+  r = await call(other, "GET", "/api/categories");
+  assert(r.json.length === 0, "other admin doesn't see my categories");
+  r = await call(cashier, "GET", "/api/categories");
+  assert(r.status === 403, "cashier can't use the categories API");
+  r = await call(admin, "PUT", "/api/categories/c1", { tenantId: "t1", name: "Beverages" });
+  assert(r.status === 200 && r.json.name === "Beverages", "admin renames the category");
+  r = await call(admin, "GET", "/api/products");
+  assert(r.json.find((x: any) => x.id === "p1").category === "Beverages", "the rename reached the products in that category");
+  r = await call(admin, "PUT", "/api/categories/c3", { tenantId: "t1", name: "x".repeat(80) });
+  assert(r.json.name.length === 40, "category names are capped at 40 characters");
+  r = await call(admin, "DELETE", "/api/categories/c3");
+  assert(r.status === 200, "admin deletes a category");
+  r = await call(admin, "GET", "/api/products");
+  assert(r.json.find((x: any) => x.id === "p1").category === "Beverages", "deleting a category leaves products as they were");
+  r = await call(admin, "PUT", "/api/categories/c1", { tenantId: "t1", name: "Drinks" });
+  r = await call(admin, "GET", "/api/products");
+  assert(r.json.find((x: any) => x.id === "p1").category === "Drinks", "renamed back, products follow");
+
   // SKU is optional and editable
   r = await call(admin, "POST", "/api/products", { id: "p2", tenantId: "t1", name: "Loose item", category: "Misc", price: 5, description: "" });
   assert((r.status === 201 || r.status === 200) && r.json.sku === "", "a product can be added without a SKU");

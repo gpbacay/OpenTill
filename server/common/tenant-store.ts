@@ -21,6 +21,8 @@ export abstract class TenantStore<T extends { id: string; tenantId: string }> {
   protected fromDb(row: any): T {
     return row;
   }
+  /** Runs after a successful save, with the record as it was before (null for a new one). */
+  protected async afterSave(_previous: T | null, _record: T): Promise<void> {}
 
   constructor(
     protected readonly dbService: DatabaseService,
@@ -28,7 +30,7 @@ export abstract class TenantStore<T extends { id: string; tenantId: string }> {
     protected readonly realtime: RealtimeService
   ) {}
 
-  private async find(id: string): Promise<T | null> {
+  protected async find(id: string): Promise<T | null> {
     if (this.dbService.client) {
       try {
         const row = await this.table(this.dbService.client).findUnique({ where: { id } });
@@ -80,6 +82,7 @@ export abstract class TenantStore<T extends { id: string; tenantId: string }> {
       if (idx === -1) this.memory.push(record);
       else this.memory[idx] = record;
     }
+    await this.afterSave(existing, record);
     this.realtime.emit(record.tenantId, this.topic);
     return record;
   }

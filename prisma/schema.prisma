@@ -170,6 +170,16 @@ model StockMovement {
   @@index([productId])
 }
 
+// The product categories a store has set up. Products store the category's name, so renaming one renames it on its products.
+model Category {
+  id        String   @id
+  tenantId  String
+  name      String
+  createdAt DateTime @default(now())
+
+  @@index([tenantId])
+}
+
 // User-defined extra columns for the products / suppliers / expenses tables. Values live in each row's `custom` JSON.
 model CustomColumn {
   id        String   @id

@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { SearchBox, matches } from "@/components/data-table/controls";
+import { CategoryManager } from "@/components/settings/CategoryManager";
 
 interface Setting {
   id: string;
@@ -26,7 +27,7 @@ interface Setting {
   body?: ReactNode;
 }
 
-const SECTIONS = ["Appearance", "Stores", "Data and sync", "Account", "Help and info"];
+const SECTIONS = ["Appearance", "Stores", "Products", "Data and sync", "Account", "Help and info"];
 
 function LinkRow({ href, label }: { href: string; label: string }) {
   return (
@@ -82,6 +83,14 @@ export default function SettingsPage() {
       control: <LinkRow href="/cashiers" label="Manage cashiers" />,
     },
     {
+      id: "categories",
+      section: "Products",
+      title: "Product categories",
+      description: `The categories you can pick when adding a product${activeTenant ? ` in ${activeTenant.name}` : ""}.`,
+      keywords: "category categories group type product kinds organize",
+      body: <CategoryManager />,
+    },
+    {
       id: "connection",
       section: "Data and sync",
       title: "Connection",
@@ -89,7 +98,7 @@ export default function SettingsPage() {
         ? "Offline. Changes are saved on this device and sent when you're back online."
         : status === "live"
           ? "Online. Changes from other devices show up instantly."
-          : "Online. Live updates are unavailable, so the app refreshes every 20 seconds.",
+          : "Online. Live updates are unavailable, so the app checks for changes every few seconds.",
       keywords: "online offline internet realtime live polling network",
       control: (
         <span className={`size-2.5 rounded-full ${!isOnline ? "bg-destructive" : status === "live" ? "bg-primary" : "bg-amber-400"}`} />

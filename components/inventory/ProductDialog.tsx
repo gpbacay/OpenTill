@@ -6,6 +6,7 @@ import { InformationCircleIcon } from "@hugeicons/core-free-icons";
 import { useOps } from "@/contexts/ops-context";
 import { usePos } from "@/contexts/pos-context";
 import { uid } from "@/lib/ids";
+import { generateSku } from "@/lib/sku";
 import { Product } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,6 +14,7 @@ import { Label } from "@/components/ui/label";
 import { NumberInput } from "@/components/NumberInput";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import Link from "next/link";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { CustomFieldInputs } from "@/components/data-table/custom-columns";
 import { ImagePicker } from "@/components/ImagePicker";
@@ -29,7 +31,7 @@ const blank = { name: "", sku: "", category: "", supplierId: "", costPrice: "", 
 
 export function ProductDialog({ target, onClose }: Props) {
   const { products, activeTenant, handleAddProduct, handleUpdateProduct, handleDeleteProduct } = usePos();
-  const { suppliers, columnsFor, recordMovement } = useOps();
+  const { suppliers, columnsFor, recordMovement, categories: setUp } = useOps();
   const [form, setForm] = useState(blank);
   const [skuHelp, setSkuHelp] = useState(false);
   const [custom, setCustom] = useState<Record<string, string>>({});
@@ -66,12 +68,13 @@ export function ProductDialog({ target, onClose }: Props) {
     clearError(setErrors, event.target.id);
     setForm((prev) => ({ ...prev, [field]: event.target.value }));
   };
-  const categories = [...new Set(products.filter((p) => p.tenantId === activeTenant.id).map((p) => p.category))].sort();
+  // Pick from the categories set up in Settings. A product whose category was since removed keeps it as an option.
+  const categories = [...new Set([...setUp.map((c) => c.name), ...(editing?.category ? [editing.category] : [])])];
 
   const submit = (event: React.FormEvent) => {
     event.preventDefault();
     const sku = form.sku.trim();
-    // A SKU is optional; only a typed one has to be unique.
+    // Leave it empty and one is generated; only a typed one has to be unique.
     const clash = sku && products.find(
       (p) => p.tenantId === activeTenant.id && p.sku.toLowerCase() === sku.toLowerCase() && p.id !== editing?.id
     );
@@ -79,7 +82,7 @@ export function ProductDialog({ target, onClose }: Props) {
       collect({
         "p-name": required(form.name, "Enter the product name.") ?? maxLength(form.name, 80, "Name"),
         "p-sku": /\s/.test(sku) ? "A SKU can't contain spaces." : clash ? `${sku.toUpperCase()} is already used by ${clash.name}.` : undefined,
-        "p-category": required(form.category, "Pick or type a category.") ?? maxLength(form.category, 40, "Category"),
+        "p-category": required(form.category, setUp.length ? "Pick a category." : "Enter a category.") ?? maxLength(form.category, 40, "Category"),
         "p-cost": numberError(form.costPrice, "the cost", { min: 0 }),
         "p-price": numberError(form.price, "the selling price", { required: true, min: 0 }),
         "p-stock": editing ? undefined : numberError(form.stock, "starting stock", { min: 0, integer: true }),
@@ -97,7 +100,12 @@ export function ProductDialog({ target, onClose }: Props) {
       id: editing?.id ?? uid("prod"),
       tenantId: activeTenant.id,
       name: form.name.trim(),
-      sku: sku.toUpperCase(),
+      sku:
+        sku.toUpperCase() ||
+        generateSku(
+          form.category,
+          new Set(products.filter((p) => p.tenantId === activeTenant.id && p.id !== editing?.id).map((p) => p.sku.toUpperCase()))
+        ),
       category: form.category.trim(),
       supplierId: form.supplierId || null,
       costPrice,
@@ -162,23 +170,45 @@ export function ProductDialog({ target, onClose }: Props) {
                     </button>
                   </TooltipTrigger>
                   <TooltipContent side="top" className="block">
-                    SKU (Stock Keeping Unit) is a short, unique code you give each product, like COLA-500ML or BRK-PAD-01.
-                    It tells similar items apart and makes them quick to find. Optional. No spaces, and no two products can share one.
+                    SKU (Stock Keeping Unit) is a short, unique code for each product, like SNA-7K3Q. It tells similar items apart and makes them
+                    quick to find or scan. Leave it empty and OpenTill creates one for you, or type your own (no spaces, no two products can share one).
                   </TooltipContent>
                 </Tooltip>
               </div>
-              <Input id="p-sku" {...invalid(errors, "p-sku")} value={form.sku} placeholder="Optional" onChange={set("sku")} />
+              <Input id="p-sku" {...invalid(errors, "p-sku")} value={form.sku} placeholder="Leave empty to generate one" onChange={set("sku")} />
               <FieldError errors={errors} id="p-sku" />
             </div>
             <div className="space-y-1">
               <Label htmlFor="p-category" required>Category</Label>
-              <Input id="p-category" {...invalid(errors, "p-category")} list="p-categories" value={form.category} onChange={set("category")} />
+              {setUp.length > 0 ? (
+                <select
+                  id="p-category"
+                  {...invalid(errors, "p-category")}
+                  value={form.category}
+                  onChange={set("category")}
+                  className="h-8 w-full rounded-lg bg-input px-2 text-sm aria-invalid:ring-3 aria-invalid:ring-destructive/20"
+                >
+                  <option value="">Pick a category</option>
+                  {categories.map((category) => (
+                    <option key={category} value={category}>
+                      {category}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <>
+                  {/* Nothing set up yet: type one, and point to Settings where the list is managed. */}
+                  <Input id="p-category" {...invalid(errors, "p-category")} value={form.category} onChange={set("category")} />
+                  <p className="text-xs text-muted-foreground">
+                    Tip: set up your categories in{" "}
+                    <Link href="/settings" className="underline underline-offset-2" onClick={onClose}>
+                      Settings
+                    </Link>{" "}
+                    to pick from a list.
+                  </p>
+                </>
+              )}
               <FieldError errors={errors} id="p-category" />
-              <datalist id="p-categories">
-                {categories.map((category) => (
-                  <option key={category} value={category} />
-                ))}
-              </datalist>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-2">

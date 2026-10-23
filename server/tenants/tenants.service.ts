@@ -157,6 +157,7 @@ export class TenantsService {
         client.expense.deleteMany({ where: { tenantId: id } }),
         client.stockMovement.deleteMany({ where: { tenantId: id } }),
         client.customColumn.deleteMany({ where: { tenantId: id } }),
+        client.category.deleteMany({ where: { tenantId: id } }),
         client.tenant.delete({ where: { id } }),
       ]);
       return { success: true };

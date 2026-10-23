@@ -2,7 +2,7 @@ import { Inject, Injectable } from "@nestjs/common";
 import { Subject } from "rxjs";
 import { DatabaseService } from "../database/database.service";
 
-export type Topic = "products" | "orders" | "suppliers" | "expenses" | "stock" | "columns" | "tenants";
+export type Topic = "products" | "orders" | "suppliers" | "expenses" | "stock" | "columns" | "tenants" | "categories";
 
 export interface ChangeEvent {
   tenantId: string;

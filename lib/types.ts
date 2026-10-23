@@ -90,6 +90,14 @@ export interface StockMovement {
   date: string;
 }
 
+/** A product category the store has set up in Settings. Products store the category's name. */
+export interface Category {
+  id: string;
+  tenantId: string;
+  name: string;
+  createdAt: string;
+}
+
 export type CustomColumnTable = "products" | "suppliers" | "expenses";
 
 export interface CustomColumn {
