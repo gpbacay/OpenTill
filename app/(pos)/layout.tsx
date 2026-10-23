@@ -7,7 +7,8 @@ import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/auth-context";
 import { PosProvider, usePos } from "@/contexts/pos-context";
 import { OpsProvider } from "@/contexts/ops-context";
-import AppSidebar, { MENU_ITEMS } from "@/components/layout/Sidebar";
+import AppSidebar, { CASHIER_PATHS, MENU_ITEMS } from "@/components/layout/Sidebar";
+import { isCashier } from "@/lib/local-auth";
 import Header from "@/components/layout/Header";
 import { AddMenu } from "@/components/layout/AddMenu";
 import { TenantOnboarding } from "@/components/TenantOnboarding";
@@ -37,7 +38,6 @@ function PosShell({ children }: { children: React.ReactNode }) {
     isSyncing,
     syncProgress,
     handleAddTenant,
-    handleSwitchTenant,
   } = usePos();
   const pathname = usePathname();
   const router = useRouter();
@@ -45,6 +45,12 @@ function PosShell({ children }: { children: React.ReactNode }) {
   const isMobile = useIsMobile();
   const swipeStart = useRef<{ x: number; y: number } | null>(null);
   const tabIndex = TABS.findIndex((item) => item.href === pathname);
+  const cashier = isCashier(user);
+  // Cashiers can't open back-office pages (the API refuses them too); send them to the register.
+  const blocked = cashier && !CASHIER_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`));
+  useEffect(() => {
+    if (blocked) router.replace("/orders");
+  }, [blocked, router]);
 
   // Swipe between the bottom bar's pages on phones. Touches near the screen edges stay with the browser's back gesture.
   const onTouchStart = (event: React.TouchEvent<HTMLElement>) => {
@@ -74,7 +80,7 @@ function PosShell({ children }: { children: React.ReactNode }) {
     if (next) router.push(next.href);
   };
 
-  if (!hydrated) {
+  if (!hydrated || blocked) {
     return <AppShellSkeleton />;
   }
 
@@ -86,9 +92,11 @@ function PosShell({ children }: { children: React.ReactNode }) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background px-6">
         <div className="w-full max-w-md">
-          <h1 className="mb-1 text-3xl font-bold">Open your store</h1>
+          <h1 className="mb-1 text-3xl font-bold">{cashier ? "Loading your store" : "Open your store"}</h1>
           <p className="mb-2 text-sm text-muted-foreground">
-            Sales and products stay with the store you create.
+            {cashier
+              ? "Your register opens once your store has loaded. Connect to the internet if this takes long, or ask your admin to check your account."
+              : "Sales and products stay with the store you create."}
           </p>
           <p className="mb-4 text-sm text-muted-foreground">Signed in as {user?.name}</p>
           <div className="mb-6 flex gap-2">
@@ -99,12 +107,7 @@ function PosShell({ children }: { children: React.ReactNode }) {
               <Button variant="ghost">Log out</Button>
             </LogoutButton>
           </div>
-          <TenantOnboarding
-            tenants={tenants}
-            activeTenant={null}
-            onAddTenant={handleAddTenant}
-            onSwitchTenant={handleSwitchTenant}
-          />
+          {cashier ? null : <TenantOnboarding tenants={tenants} onAddTenant={handleAddTenant} />}
         </div>
       </div>
     );
@@ -125,14 +128,14 @@ function PosShell({ children }: { children: React.ReactNode }) {
           </div>
         ) : null}
         <main
-          className="flex min-h-0 flex-1 flex-col overflow-hidden px-3 pb-24 sm:px-4 md:pb-4"
+          className={`flex min-h-0 flex-1 flex-col overflow-hidden px-3 sm:px-4 md:pb-4 ${cashier ? "pb-4" : "pb-24"}`}
           onTouchStart={onTouchStart}
           onTouchEnd={onTouchEnd}
           onTouchCancel={() => (swipeStart.current = null)}
         >
           {children}
         </main>
-        <nav
+        {cashier ? null : <nav
           aria-label="Main"
           data-bottom-nav
           className="fixed inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-40 flex items-center gap-2 md:hidden"
@@ -158,7 +161,7 @@ function PosShell({ children }: { children: React.ReactNode }) {
             })}
           </div>
           <AddMenu side="top" align="end" iconSize={24} className="size-16 rounded-2xl shadow-lg" />
-        </nav>
+        </nav>}
       </SidebarInset>
     </SidebarProvider>
     </OpsProvider>

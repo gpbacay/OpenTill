@@ -53,6 +53,9 @@ interface PosContextValue {
   handleDeleteProduct: (productId: string) => Promise<void>;
   handleApplyMovement: (movement: StockMovement) => void;
   handleAddTenant: (newTenant: Tenant) => Promise<void>;
+  handleUpdateTenant: (tenant: Tenant) => Promise<void>;
+  /** Deletes stores and everything in them. Needs a connection; resolves to an error message, or null when done. */
+  handleDeleteTenants: (tenantIds: string[]) => Promise<string | null>;
   handleSwitchTenant: (tenantId: string) => void;
 }
 
@@ -268,12 +271,13 @@ export function PosProvider({
           remember("tenantUpserts", id, false);
           continue;
         }
-        const res = await api("/api/tenants", {
-          method: "POST",
+        const res = await api(`/api/tenants/${id}`, {
+          method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(tenant),
         });
-        if (res.ok) remember("tenantUpserts", id, false);
+        // A 4xx will never succeed on retry (e.g. the store was deleted elsewhere), so drop it from the queue.
+        if (res.ok || (res.status >= 400 && res.status < 500 && res.status !== 401)) remember("tenantUpserts", id, false);
       }
 
       const queue = offlineQueueRef.current;
@@ -713,21 +717,71 @@ export function PosProvider({
       return next;
     });
     setActiveTenantId(newTenant.id);
+    await saveTenant(newTenant);
+  };
+
+  const saveTenant = async (tenant: Tenant) => {
     if (!isOnline) {
-      remember("tenantUpserts", newTenant.id, true);
+      remember("tenantUpserts", tenant.id, true);
       return;
     }
     try {
-      const res = await api("/api/tenants", {
-        method: "POST",
+      const res = await api(`/api/tenants/${tenant.id}`, {
+        method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(newTenant),
+        body: JSON.stringify(tenant),
       });
       if (!res.ok) throw new Error("save failed");
     } catch (err) {
       console.warn("Store kept on this device.", err);
-      remember("tenantUpserts", newTenant.id, true);
+      remember("tenantUpserts", tenant.id, true);
     }
+  };
+
+  const handleUpdateTenant = async (tenant: Tenant) => {
+    setTenants((prev) => {
+      const next = prev.map((t) => (t.id === tenant.id ? tenant : t));
+      tenantsRef.current = next;
+      return next;
+    });
+    await saveTenant(tenant);
+  };
+
+  const handleDeleteTenants = async (tenantIds: string[]) => {
+    if (!isOnline) return "Deleting a store needs an internet connection.";
+    const gone = new Set<string>();
+    let failure: string | null = null;
+    for (const id of tenantIds) {
+      try {
+        const res = await api(`/api/tenants/${id}`, { method: "DELETE" });
+        // 404: it only ever existed on this device (never synced), so there is nothing to delete remotely.
+        if (res.ok || res.status === 404) gone.add(id);
+        else failure = (await res.json().catch(() => null))?.message ?? "Could not delete the store.";
+      } catch {
+        failure = "Could not reach the server. Try again when you're online.";
+      }
+      if (failure) break;
+    }
+    if (gone.size > 0) {
+      gone.forEach((id) => remember("tenantUpserts", id, false));
+      const left = tenantsRef.current.filter((t) => !gone.has(t.id));
+      tenantsRef.current = left;
+      setTenants(left);
+      setActiveTenantId((current) => (gone.has(current) ? left[0]?.id ?? "" : current));
+      setProducts((prev) => {
+        const next = prev.filter((p) => !gone.has(p.tenantId));
+        productsRef.current = next;
+        return next;
+      });
+      setSyncedOrders((prev) => prev.filter((o) => !gone.has(o.tenantId)));
+      setOfflineQueue((prev) => {
+        const next = prev.filter((entry) => !gone.has(entry.order.tenantId));
+        offlineQueueRef.current = next;
+        return next;
+      });
+      setHeldCarts((prev) => prev.filter((hc) => !gone.has(hc.tenantId)));
+    }
+    return failure;
   };
 
   const handleSwitchTenant = (tenantId: string) => {
@@ -778,6 +832,8 @@ export function PosProvider({
     handleDeleteProduct,
     handleApplyMovement,
     handleAddTenant,
+    handleUpdateTenant,
+    handleDeleteTenants,
     handleSwitchTenant,
   };
 

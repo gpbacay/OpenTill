@@ -56,8 +56,15 @@ function apiMissing(res: Response) {
   return res.status === 404 || res.status >= 500;
 }
 
-function asUser(value: { id: string; name: string; username: string; avatar?: string }): LocalUser {
-  return { id: value.id, name: value.name, username: value.username, avatar: value.avatar ?? "" };
+function asUser(value: LocalUser): LocalUser {
+  return {
+    id: value.id,
+    name: value.name,
+    username: value.username,
+    avatar: value.avatar ?? "",
+    role: value.role ?? "ADMIN",
+    tenantId: value.tenantId ?? null,
+  };
 }
 
 async function syncPendingAccounts() {
@@ -160,7 +167,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {
       const local = await matchLocalAccount(normalized, password);
       if (!local) return "Username or password is incorrect.";
-      const next = { id: local.id, name: local.name, username: local.username, avatar: local.avatar ?? "" };
+      const next = asUser(local);
       writeLocalSession(next, remember);
       setUser(next);
       return null;

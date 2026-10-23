@@ -16,11 +16,14 @@ import {
   Package01Icon,
   Settings01Icon,
   ShoppingCart01Icon,
+  Store01Icon,
   TruckDeliveryIcon,
+  UserGroupIcon,
   Wallet01Icon,
 } from "@hugeicons/core-free-icons";
 import { useAuth } from "@/contexts/auth-context";
 import { usePos } from "@/contexts/pos-context";
+import { isCashier } from "@/lib/local-auth";
 import { useRealtimeStatus } from "@/lib/realtime";
 import { useRecentActivity } from "@/hooks/use-recent-activity";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -56,10 +59,15 @@ export const MENU_ITEMS = [
   { id: "expenses", href: "/expenses", label: "Expenses", icon: Wallet01Icon, primary: false },
   { id: "reports", href: "/reports", label: "Reports", icon: Analytics01Icon, primary: false },
   { id: "activity", href: "/activity", label: "Recent activity", icon: Notification03Icon, primary: false },
+  { id: "stores", href: "/stores", label: "Stores", icon: Store01Icon, primary: false },
+  { id: "cashiers", href: "/cashiers", label: "Cashiers", icon: UserGroupIcon, primary: false },
   { id: "settings", href: "/settings", label: "Settings", icon: Settings01Icon, primary: false },
   { id: "help", href: "/help", label: "Help center", icon: HelpCircleIcon, primary: false },
   { id: "about", href: "/about", label: "About", icon: InformationCircleIcon, primary: false },
 ] as const;
+
+/** Cashier accounts only get the register (plus their own account page). */
+export const CASHIER_PATHS = ["/orders", "/account"];
 
 export function sectionFromPath(pathname: string) {
   const match = MENU_ITEMS.find((item) => item.href !== "/" && pathname.startsWith(item.href));
@@ -146,6 +154,7 @@ export default function AppSidebar() {
   const pathname = usePathname();
   const activeSection = sectionFromPath(pathname);
   const { activeTenant, offlineQueue } = usePos();
+  const { user } = useAuth();
   const { unreadCount } = useRecentActivity();
   const { setOpenMobile } = useSidebar();
   // Close the phone menu after navigating.
@@ -175,7 +184,7 @@ export default function AppSidebar() {
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
-              {MENU_ITEMS.map((item) => {
+              {MENU_ITEMS.filter((item) => !isCashier(user) || CASHIER_PATHS.includes(item.href)).map((item) => {
                 const active = activeSection === item.id;
                 return (
                   <SidebarMenuItem key={item.id}>

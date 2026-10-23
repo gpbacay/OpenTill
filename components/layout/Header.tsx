@@ -4,7 +4,9 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { FullScreenIcon, Menu01Icon, MinimizeScreenIcon, Notification03Icon } from "@hugeicons/core-free-icons";
+import { useAuth } from "@/contexts/auth-context";
 import { usePos } from "@/contexts/pos-context";
+import { isCashier } from "@/lib/local-auth";
 import { useRecentActivity } from "@/hooks/use-recent-activity";
 import { Button } from "@/components/ui/button";
 import { SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
@@ -13,6 +15,7 @@ import { Breadcrumbs } from "@/components/layout/Breadcrumbs";
 export default function Header() {
   const { isOnline, offlineQueue, isSyncing, triggerOfflineSync, activeTenant } = usePos();
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const { user } = useAuth();
   const { unreadCount } = useRecentActivity();
   const { setOpenMobile } = useSidebar();
   const queued = offlineQueue.filter((entry) => entry.order.tenantId === activeTenant?.id).length;
@@ -52,14 +55,16 @@ export default function Header() {
             {isSyncing ? "Saving" : `Save ${queued}`}
           </Button>
         ) : null}
-        <Button asChild size="icon" variant="ghost" className="relative">
-          <Link href="/activity" aria-label={`Recent activity${unreadCount ? `, ${unreadCount} unread` : ""}`} title="Recent activity">
-            <HugeiconsIcon icon={Notification03Icon} size={17} />
-            {unreadCount > 0 ? (
-              <span className="absolute top-1 right-1 size-2 rounded-full bg-primary ring-2 ring-background" />
-            ) : null}
-          </Link>
-        </Button>
+        {isCashier(user) ? null : (
+          <Button asChild size="icon" variant="ghost" className="relative">
+            <Link href="/activity" aria-label={`Recent activity${unreadCount ? `, ${unreadCount} unread` : ""}`} title="Recent activity">
+              <HugeiconsIcon icon={Notification03Icon} size={17} />
+              {unreadCount > 0 ? (
+                <span className="absolute top-1 right-1 size-2 rounded-full bg-primary ring-2 ring-background" />
+              ) : null}
+            </Link>
+          </Button>
+        )}
         <Button
           size="icon"
           variant="ghost"

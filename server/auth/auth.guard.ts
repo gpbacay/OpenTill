@@ -1,6 +1,7 @@
 import {
   CanActivate,
   ExecutionContext,
+  ForbiddenException,
   Inject,
   Injectable,
   SetMetadata,
@@ -15,8 +16,18 @@ export const Public = () => SetMetadata(IS_PUBLIC, true);
 
 export interface AuthedRequest {
   headers: { cookie?: string };
+  method: string;
+  originalUrl: string;
   user?: AuthUser;
 }
+
+// Cashiers can only ring up sales: read their store and its products, post orders, and edit their own account.
+// Everything not listed here is admin-only, so new endpoints are closed to cashiers by default.
+const CASHIER_ROUTES: [method: string, path: RegExp][] = [
+  ["GET", /^\/api\/(auth\/me|tenants|products|events)$/],
+  ["PATCH", /^\/api\/auth\/account$/],
+  ["POST", /^\/api\/orders\/sync$/],
+];
 
 @Injectable()
 export class AuthGuard implements CanActivate {
@@ -35,6 +46,12 @@ export class AuthGuard implements CanActivate {
     if (user) req.user = user;
     if (isPublic) return true;
     if (!user) throw new UnauthorizedException("Sign in required.");
+    if (user.role === "CASHIER") {
+      const path = req.originalUrl.split("?")[0].replace(/\/$/, "");
+      if (!CASHIER_ROUTES.some(([method, pattern]) => method === req.method && pattern.test(path))) {
+        throw new ForbiddenException("Cashier accounts can only use the register.");
+      }
+    }
     return true;
   }
 }

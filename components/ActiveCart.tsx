@@ -13,6 +13,7 @@ import {
   Tenant,
 } from "@/lib/types";
 import { useAuth } from "@/contexts/auth-context";
+import { isCashier } from "@/lib/local-auth";
 import { money } from "@/lib/money";
 import { PrintReceipt } from "./PrintReceipt";
 import { Button } from "@/components/ui/button";
@@ -88,7 +89,8 @@ export function ActiveCart({
 
   useEffect(() => {
     if (!cashierKey) return;
-    setCashierName(localStorage.getItem(cashierKey) || user?.name || "");
+    // A cashier account always rings sales under its own name.
+    setCashierName(isCashier(user) ? user!.name : localStorage.getItem(cashierKey) || user?.name || "");
   }, [cashierKey]);
 
   const subtotal = cart.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
@@ -370,6 +372,7 @@ export function ActiveCart({
               id="cashier"
               {...invalid(errors, "cashier")}
               value={cashierName}
+              readOnly={isCashier(user)}
               onChange={(event) => {
                 clearError(setErrors, "cashier");
                 setCashierName(event.target.value);

@@ -4,7 +4,13 @@ export interface LocalUser {
   username: string;
   /** Profile picture as a small image data URL; missing or "" for none. */
   avatar?: string;
+  /** Missing means ADMIN (accounts saved before cashier roles existed). */
+  role?: "ADMIN" | "CASHIER";
+  /** The one store a cashier works in. */
+  tenantId?: string | null;
 }
+
+export const isCashier = (user: LocalUser | null | undefined) => user?.role === "CASHIER";
 
 interface LocalAccount extends LocalUser {
   salt: string;
@@ -22,7 +28,7 @@ function readSession(storage: Storage): LocalUser | null {
     if (!saved) return null;
     const user = JSON.parse(saved) as LocalUser;
     if (!user?.id || !user.username) return null;
-    return { id: user.id, name: user.name, username: user.username, avatar: user.avatar ?? "" };
+    return { id: user.id, name: user.name, username: user.username, avatar: user.avatar ?? "", role: user.role, tenantId: user.tenantId };
   } catch {
     return null;
   }
@@ -120,6 +126,8 @@ export async function rememberLocalAccount(
     name: user.name,
     username: user.username,
     avatar: user.avatar ?? existing?.avatar ?? "",
+    role: user.role,
+    tenantId: user.tenantId,
     salt,
     passwordHash,
     ...(pendingPassword ? { pendingPassword } : {}),
@@ -145,7 +153,9 @@ export function touchLocalAccount(user: LocalUser) {
   if (!current) return;
   writeAccounts(
     accounts.map((account) =>
-      account.id === user.id ? { ...account, name: user.name, username: user.username, avatar: user.avatar ?? account.avatar } : account
+      account.id === user.id
+        ? { ...account, name: user.name, username: user.username, avatar: user.avatar ?? account.avatar, role: user.role, tenantId: user.tenantId }
+        : account
     )
   );
 }
@@ -199,5 +209,5 @@ export async function updateLocalAccount(
     ...(current.pendingPassword ? { pendingPassword: body.newPassword || current.pendingPassword } : {}),
   };
   writeAccounts(accounts.map((account) => (account.id === userId ? next : account)));
-  return { id: next.id, name: next.name, username: next.username, avatar: next.avatar };
+  return { id: next.id, name: next.name, username: next.username, avatar: next.avatar, role: next.role, tenantId: next.tenantId };
 }

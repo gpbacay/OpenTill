@@ -4,7 +4,6 @@ import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { ArrowRight01Icon } from "@hugeicons/core-free-icons";
-import { TenantOnboarding } from "@/components/TenantOnboarding";
 import { useAuth } from "@/contexts/auth-context";
 import { useOps } from "@/contexts/ops-context";
 import { usePos } from "@/contexts/pos-context";
@@ -46,8 +45,6 @@ export default function SettingsPage() {
     activeTenant,
     isDarkMode,
     setIsDarkMode,
-    handleAddTenant,
-    handleSwitchTenant,
     isOnline,
     isSyncing,
     offlineQueue,
@@ -72,16 +69,17 @@ export default function SettingsPage() {
       id: "stores",
       section: "Stores",
       title: "Your stores",
-      description: `You're working in ${activeTenant?.name ?? "no store"}. Pick another store to switch, or create a new one.`,
-      keywords: "tenant switch store create store branch currency business",
-      body: (
-        <TenantOnboarding
-          tenants={tenants}
-          activeTenant={activeTenant}
-          onAddTenant={handleAddTenant}
-          onSwitchTenant={handleSwitchTenant}
-        />
-      ),
+      description: `You have ${tenants.length} ${tenants.length === 1 ? "store" : "stores"} and you're working in ${activeTenant?.name ?? "none"}. Add, edit, switch or delete stores.`,
+      keywords: "tenant switch store create store branch currency business tax delete",
+      control: <LinkRow href="/stores" label="Manage stores" />,
+    },
+    {
+      id: "cashiers",
+      section: "Stores",
+      title: "Cashier accounts",
+      description: "Give staff their own login that can only use the Register of one store.",
+      keywords: "cashier staff employee team user login role permission access",
+      control: <LinkRow href="/cashiers" label="Manage cashiers" />,
     },
     {
       id: "connection",

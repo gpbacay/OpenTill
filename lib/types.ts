@@ -12,6 +12,15 @@ export interface Tenant {
   active: boolean;
 }
 
+/** A login an admin created for the register of one store. */
+export interface Cashier {
+  id: string;
+  name: string;
+  username: string;
+  tenantId: string;
+  createdAt: string;
+}
+
 export interface Product {
   id: string;
   tenantId: string;

@@ -21,7 +21,12 @@ export interface AuthUser {
   name: string;
   username: string;
   avatar: string;
+  role: Role;
+  /** The store a cashier is limited to; null for admins. */
+  tenantId: string | null;
 }
+
+export type Role = "ADMIN" | "CASHIER";
 
 interface StoredUser {
   id: string;
@@ -50,7 +55,7 @@ function hashToken(token: string) {
   return createHash("sha256").update(token).digest("hex");
 }
 
-async function hashPassword(password: string) {
+export async function hashPassword(password: string) {
   const salt = randomBytes(16).toString("hex");
   const derived = (await scrypt(password, salt, KEY_LENGTH)) as Buffer;
   return `${salt}:${derived.toString("hex")}`;
@@ -65,14 +70,14 @@ async function verifyPassword(password: string, stored: string) {
   return timingSafeEqual(derived, expected);
 }
 
-function requireName(name: unknown) {
+export function requireName(name: unknown) {
   if (typeof name !== "string" || !name.trim()) {
     throw new BadRequestException("Enter your name.");
   }
   return name.trim();
 }
 
-function requireUsername(username: unknown) {
+export function requireUsername(username: unknown) {
   if (typeof username !== "string" || !username.trim()) {
     throw new BadRequestException("Enter a username.");
   }
@@ -84,7 +89,7 @@ function chooseId(requested: unknown) {
   return randomBytes(16).toString("hex");
 }
 
-function requirePassword(password: unknown) {
+export function requirePassword(password: unknown) {
   if (typeof password !== "string" || password.length < 8) {
     throw new BadRequestException("Password must be at least 8 characters.");
   }
@@ -100,8 +105,22 @@ function readCookie(header: string | undefined, name: string) {
   return null;
 }
 
-function publicUser(user: { id: string; name: string; email: string; avatar?: string }): AuthUser {
-  return { id: user.id, name: user.name, username: user.email, avatar: user.avatar ?? "" };
+function publicUser(user: {
+  id: string;
+  name: string;
+  email: string;
+  avatar?: string;
+  role?: string;
+  tenantId?: string | null;
+}): AuthUser {
+  return {
+    id: user.id,
+    name: user.name,
+    username: user.email,
+    avatar: user.avatar ?? "",
+    role: user.role === "CASHIER" ? "CASHIER" : "ADMIN",
+    tenantId: user.tenantId ?? null,
+  };
 }
 
 @Injectable()

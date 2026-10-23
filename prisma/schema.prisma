@@ -14,9 +14,15 @@ model User {
   email        String    @unique
   passwordHash String
   avatar       String    @default("") // small image data URL, "" for none
+  role         String    @default("ADMIN") // "ADMIN" owns stores | "CASHIER" works the register of one store
+  tenantId     String? // the store a CASHIER belongs to
+  createdById  String? // the admin who created a CASHIER
   createdAt    DateTime  @default(now())
   sessions     Session[]
-  tenants      Tenant[]
+  tenants      Tenant[]  @relation("StoreOwner")
+  store        Tenant?   @relation("StoreCashiers", fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([createdById])
 }
 
 model Session {
@@ -36,7 +42,8 @@ model Tenant {
   currency     String
   createdAt    DateTime  @default(now())
   active       Boolean   @default(true)
-  owner        User?     @relation(fields: [ownerId], references: [id])
+  owner        User?     @relation("StoreOwner", fields: [ownerId], references: [id])
+  cashiers     User[]    @relation("StoreCashiers")
   products     Product[]
   orders       Order[]
 }
