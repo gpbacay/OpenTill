@@ -19,15 +19,33 @@ function apiOrigin() {
 
 const nextConfig: NextConfig = {
   outputFileTracingRoot: path.join(__dirname),
+  // The Nest API runs inside pages/api: load these from node_modules at runtime instead of bundling them.
+  serverExternalPackages: [
+    "@nestjs/common",
+    "@nestjs/core",
+    "@nestjs/platform-express",
+    "express",
+    "reflect-metadata",
+    "@prisma/client",
+    "@prisma/adapter-libsql",
+    "@libsql/client",
+  ],
+  outputFileTracingIncludes: { "/api/**": ["./node_modules/.prisma/client/**"] },
   async rewrites() {
     const origin = apiOrigin();
+    // Without an API origin (Vercel) /api/* is served by pages/api inside this app.
     if (!origin) return [];
-    return [
-      {
-        source: "/api/:path*",
-        destination: `${origin}/api/:path*`,
-      },
-    ];
+    return {
+      // beforeFiles so the proxy wins over pages/api when a separate API is configured (npm run dev).
+      beforeFiles: [
+        {
+          source: "/api/:path*",
+          destination: `${origin}/api/:path*`,
+        },
+      ],
+      afterFiles: [],
+      fallback: [],
+    };
   },
 };
 

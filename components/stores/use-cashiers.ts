@@ -17,7 +17,11 @@ export type CashierInvite = Cashier & { inviteToken: string };
 
 async function failure(res: Response) {
   const message = (await res.json().catch(() => null))?.message;
-  return (Array.isArray(message) ? message[0] : message) || "Something went wrong.";
+  if (message) return Array.isArray(message) ? message[0] : message;
+  // Not JSON: the page got an error page, not an answer from the API.
+  return res.status === 404 || res.status >= 500
+    ? `The server isn't answering properly (error ${res.status}). Try again in a moment.`
+    : "Something went wrong.";
 }
 
 /** Cashier accounts live on the server only, so unlike products they can't be edited offline. */

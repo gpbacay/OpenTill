@@ -1,11 +1,5 @@
 {
   "framework": "nextjs",
   "buildCommand": "prisma generate && tsx scripts/migrate-remote.ts && next build",
-  "installCommand": "npm install",
-  "functions": {
-    "api/**/*.ts": {
-      "maxDuration": 30,
-      "includeFiles": "node_modules/.prisma/client/**"
-    }
-  }
+  "installCommand": "npm install"
 }

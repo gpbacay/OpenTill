@@ -58,7 +58,7 @@ A multi-tenant, offline-first Point of Sale system for retail operations: regist
 
 ## Deploy on Vercel (one project, no separate server)
 
-The web app and the API both run on Vercel: `api/[...path].ts` serves the whole Nest API as one Vercel Function, and everything under `/api/*` goes to it.
+The web app and the API both run on Vercel: `app/api/[[...path]]/route.ts` runs the whole Nest API inside the Next.js app, and everything under `/api/*` goes to it.
 
 1. Create a [Turso](https://turso.tech) database (SQLite over the network; it is in the Vercel Marketplace too).
 2. In the Vercel project, set `TURSO_DATABASE_URL` (`libsql://…`) and `TURSO_AUTH_TOKEN`. Leave `API_URL` unset.
