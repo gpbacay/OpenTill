@@ -18,7 +18,7 @@ const TOPICS: { title: string; articles: Article[] }[] = [
     title: "Getting started",
     articles: [
       { q: "How do I set up my store?", a: "After you create an account, enter your store's name, business type and currency. You can add more stores later in Settings and switch between them at any time.", href: "/settings" },
-      { q: "How do I add my first products?", a: "Open Inventory and press Add product. Enter a name, SKU, category, cost and selling price, and the stock you have now. A photo is optional.", href: "/inventory" },
+      { q: "How do I add my first products?", a: "Open Inventory and press Add product. Enter a name, category, cost and selling price, and the stock you have now. A SKU (your own short code for the product) and a photo are optional.", href: "/inventory" },
       { q: "What does the + button do?", a: "It's a shortcut to start a new sale, add an expense, add a product or generate this month's report. It's on the Dashboard and, on phones, next to the bottom bar." },
     ],
   },

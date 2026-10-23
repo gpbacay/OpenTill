@@ -66,7 +66,7 @@ export function ProductQrCode({ product, tenant }: { product: Product; tenant: T
           <Skeleton className="mx-auto aspect-square w-full max-w-48 rounded-none" />
         )}
         <p className="mt-3 font-mono text-xs">{product.id}</p>
-        <p className="text-xs">SKU {product.sku}</p>
+        {product.sku ? <p className="text-xs">SKU {product.sku}</p> : null}
         <p className="mt-1 text-sm font-semibold">{status} · {product.stock}</p>
         <p className="mt-2 text-[10px]">Scan to view live product details</p>
       </div>

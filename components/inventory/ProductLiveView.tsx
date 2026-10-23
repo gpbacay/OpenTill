@@ -80,7 +80,7 @@ export function ProductLiveView({ productId }: { productId: string }) {
             <div className="min-w-0">
               <p className="break-all font-mono text-xs text-muted-foreground">{product.id}</p>
               <h2 className="mt-1 text-2xl font-bold">{product.name}</h2>
-              <p className="text-sm text-muted-foreground">SKU {product.sku}</p>
+              {product.sku ? <p className="text-sm text-muted-foreground">SKU {product.sku}</p> : null}
             </div>
             {state === "out" ? (
               <Badge variant="destructive">Out of stock</Badge>

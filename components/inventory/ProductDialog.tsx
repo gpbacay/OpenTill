@@ -71,15 +71,14 @@ export function ProductDialog({ target, onClose }: Props) {
   const submit = (event: React.FormEvent) => {
     event.preventDefault();
     const sku = form.sku.trim();
-    const clash = products.find(
+    // A SKU is optional; only a typed one has to be unique.
+    const clash = sku && products.find(
       (p) => p.tenantId === activeTenant.id && p.sku.toLowerCase() === sku.toLowerCase() && p.id !== editing?.id
     );
     const ok = check(
       collect({
         "p-name": required(form.name, "Enter the product name.") ?? maxLength(form.name, 80, "Name"),
-        "p-sku":
-          required(sku, "Enter a SKU.") ??
-          (/\s/.test(sku) ? "A SKU can't contain spaces." : clash ? `${sku.toUpperCase()} is already used by ${clash.name}.` : undefined),
+        "p-sku": /\s/.test(sku) ? "A SKU can't contain spaces." : clash ? `${sku.toUpperCase()} is already used by ${clash.name}.` : undefined,
         "p-category": required(form.category, "Pick or type a category.") ?? maxLength(form.category, 40, "Category"),
         "p-cost": numberError(form.costPrice, "the cost", { min: 0 }),
         "p-price": numberError(form.price, "the selling price", { required: true, min: 0 }),
@@ -148,7 +147,7 @@ export function ProductDialog({ target, onClose }: Props) {
           <div className="grid grid-cols-2 gap-2">
             <div className="space-y-1">
               <div className="flex items-center gap-1.5">
-                <Label htmlFor="p-sku" required>SKU</Label>
+                <Label htmlFor="p-sku">SKU</Label>
                 {/* Controlled so a tap opens it on phones, where there is no hover. */}
                 <Tooltip open={skuHelp} onOpenChange={setSkuHelp}>
                   <TooltipTrigger asChild>
@@ -164,11 +163,11 @@ export function ProductDialog({ target, onClose }: Props) {
                   </TooltipTrigger>
                   <TooltipContent side="top" className="block">
                     SKU (Stock Keeping Unit) is a short, unique code you give each product, like COLA-500ML or BRK-PAD-01.
-                    It tells similar items apart and makes them quick to find. No spaces, and no two products can share one.
+                    It tells similar items apart and makes them quick to find. Optional. No spaces, and no two products can share one.
                   </TooltipContent>
                 </Tooltip>
               </div>
-              <Input id="p-sku" {...invalid(errors, "p-sku")} value={form.sku} onChange={set("sku")} />
+              <Input id="p-sku" {...invalid(errors, "p-sku")} value={form.sku} placeholder="Optional" onChange={set("sku")} />
               <FieldError errors={errors} id="p-sku" />
             </div>
             <div className="space-y-1">

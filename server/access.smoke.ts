@@ -77,6 +77,18 @@ async function main() {
   r = await call(cashier, "GET", "/api/products");
   assert(r.status === 200 && r.json.length === 1, "cashier reads products");
 
+  // SKU is optional and editable
+  r = await call(admin, "POST", "/api/products", { id: "p2", tenantId: "t1", name: "Loose item", category: "Misc", price: 5, description: "" });
+  assert((r.status === 201 || r.status === 200) && r.json.sku === "", "a product can be added without a SKU");
+  r = await call(admin, "POST", "/api/products", { id: "p3", tenantId: "t1", name: "Another loose item", category: "Misc", sku: "", price: 6, description: "" });
+  assert(r.json.sku === "", "two products can both have no SKU");
+  r = await call(admin, "PUT", "/api/products/p2", { id: "p2", tenantId: "t1", name: "Loose item", category: "Misc", sku: "  LOOSE-1 ", price: 5, description: "" });
+  assert(r.status === 200 && r.json.sku === "LOOSE-1", "adding a SKU later is saved");
+  r = await call(admin, "PUT", "/api/products/p2", { id: "p2", tenantId: "t1", name: "Loose item", category: "Misc", sku: "", price: 5, description: "" });
+  assert(r.status === 200 && r.json.sku === "", "clearing a SKU is saved");
+  await call(admin, "DELETE", "/api/products/p2");
+  await call(admin, "DELETE", "/api/products/p3");
+
   // change counters: what the cashier's browser polls when there is no live stream
   const versionsOf = async (cookie: string) => (await call(cookie, "GET", "/api/changes")).json as Record<string, number>;
   const until = async (cookie: string, key: string, above: number) => {
