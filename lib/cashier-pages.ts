@@ -1,20 +1,26 @@
 // Shared by the app and the API (server/), so keep it free of browser or Node-only imports.
 
-/** Pages an admin can turn on or off for each cashier. The Register and the cashier's own Account are always on. */
+/**
+ * Pages an admin can turn on or off for each cashier. `optIn` pages show costs, suppliers or spending, so they
+ * start off. The Register, Account, Help center and About are always on.
+ */
 export const CASHIER_PAGES = [
   { href: "/", label: "Dashboard" },
   { href: "/records", label: "Sales" },
   { href: "/reports", label: "Reports" },
   { href: "/activity", label: "Recent activity" },
-  { href: "/help", label: "Help center" },
-  { href: "/about", label: "About" },
+  { href: "/inventory", label: "Inventory", optIn: true },
+  { href: "/expenses", label: "Expenses", optIn: true },
 ] as const;
 
-export const ALWAYS_OPEN = ["/orders", "/account"];
+export const ALWAYS_OPEN = ["/orders", "/account", "/help", "/about"];
 
 /** Pages that show the store's sales, so they need the cashier to be able to read orders. */
 export const SALES_PAGES = ["/", "/records", "/reports", "/activity"];
 
-/** A cashier's pages; `null` (accounts made before this setting existed) means all of them. */
+/** What a new cashier gets, and what accounts made before this setting existed (`null`) have. */
+export const DEFAULT_PAGES: string[] = CASHIER_PAGES.filter((p) => !("optIn" in p)).map((p) => p.href);
+
+/** A cashier's pages; `null` means the default ones. */
 export const cashierPages = (pages: readonly string[] | null | undefined): string[] =>
-  pages ? pages.filter((page) => CASHIER_PAGES.some((p) => p.href === page)) : CASHIER_PAGES.map((p) => p.href);
+  pages ? pages.filter((page) => CASHIER_PAGES.some((p) => p.href === page)) : DEFAULT_PAGES;

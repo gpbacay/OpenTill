@@ -150,6 +150,30 @@ export function pendingAccounts() {
   return readAccounts().filter((account) => account.pendingPassword);
 }
 
+/** True for an account created offline that the server doesn't know yet, so every change to it stays local. */
+export function isLocalOnly(userId: string) {
+  return readAccounts().some((account) => account.id === userId && account.pendingPassword);
+}
+
+/** Name and photo changes made offline, waiting to be sent to the server. */
+export type ProfileChanges = { name?: string; avatar?: string };
+
+const profileKey = (userId: string) => `opentill_${userId}_pending_profile`;
+
+export function readPendingProfile(userId: string): ProfileChanges | null {
+  try {
+    const saved = localStorage.getItem(profileKey(userId));
+    return saved ? (JSON.parse(saved) as ProfileChanges) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function writePendingProfile(userId: string, changes: ProfileChanges | null) {
+  if (changes) localStorage.setItem(profileKey(userId), JSON.stringify(changes));
+  else localStorage.removeItem(profileKey(userId));
+}
+
 export function touchLocalAccount(user: LocalUser) {
   const accounts = readAccounts();
   const current = accounts.find((account) => account.id === user.id);

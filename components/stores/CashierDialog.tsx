@@ -179,7 +179,8 @@ export function CashierDialog({
           <fieldset className="space-y-2">
             <legend className="text-sm font-medium">Pages</legend>
             <p className="text-xs text-muted-foreground">
-              The Register and their Account are always on. Costs, expenses, profit, suppliers and settings are never shown to cashiers.
+              The Register, Account, Help center and About are always on. Inventory shows costs and suppliers and Expenses shows
+              spending, so both start off. Settings, suppliers and profit are never shown to cashiers.
             </p>
             <div className="divide-y divide-border rounded-lg border border-border">
               {CASHIER_PAGES.map((page) => (

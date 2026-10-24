@@ -4,7 +4,7 @@ import { createContext, useContext, useMemo, type ReactNode } from "react";
 import { useCollection } from "@/lib/use-collection";
 import { useAuth } from "@/contexts/auth-context";
 import { usePos } from "@/contexts/pos-context";
-import { isCashier } from "@/lib/local-auth";
+import { canOpen } from "@/components/layout/Sidebar";
 import type { Category, CustomColumn, CustomColumnTable, Expense, StockMovement, Supplier } from "@/lib/types";
 
 /** Back-office data for the active store: suppliers, expenses, the stock ledger and user-defined columns. */
@@ -39,13 +39,16 @@ const OpsContext = createContext<OpsValue | null>(null);
 
 export function OpsProvider({ userId, children }: { userId: string; children: ReactNode }) {
   const { activeTenant, handleApplyMovement } = usePos();
-  // The API refuses these to cashiers, so their lists stay empty.
-  const backOffice = !isCashier(useAuth().user);
-  const suppliers = useCollection<Supplier>(userId, "suppliers", "suppliers", "suppliers", backOffice);
-  const expenses = useCollection<Expense>(userId, "expenses", "expenses", "expenses", backOffice);
-  const movements = useCollection<StockMovement>(userId, "movements", "stock-movements", "stock", backOffice);
-  const columns = useCollection<CustomColumn>(userId, "columns", "columns", "columns", backOffice);
-  const categories = useCollection<Category>(userId, "categories", "categories", "categories", backOffice);
+  // A cashier only gets the lists behind the pages their admin gave them (see PAGE_ROUTES in auth.guard); the rest stay empty.
+  const { user } = useAuth();
+  const inventory = canOpen(user, "/inventory");
+  const spending = canOpen(user, "/expenses");
+  const admin = canOpen(user, "/settings");
+  const suppliers = useCollection<Supplier>(userId, "suppliers", "suppliers", "suppliers", inventory || spending);
+  const expenses = useCollection<Expense>(userId, "expenses", "expenses", "expenses", spending);
+  const movements = useCollection<StockMovement>(userId, "movements", "stock-movements", "stock", inventory);
+  const columns = useCollection<CustomColumn>(userId, "columns", "columns", "columns", inventory || spending);
+  const categories = useCollection<Category>(userId, "categories", "categories", "categories", inventory || admin);
 
   const tenantId = activeTenant?.id;
   const mine = <T extends { tenantId: string }>(rows: T[]) => rows.filter((row) => row.tenantId === tenantId);

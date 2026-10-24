@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { useAuth } from "@/contexts/auth-context";
 import { useOps } from "@/contexts/ops-context";
 import { usePos } from "@/contexts/pos-context";
+import { isCashier } from "@/lib/local-auth";
 import type { CustomColumn, CustomColumnTable } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -74,8 +76,12 @@ export function CustomFieldInputs({
   );
 }
 
-/** "Columns" button: add and remove the user's extra columns for one table. */
+/** "Columns" button: add and remove the user's extra columns for one table. Setting them up is the admin's job. */
 export function ColumnManager({ table }: { table: CustomColumnTable }) {
+  return isCashier(useAuth().user) ? null : <ColumnEditor table={table} />;
+}
+
+function ColumnEditor({ table }: { table: CustomColumnTable }) {
   const { activeTenant } = usePos();
   const { columnsFor, saveColumn, deleteColumn } = useOps();
   const [open, setOpen] = useState(false);

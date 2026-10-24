@@ -10,18 +10,23 @@ import {
 import { useRouter } from "next/navigation";
 import {
   clearPendingPassword,
+  isCashier,
+  isLocalOnly,
   matchLocalAccount,
   newLocalId,
   pendingAccounts,
   readLocalSession,
+  readPendingProfile,
   refreshLocalSession,
   rememberLocalAccount,
   touchLocalAccount,
   updateLocalAccount,
   writeLocalSession,
+  writePendingProfile,
   type LocalUser,
 } from "@/lib/local-auth";
-import "@/lib/offline"; // installed first, so even sign-in requests track whether the API is reachable
+// Imported first, so even sign-in requests track whether the API is reachable.
+import { isOnline } from "@/lib/offline";
 
 interface AccountUpdate {
   name: string;
@@ -93,6 +98,32 @@ async function syncPendingAccounts() {
   }
 }
 
+/** Sends name and photo changes made offline. Resolves to the saved user, or null when nothing was saved. */
+async function syncPendingProfile(userId: string): Promise<LocalUser | null> {
+  const changes = readPendingProfile(userId);
+  if (!changes) return null;
+  try {
+    const res = await fetch("/api/auth/account", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(changes),
+    });
+    if (apiMissing(res) || res.status === 401) return null; // not signed in on the server yet: try again later
+    // Saved, or refused for good (e.g. an invalid name). Keep anything edited while this request was out.
+    if (JSON.stringify(readPendingProfile(userId)) === JSON.stringify(changes)) writePendingProfile(userId, null);
+    if (!res.ok) return null;
+    const next = asUser(await res.json());
+    touchLocalAccount(next);
+    refreshLocalSession(next);
+    return next;
+  } catch {
+    return null;
+  }
+}
+
+/** The server's copy of the user with this device's unsent name and photo changes on top. */
+const withPendingProfile = (user: LocalUser): LocalUser => ({ ...user, ...readPendingProfile(user.id) });
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const [user, setUser] = useState<LocalUser | null>(null);
@@ -109,7 +140,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .then(async (res) => {
         if (cancelled) return;
         if (res.ok) {
-          const next = asUser(await res.json());
+          const server = asUser(await res.json());
+          const next = (await syncPendingProfile(server.id)) ?? withPendingProfile(server);
+          if (cancelled) return;
           touchLocalAccount(next);
           setUser(next);
           refreshLocalSession(next);
@@ -124,13 +157,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .finally(() => {
         if (!cancelled) setReady(true);
       });
+    const syncOffline = async () => {
+      await syncPendingAccounts();
+      const current = readLocalSession();
+      const next = current && (await syncPendingProfile(current.id));
+      if (next && !cancelled) setUser(next);
+    };
     void syncPendingAccounts();
-    window.addEventListener("online", syncPendingAccounts);
+    window.addEventListener("online", syncOffline);
     return () => {
       cancelled = true;
-      window.removeEventListener("online", syncPendingAccounts);
+      window.removeEventListener("online", syncOffline);
     };
   }, []);
+
+  // While a cashier has the app open, ping now and then so their admin's Cashiers page shows them as active.
+  const cashier = isCashier(user);
+  useEffect(() => {
+    if (!cashier) return;
+    const ping = () => {
+      if (document.visibilityState === "visible" && isOnline()) void fetch("/api/auth/me").catch(() => undefined);
+    };
+    const timer = setInterval(ping, 30_000);
+    document.addEventListener("visibilitychange", ping);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", ping);
+    };
+  }, [cashier]);
 
   const login = async (username: string, password: string, remember: boolean) => {
     const normalized = username.trim().toLowerCase();
@@ -236,11 +290,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const updateAccount = async (body: AccountUpdate) => {
+    if (!user) return "Sign in on this device first.";
     try {
+      if (!isOnline()) throw new Error("offline");
       const res = await fetch("/api/auth/account", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+        // Unsent offline changes go along, so they can't later overwrite this save.
+        body: JSON.stringify({ ...readPendingProfile(user.id), ...body }),
       });
       if (apiMissing(res)) throw new Error("api");
       if (res.status === 401) {
@@ -253,6 +310,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return message;
       }
       if (!res.ok) return errorMessage(res);
+      writePendingProfile(user.id, null);
       const next = asUser(await res.json());
       if (body.newPassword) await rememberLocalAccount(next, body.newPassword);
       else if (body.currentPassword) await rememberLocalAccount(next, body.currentPassword);
@@ -261,11 +319,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(next);
       return null;
     } catch {
-      if (!user) return "Sign in on this device first.";
-      const updated = await updateLocalAccount(user.id, body);
-      if (typeof updated === "string") return updated;
-      refreshLocalSession(updated);
-      setUser(updated);
+      // An account the server doesn't know yet is all local: its sign-up sync sends the latest details.
+      if (isLocalOnly(user.id)) {
+        const updated = await updateLocalAccount(user.id, body);
+        if (typeof updated === "string") return updated;
+        refreshLocalSession(updated);
+        setUser(updated);
+        return null;
+      }
+      // The server checks the current password, so these can't be changed offline.
+      if (body.newPassword || body.username.trim().toLowerCase() !== user.username) {
+        return "Changing your username or password needs a connection. Your name and photo can be changed offline.";
+      }
+      const name = body.name.trim();
+      if (!name) return "Enter your name.";
+      const changes = { ...readPendingProfile(user.id), name, ...(body.avatar === undefined ? {} : { avatar: body.avatar }) };
+      writePendingProfile(user.id, changes);
+      const next = { ...user, ...changes };
+      touchLocalAccount(next);
+      refreshLocalSession(next);
+      setUser(next);
       return null;
     }
   };

@@ -11,12 +11,15 @@ import {
 import { createHash, randomBytes, scrypt as scryptCallback, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
 import { DatabaseService } from "../database/database.service";
+import { RealtimeService } from "../realtime/realtime.service";
 import { cleanImage } from "../common/images";
 import { cashierPages } from "../../lib/cashier-pages";
 
 const scrypt = promisify(scryptCallback);
 const KEY_LENGTH = 64;
 const SESSION_MS = 30 * 24 * 60 * 60 * 1000;
+/** How often a cashier's activity is written down. The app pings about this often while it is open (auth-context). */
+export const SEEN_EVERY_MS = 30_000;
 export const SESSION_MAX_AGE = 30 * 24 * 60 * 60;
 export const SESSION_COOKIE = "opentill_session";
 
@@ -152,8 +155,26 @@ function publicUser(user: {
 export class AuthService {
   private memoryUsers: StoredUser[] = [];
   private memorySessions: MemorySession[] = [];
+  private readonly lastTouched = new Map<string, number>();
 
-  constructor(@Inject(DatabaseService) private readonly dbService: DatabaseService) {}
+  constructor(
+    @Inject(DatabaseService) private readonly dbService: DatabaseService,
+    @Inject(RealtimeService) private readonly realtime: RealtimeService
+  ) {}
+
+  /** Notes that a cashier is using the app, so their admin's Cashiers page shows them as active. */
+  async touch(user: AuthUser) {
+    const client = this.dbService.client;
+    const now = Date.now();
+    if (!client || !user.tenantId || now - (this.lastTouched.get(user.id) ?? 0) < SEEN_EVERY_MS) return;
+    this.lastTouched.set(user.id, now);
+    try {
+      await client.user.update({ where: { id: user.id }, data: { lastSeenAt: new Date(now) } });
+      this.realtime.emit(user.tenantId, "cashiers");
+    } catch (err: any) {
+      console.warn("Could not record cashier activity:", err.message);
+    }
+  }
 
   async register(body: { id?: string; name?: string; username?: string; password?: string }) {
     const email = requireUsername(body.username);

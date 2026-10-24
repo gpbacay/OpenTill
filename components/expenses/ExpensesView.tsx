@@ -1,8 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useAuth } from "@/contexts/auth-context";
 import { useOps } from "@/contexts/ops-context";
 import { usePos } from "@/contexts/pos-context";
+import { isCashier } from "@/lib/local-auth";
 import { money } from "@/lib/money";
 import { useSearchParams } from "next/navigation";
 import { inPeriod, inRange, presetRange, rangeFromParams } from "@/lib/periods";
@@ -20,6 +22,8 @@ import { TablePageSkeleton } from "@/components/loading/PageSkeletons";
 const PAY_LABEL = { CASH: "Cash", CARD: "Card", MOBILE_WALLET: "Wallet" } as const;
 
 export function ExpensesView() {
+  // A cashier's sales list holds only their own sales, and profit stays with the admin.
+  const cashier = isCashier(useAuth().user);
   const { activeTenant, tenantSyncedOrders } = usePos();
   const { expenses, suppliers, columnsFor, deleteExpense, ready } = useOps();
   const [query, setQuery] = useState("");
@@ -107,14 +111,18 @@ export function ExpensesView() {
   return (
     <div className="flex h-full min-h-0 flex-col">
       <SplitView panel={panel}>
-      <div className="hidden shrink-0 grid-cols-2 gap-3 sm:grid lg:grid-cols-4">
+      <div className={`hidden shrink-0 grid-cols-2 gap-3 sm:grid ${cashier ? "" : "lg:grid-cols-4"}`}>
         <StatTile label="Spent this month" value={money(currency, month.spentTotal)} />
-        <StatTile label="Sales this month" value={money(currency, month.salesTotal)} />
-        <StatTile
-          label="Left after expenses"
-          value={<span className={net < 0 ? "text-destructive" : ""}>{money(currency, net)}</span>}
-          hint="Sales minus expenses"
-        />
+        {cashier ? null : (
+          <>
+            <StatTile label="Sales this month" value={money(currency, month.salesTotal)} />
+            <StatTile
+              label="Left after expenses"
+              value={<span className={net < 0 ? "text-destructive" : ""}>{money(currency, net)}</span>}
+              hint="Sales minus expenses"
+            />
+          </>
+        )}
         <StatTile label="Biggest cost" value={month.top ? month.top[0] : "—"} hint={month.top ? money(currency, month.top[1]) : undefined} />
       </div>
       <FilterBar

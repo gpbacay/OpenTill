@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { usePos } from "@/contexts/pos-context";
 import { Cashier } from "@/lib/types";
 import { CASHIER_PAGES } from "@/lib/cashier-pages";
@@ -14,6 +14,28 @@ import { CashierDialog } from "./CashierDialog";
 import { CashierInviteDialog } from "./CashierInviteDialog";
 import { useCashiers, type CashierInvite } from "./use-cashiers";
 
+/** A cashier's open app checks in every 30 seconds, so anything older than this means it is closed or offline. */
+const ACTIVE_MS = 2 * 60_000;
+
+function activity(lastSeenAt: string | null, now: number) {
+  if (!lastSeenAt) return { active: false, label: "Never signed in" };
+  const minutes = Math.floor((now - Date.parse(lastSeenAt)) / 60_000);
+  if (now - Date.parse(lastSeenAt) < ACTIVE_MS) return { active: true, label: "Active now" };
+  if (minutes < 60) return { active: false, label: `Active ${minutes}m ago` };
+  if (minutes < 24 * 60) return { active: false, label: `Active ${Math.floor(minutes / 60)}h ago` };
+  return { active: false, label: `Active ${Math.floor(minutes / (24 * 60))}d ago` };
+}
+
+function Activity({ lastSeenAt, now }: { lastSeenAt: string | null; now: number }) {
+  const { active, label } = activity(lastSeenAt, now);
+  return (
+    <span className="inline-flex items-center gap-2 whitespace-nowrap">
+      <span aria-hidden className={`size-2 rounded-full ${active ? "bg-emerald-500" : "bg-muted-foreground/40"}`} />
+      <span className={active ? "text-foreground" : "text-muted-foreground"}>{label}</span>
+    </span>
+  );
+}
+
 export function CashiersView() {
   const { tenants, handleUpdateTenant } = usePos();
   const { cashiers, error, create, update, remove, invite, resetLink } = useCashiers();
@@ -24,6 +46,12 @@ export function CashiersView() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [actionError, setActionError] = useState("");
   const [sharing, setSharing] = useState<CashierInvite | null>(null);
+  // Re-renders the "Active …" labels as time passes; new activity arrives through useCashiers' realtime refresh.
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 15_000);
+    return () => clearInterval(timer);
+  }, []);
   const storeName = (id: string) => tenants.find((t) => t.id === id)?.name ?? "Unknown store";
 
   const rows = useMemo(
@@ -79,6 +107,7 @@ export function CashiersView() {
       ),
     },
     { id: "store", header: "Store", cell: (c) => storeName(c.tenantId) },
+    { id: "activity", header: "Status", cell: (c) => <Activity lastSeenAt={c.lastSeenAt} now={now} /> },
     { id: "created", header: "Added", cell: (c) => new Date(c.createdAt).toLocaleDateString() },
   ];
 
@@ -109,6 +138,7 @@ export function CashiersView() {
     >
       <Fields
         rows={[
+          ["Status", <Activity key="status" lastSeenAt={selected.lastSeenAt} now={now} />],
           ["Store", storeName(selected.tenantId)],
           ["Pages", ["Register", ...CASHIER_PAGES.filter((page) => selected.pages.includes(page.href)).map((page) => page.label)].join(", ")],
           ["Sign-in link", selected.hasLink ? `${selected.linkUses} of ${selected.linkMaxUses} device${selected.linkMaxUses === 1 ? "" : "s"} used` : "None"],

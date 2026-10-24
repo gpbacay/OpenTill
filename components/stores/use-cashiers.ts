@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { Cashier } from "@/lib/types";
 import { isOnline } from "@/lib/offline";
+import { subscribe } from "@/lib/realtime";
 
 export interface CashierInput {
   name?: string;
@@ -47,6 +48,8 @@ export function useCashiers() {
 
   useEffect(() => {
     void load();
+    // Fires when a cashier signs in or uses the app, so "Active now" shows up live.
+    return subscribe(["cashiers"], () => void load());
   }, [load]);
 
   /** `error` is a message, or null on success. */

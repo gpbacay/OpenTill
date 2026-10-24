@@ -146,13 +146,20 @@ async function main() {
   r = await call(admin, "GET", "/api/orders");
   assert(r.json.length === 2, "admin sees every sale");
   r = await call(admin, "GET", "/api/cashiers");
-  assert(r.json[0].pages.includes("/records") && r.json[0].pages.length === 6, "cashier starts with every page");
+  assert(
+    r.json[0].pages.join() === "/,/records,/reports,/activity",
+    "cashier starts with the sales pages; Inventory and Expenses start off"
+  );
+  assert(r.json[0].lastSeenAt !== null, "the cashier's requests mark them as recently active");
+  assert(((await versionsOf(admin))["t1:cashiers"] ?? 0) >= 1, "cashier activity reaches the admin's change counter");
   r = await call(admin, "PATCH", "/api/cashiers/" + cid, { pages: ["/settings"] });
   assert(r.status === 400, "admin can't give a cashier a back-office page");
   r = await call(admin, "PATCH", "/api/cashiers/" + cid, { pages: ["/help"] });
-  assert(r.status === 200 && r.json.pages.join() === "/help", "admin turns off the cashier's sales pages");
+  assert(r.status === 400, "Help center is always on, so it isn't a page to toggle");
+  r = await call(admin, "PATCH", "/api/cashiers/" + cid, { pages: [] });
+  assert(r.status === 200 && r.json.pages.length === 0, "admin turns off the cashier's sales pages");
   r = await call(cashier, "GET", "/api/auth/me");
-  assert(r.json.pages.join() === "/help", "the cashier's session carries their pages");
+  assert(r.json.pages.length === 0, "the cashier's session carries their pages");
   r = await call(cashier, "GET", "/api/orders");
   assert(r.status === 403, "no sales pages, no sales data");
   r = await call(admin, "PATCH", "/api/cashiers/" + cid, { pages: ["/", "/records"] });
@@ -162,6 +169,39 @@ async function main() {
     r = await call(cashier, m, p, {});
     assert(r.status === 403, `cashier blocked: ${m} ${p}`);
   }
+
+  // Inventory and Expenses open their own endpoints, scoped to the cashier's store
+  r = await call(admin, "PATCH", "/api/cashiers/" + cid, { pages: ["/", "/records", "/inventory"] });
+  assert(r.status === 200 && r.json.pages.includes("/inventory"), "admin gives the cashier Inventory");
+  r = await call(cashier, "GET", "/api/products");
+  assert("costPrice" in r.json[0], "with Inventory the cashier sees cost prices");
+  r = await call(cashier, "PUT", "/api/products/p1", { id: "p1", tenantId: "t1", name: "Cola", category: "Drinks", sku: "C1", price: 13, description: "" });
+  assert(r.status === 200 && r.json.price === 13, "with Inventory the cashier edits a product");
+  r = await call(cashier, "PUT", "/api/stock-movements/m-cashier", { tenantId: "t1", productId: "p1", type: "ADJUSTMENT", quantity: 2, date: new Date().toISOString() });
+  assert(r.status === 200, "with Inventory the cashier adjusts stock");
+  for (const p of ["/api/stock-movements", "/api/suppliers", "/api/categories", "/api/columns"]) {
+    r = await call(cashier, "GET", p);
+    assert(r.status === 200, `with Inventory the cashier reads ${p}`);
+  }
+  r = await call(cashier, "POST", "/api/products", { id: "p-other", tenantId: "t2", name: "Sneaky", price: 1, description: "" });
+  assert(r.status === 403, "with Inventory the cashier still can't add products to another store");
+  for (const [m, p] of [["PUT", "/api/suppliers/s1"], ["PUT", "/api/categories/c9"], ["PUT", "/api/columns/x1"], ["GET", "/api/expenses"], ["PUT", "/api/expenses/e1"]] as const) {
+    r = await call(cashier, m, p, { tenantId: "t1", name: "x" });
+    assert(r.status === 403, `Inventory alone still blocks ${m} ${p}`);
+  }
+  r = await call(admin, "PATCH", "/api/cashiers/" + cid, { pages: ["/", "/records", "/expenses"] });
+  r = await call(cashier, "PUT", "/api/expenses/e-cashier", { tenantId: "t1", category: "Supplies", description: "Bags", amount: 50, paymentMethod: "CASH", date: new Date().toISOString() });
+  assert(r.status === 200 && r.json.amount === 50, "with Expenses the cashier records an expense");
+  r = await call(cashier, "GET", "/api/expenses");
+  assert(r.status === 200 && r.json.some((e: any) => e.id === "e-cashier"), "with Expenses the cashier reads expenses");
+  r = await call(cashier, "PUT", "/api/expenses/e-other", { tenantId: "t2", category: "Supplies", amount: 5, paymentMethod: "CASH" });
+  assert(r.status === 403, "with Expenses the cashier still can't spend in another store");
+  r = await call(cashier, "DELETE", "/api/expenses/e-cashier");
+  assert(r.status === 200, "with Expenses the cashier deletes an expense");
+  r = await call(cashier, "PUT", "/api/products/p1", { id: "p1", tenantId: "t1", name: "Cola", price: 12 });
+  assert(r.status === 403, "turning Inventory off closes product edits again");
+  r = await call(admin, "PATCH", "/api/cashiers/" + cid, { pages: ["/", "/records"] });
+
   r = await call(cashier, "GET", "/api/tenants?x=1");
   assert(r.status === 200, "query string doesn't break allowlist");
   r = await call(cashier, "PATCH", "/api/auth/account", { name: "Cathy B", username: "cathy" });

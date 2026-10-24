@@ -18,11 +18,11 @@ export class ProductsController {
     @Inject(ProductsService) private readonly productsService: ProductsService
   ) {}
 
-  // Cashiers don't see what the shop pays for stock or who supplies it.
+  // Cashiers don't see what the shop pays for stock or who supplies it, unless their admin gave them Inventory.
   @Get()
   async getProducts(@Req() req: AuthedRequest): Promise<Partial<Product>[]> {
     const products = await this.productsService.findAll(req.user!.id);
-    if (req.user!.role !== "CASHIER") return products;
+    if (req.user!.role !== "CASHIER" || req.user!.pages?.includes("/inventory")) return products;
     return products.map(({ costPrice: _cost, supplierId: _supplier, ...product }) => product);
   }
 

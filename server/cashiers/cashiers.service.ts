@@ -25,6 +25,8 @@ export interface Cashier {
   linkMaxUses: number;
   /** The pages this cashier may open besides the Register and Account. */
   pages: string[];
+  /** When the cashier last had the app open (ISO), or null if they never have. */
+  lastSeenAt: string | null;
 }
 
 /** What creating or re-linking returns: the cashier plus the sign-in link token (shown once, only its hash is stored). */
@@ -39,7 +41,7 @@ export interface CashierInput {
   tenantId?: string;
   /** How many devices the sign-in link may sign in (1 to 20). */
   maxUses?: number;
-  /** Pages from CASHIER_PAGES this cashier may open. Missing means all of them on create, unchanged on edit. */
+  /** Pages from CASHIER_PAGES this cashier may open. Missing means the default ones on create, unchanged on edit. */
   pages?: string[];
 }
 
@@ -71,6 +73,7 @@ function toCashier(row: {
   inviteHash: string | null;
   inviteMaxUses: number;
   cashierPages: string | null;
+  lastSeenAt: Date | null;
   _count: { inviteDevices: number };
 }): Cashier {
   return {
@@ -83,6 +86,7 @@ function toCashier(row: {
     linkUses: row._count.inviteDevices,
     linkMaxUses: row.inviteMaxUses,
     pages: cashierPages(row.cashierPages ? JSON.parse(row.cashierPages) : null),
+    lastSeenAt: row.lastSeenAt?.toISOString() ?? null,
   };
 }
 

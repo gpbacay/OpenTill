@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useAuth } from "@/contexts/auth-context";
 import { isCashier } from "@/lib/local-auth";
+import { useOnline } from "@/lib/offline";
 import { ImagePicker } from "@/components/ImagePicker";
 import { LogoutButton } from "@/components/LogoutButton";
 import { Button } from "@/components/ui/button";
@@ -22,6 +23,7 @@ function initials(name: string) {
 
 export default function AccountPage() {
   const { user, updateAccount } = useAuth();
+  const online = useOnline();
   const [name, setName] = useState(user?.name ?? "");
   const [username, setUsername] = useState(user?.username ?? "");
   const [currentPassword, setCurrentPassword] = useState("");
@@ -159,10 +161,15 @@ export default function AccountPage() {
               />
               <FieldError errors={errors} id="new-password" />
             </div>
+            {online ? null : (
+              <p className="text-sm text-muted-foreground">You're offline. Your name and photo still save; changing your username or password needs a connection.</p>
+            )}
           </>
         )}
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
-        {saved ? <p className="text-sm text-muted-foreground">Saved.</p> : null}
+        {saved ? (
+          <p className="text-sm text-muted-foreground">{online ? "Saved." : "Saved on this device. It syncs when you're back online."}</p>
+        ) : null}
         <Button type="submit" disabled={pending}>
           {pending ? "Saving" : "Save"}
         </Button>

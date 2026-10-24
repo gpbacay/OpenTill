@@ -25,6 +25,8 @@ export interface Cashier {
   linkMaxUses: number;
   /** Pages this cashier may open besides the Register and Account (see lib/cashier-pages). */
   pages: string[];
+  /** When the cashier last had the app open (ISO), or null if they never have. */
+  lastSeenAt: string | null;
 }
 
 export interface Product {

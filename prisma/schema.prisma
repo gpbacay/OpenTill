@@ -21,6 +21,7 @@ model User {
   inviteHash    String?        @unique // sha256 of the cashier's sign-in link token
   inviteMaxUses Int            @default(1) // how many devices the link may sign in
   cashierPages  String? // JSON array of the pages a CASHIER may open; null means all of them
+  lastSeenAt    DateTime? // when a CASHIER last had the app open; their admin sees it on the Cashiers page
   inviteDevices InviteDevice[]
   createdAt     DateTime       @default(now())
   sessions      Session[]

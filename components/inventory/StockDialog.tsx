@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { useOps } from "@/contexts/ops-context";
 import { usePos } from "@/contexts/pos-context";
+import { useAuth } from "@/contexts/auth-context";
+import { canOpen } from "@/components/layout/Sidebar";
 import { uid } from "@/lib/ids";
 import { money } from "@/lib/money";
 import { Product } from "@/lib/types";
@@ -26,6 +28,8 @@ export function StockDialog({ action, onClose }: { action: StockAction | null; o
   const [supplierId, setSupplierId] = useState("");
   const [reason, setReason] = useState(REASONS[0]);
   const [note, setNote] = useState("");
+  // A cashier given Inventory but not Expenses can't record spending.
+  const canLogExpense = canOpen(useAuth().user, "/expenses");
   const [logExpense, setLogExpense] = useState(true);
   const [errors, setErrors] = useState<FieldErrors>({});
 
@@ -79,7 +83,7 @@ export function StockDialog({ action, onClose }: { action: StockAction | null; o
       note: mode === "restock" ? note.trim() : [reason, note.trim()].filter(Boolean).join(": "),
       date: now,
     });
-    if (mode === "restock" && logExpense && total > 0) {
+    if (mode === "restock" && canLogExpense && logExpense && total > 0) {
       saveExpense({
         id: uid("exp"),
         tenantId: activeTenant.id,
@@ -134,7 +138,7 @@ export function StockDialog({ action, onClose }: { action: StockAction | null; o
                   </select>
                 </div>
               </div>
-              {total > 0 ? (
+              {canLogExpense && total > 0 ? (
                 <label className="flex items-center gap-2 text-sm">
                   <input type="checkbox" checked={logExpense} onChange={(e) => setLogExpense(e.target.checked)} />
                   Also record a {money(activeTenant.currency, total)} expense

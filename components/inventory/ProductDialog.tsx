@@ -15,6 +15,8 @@ import { NumberInput } from "@/components/NumberInput";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import Link from "next/link";
+import { useAuth } from "@/contexts/auth-context";
+import { canOpen } from "@/components/layout/Sidebar";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { CustomFieldInputs } from "@/components/data-table/custom-columns";
 import { ImagePicker } from "@/components/ImagePicker";
@@ -31,6 +33,7 @@ const blank = { name: "", sku: "", category: "", supplierId: "", costPrice: "", 
 
 export function ProductDialog({ target, onClose }: Props) {
   const { products, activeTenant, handleAddProduct, handleUpdateProduct, handleDeleteProduct } = usePos();
+  const settingsOpen = canOpen(useAuth().user, "/settings");
   const { suppliers, columnsFor, recordMovement, categories: setUp } = useOps();
   const [form, setForm] = useState(blank);
   const [skuHelp, setSkuHelp] = useState(false);
@@ -199,13 +202,15 @@ export function ProductDialog({ target, onClose }: Props) {
                 <>
                   {/* Nothing set up yet: type one, and point to Settings where the list is managed. */}
                   <Input id="p-category" {...invalid(errors, "p-category")} value={form.category} onChange={set("category")} />
-                  <p className="text-xs text-muted-foreground">
-                    Tip: set up your categories in{" "}
-                    <Link href="/settings" className="underline underline-offset-2" onClick={onClose}>
-                      Settings
-                    </Link>{" "}
-                    to pick from a list.
-                  </p>
+                  {settingsOpen ? (
+                    <p className="text-xs text-muted-foreground">
+                      Tip: set up your categories in{" "}
+                      <Link href="/settings" className="underline underline-offset-2" onClick={onClose}>
+                        Settings
+                      </Link>{" "}
+                      to pick from a list.
+                    </p>
+                  ) : null}
                 </>
               )}
               <FieldError errors={errors} id="p-category" />
