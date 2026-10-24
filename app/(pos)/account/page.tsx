@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { PencilEdit01Icon } from "@hugeicons/core-free-icons";
 import { useAuth } from "@/contexts/auth-context";
 import { isCashier } from "@/lib/local-auth";
 import { useOnline } from "@/lib/offline";
@@ -34,6 +36,7 @@ export default function AccountPage() {
   const [errors, setErrors] = useState<FieldErrors>({});
   const [photoError, setPhotoError] = useState("");
   const [photoPending, setPhotoPending] = useState(false);
+  const [editing, setEditing] = useState(false);
 
   if (!user) return null;
   // A cashier's username and password belong to their admin.
@@ -79,6 +82,17 @@ export default function AccountPage() {
     setCurrentPassword("");
     setNewPassword("");
     setSaved(true);
+    setEditing(false);
+  };
+
+  const cancel = () => {
+    setName(user.name);
+    setUsername(user.username);
+    setCurrentPassword("");
+    setNewPassword("");
+    setError("");
+    setErrors({});
+    setEditing(false);
   };
 
   return (
@@ -90,7 +104,7 @@ export default function AccountPage() {
           onChange={(avatar) => void changePhoto(avatar)}
           max={192}
           round
-          disabled={photoPending}
+          disabled={photoPending || !editing}
           fallback={<span className="text-xl font-semibold text-foreground">{initials(user.name) || "OT"}</span>}
         />
         <p className="text-sm text-muted-foreground">
@@ -99,11 +113,30 @@ export default function AccountPage() {
         {photoError ? <p className="text-sm text-destructive">{photoError}</p> : null}
       </div>
       <form className="flex flex-col gap-4" onSubmit={submit} noValidate>
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="text-lg font-semibold">Account details</h2>
+          {editing ? null : (
+            <Button
+              type="button"
+              size="icon"
+              variant="secondary"
+              aria-label="Edit account details"
+              title="Edit account details"
+              onClick={() => {
+                setSaved(false);
+                setEditing(true);
+              }}
+            >
+              <HugeiconsIcon icon={PencilEdit01Icon} size={16} />
+            </Button>
+          )}
+        </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="account-name" required>Name</Label>
           <Input
             id="account-name"
             {...invalid(errors, "account-name")}
+            readOnly={!editing}
             value={name}
             onChange={(event) => {
               clearError(setErrors, "account-name");
@@ -118,7 +151,7 @@ export default function AccountPage() {
             id="account-username"
             {...invalid(errors, "account-username")}
             autoComplete="username"
-            readOnly={locked}
+            readOnly={locked || !editing}
             value={username}
             onChange={(event) => {
               clearError(setErrors, "account-username");
@@ -127,7 +160,7 @@ export default function AccountPage() {
           />
           <FieldError errors={errors} id="account-username" />
         </div>
-        {locked ? (
+        {!editing ? null : locked ? (
           <p className="text-sm text-muted-foreground">Your admin manages your username and password. Ask them to change either.</p>
         ) : (
           <>
@@ -170,9 +203,16 @@ export default function AccountPage() {
         {saved ? (
           <p className="text-sm text-muted-foreground">{online ? "Saved." : "Saved on this device. It syncs when you're back online."}</p>
         ) : null}
-        <Button type="submit" disabled={pending}>
-          {pending ? "Saving" : "Save"}
-        </Button>
+        {editing ? (
+          <div className="flex gap-2">
+            <Button type="button" variant="secondary" className="flex-1" disabled={pending} onClick={cancel}>
+              Cancel
+            </Button>
+            <Button type="submit" className="flex-1" disabled={pending}>
+              {pending ? "Saving" : "Save"}
+            </Button>
+          </div>
+        ) : null}
       </form>
       <LogoutButton>
         <Button variant="ghost" className="self-start">

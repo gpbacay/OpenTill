@@ -69,7 +69,7 @@ export function Toolbar({ children }: { children: ReactNode }) {
 }
 
 /**
- * Toolbar whose search and filters fold into a "Search and filters" accordion on phones.
+ * Toolbar whose search and filters fold behind an icon-only filter button on phones.
  * From md up it's one row, same as Toolbar. `leading` (tabs, a scanner field) and `actions` stay visible.
  */
 export function FilterBar({
@@ -93,17 +93,15 @@ export function FilterBar({
       <button
         type="button"
         aria-expanded={open}
+        aria-label={active ? `${label} (on)` : label}
+        title={label}
         onClick={() => setOpen((value) => !value)}
-        className={`flex h-9 items-center justify-between gap-2 rounded-xl border border-border bg-card px-3 text-sm font-medium md:hidden ${
-          leading ? "" : "flex-1"
+        className={`relative flex size-9 shrink-0 items-center justify-center rounded-xl border border-border md:hidden ${
+          open ? "bg-muted" : "bg-card"
         }`}
       >
-        <span className="flex items-center gap-2">
-          <HugeiconsIcon icon={FilterHorizontalIcon} size={16} className="text-muted-foreground" />
-          {label}
-          {active ? <span className="size-2 rounded-full bg-primary" aria-label="Filters on" /> : null}
-        </span>
-        <HugeiconsIcon icon={ArrowDown01Icon} size={16} className={`text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} />
+        <HugeiconsIcon icon={FilterHorizontalIcon} size={16} className="text-muted-foreground" />
+        {active ? <span className="absolute top-1.5 right-1.5 size-2 rounded-full bg-primary" /> : null}
       </button>
       {actions ? <div className="ml-auto flex gap-2 md:order-last">{actions}</div> : null}
       <div

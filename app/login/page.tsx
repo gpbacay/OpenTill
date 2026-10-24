@@ -10,6 +10,8 @@ import { FieldError, check, clearError, invalid } from "@/components/FieldError"
 import { PasswordInput } from "@/components/PasswordInput";
 import { collect, passwordError, required, usernameError, type FieldErrors } from "@/lib/validation";
 
+const REMEMBERED_USERNAME_KEY = "opentill_remembered_username";
+
 export default function LoginPage() {
   const router = useRouter();
   const { user, ready, login, register } = useAuth();
@@ -20,6 +22,17 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [errors, setErrors] = useState<FieldErrors>({});
   const [pending, setPending] = useState(false);
+
+  // Remember me keeps the username on this device so it's filled in after logging out.
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(REMEMBERED_USERNAME_KEY);
+      if (saved) {
+        setUsername(saved);
+        setRemember(true);
+      }
+    } catch {}
+  }, []);
 
   const continueToRequestedPage = () => {
     const next = sessionStorage.getItem("opentill_after_login") ?? "/";
@@ -53,6 +66,12 @@ export default function LoginPage() {
     if (message) {
       setError(message);
       return;
+    }
+    if (!creating) {
+      try {
+        if (remember) localStorage.setItem(REMEMBERED_USERNAME_KEY, username.trim().toLowerCase());
+        else localStorage.removeItem(REMEMBERED_USERNAME_KEY);
+      } catch {}
     }
     router.replace(continueToRequestedPage());
   };
