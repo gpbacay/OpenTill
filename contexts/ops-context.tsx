@@ -2,7 +2,9 @@
 
 import { createContext, useContext, useMemo, type ReactNode } from "react";
 import { useCollection } from "@/lib/use-collection";
+import { useAuth } from "@/contexts/auth-context";
 import { usePos } from "@/contexts/pos-context";
+import { isCashier } from "@/lib/local-auth";
 import type { Category, CustomColumn, CustomColumnTable, Expense, StockMovement, Supplier } from "@/lib/types";
 
 /** Back-office data for the active store: suppliers, expenses, the stock ledger and user-defined columns. */
@@ -37,11 +39,13 @@ const OpsContext = createContext<OpsValue | null>(null);
 
 export function OpsProvider({ userId, children }: { userId: string; children: ReactNode }) {
   const { activeTenant, handleApplyMovement } = usePos();
-  const suppliers = useCollection<Supplier>(userId, "suppliers", "suppliers", "suppliers");
-  const expenses = useCollection<Expense>(userId, "expenses", "expenses", "expenses");
-  const movements = useCollection<StockMovement>(userId, "movements", "stock-movements", "stock");
-  const columns = useCollection<CustomColumn>(userId, "columns", "columns", "columns");
-  const categories = useCollection<Category>(userId, "categories", "categories", "categories");
+  // The API refuses these to cashiers, so their lists stay empty.
+  const backOffice = !isCashier(useAuth().user);
+  const suppliers = useCollection<Supplier>(userId, "suppliers", "suppliers", "suppliers", backOffice);
+  const expenses = useCollection<Expense>(userId, "expenses", "expenses", "expenses", backOffice);
+  const movements = useCollection<StockMovement>(userId, "movements", "stock-movements", "stock", backOffice);
+  const columns = useCollection<CustomColumn>(userId, "columns", "columns", "columns", backOffice);
+  const categories = useCollection<Category>(userId, "categories", "categories", "categories", backOffice);
 
   const tenantId = activeTenant?.id;
   const mine = <T extends { tenantId: string }>(rows: T[]) => rows.filter((row) => row.tenantId === tenantId);

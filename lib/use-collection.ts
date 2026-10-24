@@ -29,8 +29,9 @@ function write(storageKey: string, value: unknown) {
  * A tenant-scoped list that works offline. Reads come from a local copy (instant, survives the API being down);
  * writes apply locally, join an outbox, and replay against `/api/<path>/:id` whenever the API is reachable.
  * The server copy is re-fetched on realtime events, when the browser comes back online, and on mount.
+ * With `enabled` false it never talks to the server (e.g. back-office lists a cashier isn't allowed to read).
  */
-export function useCollection<T extends Row>(userId: string, name: string, path: string, topic: string) {
+export function useCollection<T extends Row>(userId: string, name: string, path: string, topic: string, enabled = true) {
   const [items, setItems] = useState<T[]>([]);
   const [ready, setReady] = useState(false);
   const [pending, setPending] = useState(0);
@@ -59,7 +60,7 @@ export function useCollection<T extends Row>(userId: string, name: string, path:
   );
 
   flushRef.current = async () => {
-    if (!navigator.onLine) return;
+    if (!enabled || !navigator.onLine) return;
     if (busyRef.current) {
       rerunRef.current = true;
       return;

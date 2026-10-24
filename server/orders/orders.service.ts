@@ -4,6 +4,7 @@ import { InventoryService } from "../inventory/inventory.service";
 import { ProductsService } from "../products/products.service";
 import { RealtimeService } from "../realtime/realtime.service";
 import { TenantsService } from "../tenants/tenants.service";
+import type { AuthUser } from "../auth/auth.service";
 
 export interface Order {
   id: string;
@@ -17,6 +18,8 @@ export interface Order {
   date: string;
   syncedAt?: string | null;
   cashierName?: string | null;
+  /** The cashier account that rang it up; null for admins. */
+  cashierId?: string | null;
   customerName?: string | null;
   discountAmount?: number | null;
   discountPercent?: number | null;
@@ -47,13 +50,15 @@ export class OrdersService {
     @Inject(RealtimeService) private readonly realtime: RealtimeService
   ) {}
 
-  async findAll(userId: string): Promise<any[]> {
-    const owned = await this.tenantsService.ownedIds(userId);
+  /** Admins get every sale in their stores; a cashier only the sales they rang up. */
+  async findAll(user: Pick<AuthUser, "id" | "role">): Promise<any[]> {
+    const owned = await this.tenantsService.ownedIds(user.id);
     if (owned.size === 0) return [];
+    const cashierId = user.role === "CASHIER" ? user.id : undefined;
     if (this.dbService.client) {
       try {
         return await this.dbService.client.order.findMany({
-          where: { tenantId: { in: [...owned] } },
+          where: { tenantId: { in: [...owned] }, ...(cashierId ? { cashierId } : {}) },
           include: { items: true }
         });
       } catch (err: any) {
@@ -61,7 +66,7 @@ export class OrdersService {
       }
     }
     return this.memoryOrders
-      .filter((order) => owned.has(order.tenantId))
+      .filter((order) => owned.has(order.tenantId) && (!cashierId || order.cashierId === cashierId))
       .map(o => ({
         ...o,
         items: this.memoryOrderItems.filter(item => item.orderId === o.id)
@@ -89,8 +94,10 @@ export class OrdersService {
     }
   }
 
-  async sync(userId: string, orders: any[], items: any[]): Promise<{ success: boolean; count: number; mode?: string }> {
-    await this.assertOwned(userId, orders, items);
+  async sync(user: Pick<AuthUser, "id" | "role">, orders: any[], items: any[]): Promise<{ success: boolean; count: number; mode?: string }> {
+    await this.assertOwned(user.id, orders, items);
+    // Set here, never from the request body, so a cashier can't file sales under someone else.
+    const cashierId = user.role === "CASHIER" ? user.id : null;
     const tenantByOrder = new Map<string, string>((orders ?? []).map((o) => [o.id, o.tenantId]));
     const dateByOrder = new Map<string, string>((orders ?? []).map((o) => [o.id, o.date]));
     console.log(`📡 [OrdersModule] Sync batch received: ${orders?.length || 0} orders, ${items?.length || 0} items.`);
@@ -114,6 +121,7 @@ export class OrdersService {
                 date: new Date(o.date),
                 syncedAt: new Date(),
                 cashierName: o.cashierName,
+                cashierId,
                 customerName: o.customerName,
                 discountAmount: o.discountAmount == null || o.discountAmount === "" ? null : parseFloat(o.discountAmount),
                 discountPercent: o.discountPercent == null || o.discountPercent === "" ? null : parseFloat(o.discountPercent),
@@ -174,6 +182,7 @@ export class OrdersService {
             date: o.date,
             syncedAt: new Date().toISOString(),
             cashierName: o.cashierName,
+            cashierId,
             customerName: o.customerName,
             discountAmount: o.discountAmount == null || o.discountAmount === "" ? null : parseFloat(o.discountAmount),
             discountPercent: o.discountPercent == null || o.discountPercent === "" ? null : parseFloat(o.discountPercent),

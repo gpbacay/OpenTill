@@ -10,7 +10,7 @@ export class OrdersController {
 
   @Get()
   async getOrders(@Req() req: AuthedRequest) {
-    return this.ordersService.findAll(req.user!.id);
+    return this.ordersService.findAll(req.user!);
   }
 
   @Post("sync")
@@ -18,6 +18,6 @@ export class OrdersController {
     @Req() req: AuthedRequest,
     @Body() body: { orders: any[]; items: any[] }
   ) {
-    return this.ordersService.sync(req.user!.id, body.orders, body.items);
+    return this.ordersService.sync(req.user!, body.orders, body.items);
   }
 }

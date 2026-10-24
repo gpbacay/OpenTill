@@ -11,6 +11,8 @@ export interface CashierInput {
   tenantId?: string;
   /** How many devices the sign-in link may sign in. */
   maxUses?: number;
+  /** Pages this cashier may open besides the Register and Account. */
+  pages?: string[];
 }
 
 /** A cashier plus the sign-in link token the server returns when it makes a link (shown once). */

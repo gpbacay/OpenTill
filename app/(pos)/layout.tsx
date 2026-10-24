@@ -7,7 +7,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/auth-context";
 import { PosProvider, usePos } from "@/contexts/pos-context";
 import { OpsProvider } from "@/contexts/ops-context";
-import AppSidebar, { CASHIER_PATHS, MENU_ITEMS } from "@/components/layout/Sidebar";
+import AppSidebar, { MENU_ITEMS, canOpen } from "@/components/layout/Sidebar";
 import { isCashier } from "@/lib/local-auth";
 import Header from "@/components/layout/Header";
 import { AddMenu } from "@/components/layout/AddMenu";
@@ -19,6 +19,8 @@ import { AppShellSkeleton } from "@/components/loading/PageSkeletons";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 const TABS = MENU_ITEMS.filter((item) => item.primary);
+// Cashiers can't open Suppliers or Inventory, so their bar holds the pages they use instead.
+const CASHIER_TABS = MENU_ITEMS.filter((item) => ["home", "records", "reports", "activity"].includes(item.id));
 
 // Leave sideways gestures to fields, charts and anything that scrolls sideways (tables).
 function usesSideways(el: HTMLElement | null, root: HTMLElement) {
@@ -44,10 +46,12 @@ function PosShell({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   const isMobile = useIsMobile();
   const swipeStart = useRef<{ x: number; y: number } | null>(null);
-  const tabIndex = TABS.findIndex((item) => item.href === pathname);
   const cashier = isCashier(user);
-  // Cashiers can't open back-office pages (the API refuses them too); send them to the register.
-  const blocked = cashier && !CASHIER_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`));
+  const tabs = cashier ? CASHIER_TABS.filter((item) => canOpen(user, item.href)) : TABS;
+  const bottomBar = tabs.length > 0;
+  const tabIndex = tabs.findIndex((item) => item.href === pathname);
+  // Cashiers can't open back-office pages (the API refuses their writes too); send them to the register.
+  const blocked = !canOpen(user, pathname);
   useEffect(() => {
     if (blocked) router.replace("/orders");
   }, [blocked, router]);
@@ -76,7 +80,7 @@ function PosShell({ children }: { children: React.ReactNode }) {
     const dx = touch.clientX - start.x;
     const dy = touch.clientY - start.y;
     if (Math.abs(dx) < 70 || Math.abs(dx) < Math.abs(dy) * 2) return;
-    const next = TABS[tabIndex + (dx < 0 ? 1 : -1)];
+    const next = tabs[tabIndex + (dx < 0 ? 1 : -1)];
     if (next) router.push(next.href);
   };
 
@@ -128,21 +132,21 @@ function PosShell({ children }: { children: React.ReactNode }) {
           </div>
         ) : null}
         <main
-          className={`flex min-h-0 flex-1 flex-col overflow-hidden px-3 sm:px-4 md:pb-4 ${cashier ? "pb-4" : "pb-24"}`}
+          className={`flex min-h-0 flex-1 flex-col overflow-hidden px-3 sm:px-4 md:pb-4 ${bottomBar ? "pb-24" : "pb-4"}`}
           onTouchStart={onTouchStart}
           onTouchEnd={onTouchEnd}
           onTouchCancel={() => (swipeStart.current = null)}
         >
           {children}
         </main>
-        {cashier ? null : <nav
+        {bottomBar ? <nav
           aria-label="Main"
           data-bottom-nav
           className="fixed inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-40 flex items-center gap-2 md:hidden"
         >
           {/* Bar and "+" share one height and corner radius; tabs use the inner radius (outer minus the bar's padding). */}
-          <div className="grid h-16 flex-1 grid-cols-4 gap-1 rounded-2xl border border-border bg-card/90 p-1.5 shadow-lg backdrop-blur-md">
-            {TABS.map((item) => {
+          <div style={{ gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))` }} className="grid h-16 flex-1 gap-1 rounded-2xl border border-border bg-card/90 p-1.5 shadow-lg backdrop-blur-md">
+            {tabs.map((item) => {
               const active =
                 item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
               return (
@@ -155,13 +159,13 @@ function PosShell({ children }: { children: React.ReactNode }) {
                   }`}
                 >
                   <HugeiconsIcon icon={item.icon} size={20} />
-                  <span className="max-w-full truncate">{item.label}</span>
+                  <span className="max-w-full truncate">{item.id === "activity" ? "Activity" : item.label}</span>
                 </Link>
               );
             })}
           </div>
           <AddMenu side="top" align="end" iconSize={24} className="size-16 rounded-2xl shadow-lg" />
-        </nav>}
+        </nav> : null}
       </SidebarInset>
     </SidebarProvider>
     </OpsProvider>

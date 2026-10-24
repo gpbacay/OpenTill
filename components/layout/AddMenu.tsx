@@ -2,6 +2,9 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/contexts/auth-context";
+import { isCashier } from "@/lib/local-auth";
+import { canOpen } from "@/components/layout/Sidebar";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { PlusSignIcon } from "@hugeicons/core-free-icons";
 import { Button } from "@/components/ui/button";
@@ -27,6 +30,8 @@ export function AddMenu({
   align?: "start" | "end";
 }) {
   const router = useRouter();
+  const { user } = useAuth();
+  const cashier = isCashier(user);
   const [addingProduct, setAddingProduct] = useState(false);
   const [generating, setGenerating] = useState(false);
 
@@ -40,9 +45,15 @@ export function AddMenu({
         </DropdownMenuTrigger>
         <DropdownMenuContent side={side} align={align} className="min-w-40">
           <DropdownMenuItem onSelect={() => router.push("/orders")}>New sale</DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => router.push("/expenses")}>Add expense</DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => setAddingProduct(true)}>Add product</DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => setGenerating(true)}>Generate report</DropdownMenuItem>
+          {cashier ? null : (
+            <>
+              <DropdownMenuItem onSelect={() => router.push("/expenses")}>Add expense</DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => setAddingProduct(true)}>Add product</DropdownMenuItem>
+            </>
+          )}
+          {canOpen(user, "/reports") ? (
+            <DropdownMenuItem onSelect={() => setGenerating(true)}>Generate report</DropdownMenuItem>
+          ) : null}
         </DropdownMenuContent>
       </DropdownMenu>
       <ProductDialog target={addingProduct ? "new" : null} onClose={() => setAddingProduct(false)} />

@@ -12,6 +12,7 @@ import { createHash, randomBytes, scrypt as scryptCallback, timingSafeEqual } fr
 import { promisify } from "node:util";
 import { DatabaseService } from "../database/database.service";
 import { cleanImage } from "../common/images";
+import { cashierPages } from "../../lib/cashier-pages";
 
 const scrypt = promisify(scryptCallback);
 const KEY_LENGTH = 64;
@@ -27,6 +28,8 @@ export interface AuthUser {
   role: Role;
   /** The store a cashier is limited to; null for admins. */
   tenantId: string | null;
+  /** The pages a cashier may open besides the Register and Account; null for admins. */
+  pages: string[] | null;
 }
 
 export type Role = "ADMIN" | "CASHIER";
@@ -131,14 +134,17 @@ function publicUser(user: {
   avatar?: string;
   role?: string;
   tenantId?: string | null;
+  cashierPages?: string | null;
 }): AuthUser {
+  const cashier = user.role === "CASHIER";
   return {
     id: user.id,
     name: user.name,
     username: user.email,
     avatar: user.avatar ?? "",
-    role: user.role === "CASHIER" ? "CASHIER" : "ADMIN",
+    role: cashier ? "CASHIER" : "ADMIN",
     tenantId: user.tenantId ?? null,
+    pages: cashier ? cashierPages(user.cashierPages ? JSON.parse(user.cashierPages) : null) : null,
   };
 }
 

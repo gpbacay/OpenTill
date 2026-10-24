@@ -11,6 +11,7 @@ import { randomBytes } from "node:crypto";
 import { DatabaseService } from "../database/database.service";
 import { TenantsService } from "../tenants/tenants.service";
 import { hashPassword, newInvite, requireName, requirePassword, requireUsername, verifyPassword } from "../auth/auth.service";
+import { CASHIER_PAGES, cashierPages } from "../../lib/cashier-pages";
 
 export interface Cashier {
   id: string;
@@ -22,6 +23,8 @@ export interface Cashier {
   hasLink: boolean;
   linkUses: number;
   linkMaxUses: number;
+  /** The pages this cashier may open besides the Register and Account. */
+  pages: string[];
 }
 
 /** What creating or re-linking returns: the cashier plus the sign-in link token (shown once, only its hash is stored). */
@@ -36,6 +39,8 @@ export interface CashierInput {
   tenantId?: string;
   /** How many devices the sign-in link may sign in (1 to 20). */
   maxUses?: number;
+  /** Pages from CASHIER_PAGES this cashier may open. Missing means all of them on create, unchanged on edit. */
+  pages?: string[];
 }
 
 const MAX_DEVICES = 20;
@@ -49,6 +54,14 @@ function requireMaxUses(value: unknown, fallback: number) {
   return value;
 }
 
+/** The stored form of a page list (JSON), after checking every entry is a page cashiers can be given. */
+function requirePages(value: unknown) {
+  if (!Array.isArray(value) || value.some((page) => !CASHIER_PAGES.some((p) => p.href === page))) {
+    throw new BadRequestException("Pick pages from the list.");
+  }
+  return JSON.stringify([...new Set(value as string[])]);
+}
+
 function toCashier(row: {
   id: string;
   name: string;
@@ -57,6 +70,7 @@ function toCashier(row: {
   createdAt: Date;
   inviteHash: string | null;
   inviteMaxUses: number;
+  cashierPages: string | null;
   _count: { inviteDevices: number };
 }): Cashier {
   return {
@@ -68,6 +82,7 @@ function toCashier(row: {
     hasLink: row.inviteHash !== null,
     linkUses: row._count.inviteDevices,
     linkMaxUses: row.inviteMaxUses,
+    pages: cashierPages(row.cashierPages ? JSON.parse(row.cashierPages) : null),
   };
 }
 
@@ -133,6 +148,7 @@ export class CashiersService {
         createdById: adminId,
         inviteHash: invite.hash,
         inviteMaxUses: maxUses,
+        cashierPages: body.pages === undefined ? null : requirePages(body.pages),
       },
       include: withUses,
     });
@@ -178,6 +194,8 @@ export class CashiersService {
       data.passwordHash = await hashPassword(requirePassword(body.password));
     }
     if (body.maxUses !== undefined) data.inviteMaxUses = requireMaxUses(body.maxUses, 1);
+    // Takes effect on the cashier's next request: the API reads their pages fresh each time.
+    if (body.pages !== undefined) data.cashierPages = requirePages(body.pages);
     const row = await this.client.user.update({ where: { id }, data, include: withUses });
     // A new password signs the cashier out of every device.
     if (resetPassword) await this.client.session.deleteMany({ where: { userId: id } });

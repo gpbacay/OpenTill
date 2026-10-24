@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { usePos } from "@/contexts/pos-context";
 import { Cashier } from "@/lib/types";
+import { CASHIER_PAGES } from "@/lib/cashier-pages";
 import { Button } from "@/components/ui/button";
 import { DataTable, type Column } from "@/components/data-table/DataTable";
 import { DetailPanel, Fields, SplitView } from "@/components/data-table/DetailPanel";
@@ -109,7 +110,7 @@ export function CashiersView() {
       <Fields
         rows={[
           ["Store", storeName(selected.tenantId)],
-          ["Access", "Register only"],
+          ["Pages", ["Register", ...CASHIER_PAGES.filter((page) => selected.pages.includes(page.href)).map((page) => page.label)].join(", ")],
           ["Sign-in link", selected.hasLink ? `${selected.linkUses} of ${selected.linkMaxUses} device${selected.linkMaxUses === 1 ? "" : "s"} used` : "None"],
           ["Added", new Date(selected.createdAt).toLocaleDateString()],
         ]}

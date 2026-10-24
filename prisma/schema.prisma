@@ -20,6 +20,7 @@ model User {
   createdById   String? // the admin who created a CASHIER
   inviteHash    String?        @unique // sha256 of the cashier's sign-in link token
   inviteMaxUses Int            @default(1) // how many devices the link may sign in
+  cashierPages  String? // JSON array of the pages a CASHIER may open; null means all of them
   inviteDevices InviteDevice[]
   createdAt     DateTime       @default(now())
   sessions      Session[]
@@ -103,6 +104,7 @@ model Order {
   date            DateTime    @default(now())
   syncedAt        DateTime?
   cashierName     String?
+  cashierId       String? // the CASHIER account that rang it up; null for admins and older sales
   customerName    String?
   discountAmount  Float?
   discountPercent Float?
@@ -110,6 +112,8 @@ model Order {
   changeDue       Float?
   tenant          Tenant      @relation(fields: [tenantId], references: [id])
   items           OrderItem[]
+
+  @@index([cashierId])
 }
 
 model OrderItem {

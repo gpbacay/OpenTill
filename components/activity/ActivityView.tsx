@@ -10,7 +10,10 @@ import {
   Wallet01Icon,
 } from "@hugeicons/core-free-icons";
 import type { ActivityKind } from "@/lib/activity";
+import { useAuth } from "@/contexts/auth-context";
 import { useRecentActivity } from "@/hooks/use-recent-activity";
+import { canOpen } from "@/components/layout/Sidebar";
+import { isCashier } from "@/lib/local-auth";
 import { Button } from "@/components/ui/button";
 import { TablePageSkeleton } from "@/components/loading/PageSkeletons";
 import { ResetFiltersButton } from "@/components/data-table/controls";
@@ -49,6 +52,9 @@ function when(value: string) {
 
 export function ActivityView() {
   const { activities, unreadCount, isUnread, markAllRead, ready } = useRecentActivity();
+  const { user } = useAuth();
+  // Cashiers only get sales; the other kinds come from back-office records they can't read.
+  const filters = isCashier(user) ? FILTERS.filter((option) => ["all", "unread", "sale"].includes(option.value)) : FILTERS;
   const [filter, setFilter] = useState<ActivityFilter>("all");
   const visibleActivities = useMemo(
     () =>
@@ -82,7 +88,7 @@ export function ActivityView() {
         <div className="no-scrollbar min-w-0 flex-1 overflow-x-auto">
           <Tabs value={filter} onValueChange={(value) => setFilter(value as ActivityFilter)} className="w-max">
             <TabsList variant="line">
-              {FILTERS.map((option) => (
+              {filters.map((option) => (
                 <TabsTrigger key={option.value} value={option.value} className="gap-1 px-2.5">
                   {option.label}
                   <span className="text-[10px] tabular-nums text-muted-foreground">{countFor(option.value)}</span>
@@ -107,26 +113,35 @@ export function ActivityView() {
           <ul className="divide-y divide-border/60">
             {visibleActivities.map((item) => {
               const unread = isUnread(item.date);
+              const body = (
+                <>
+                  <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-secondary text-foreground">
+                    <HugeiconsIcon icon={ICONS[item.kind]} size={17} />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-center gap-2">
+                      <span className="truncate text-sm font-medium">{item.title}</span>
+                      {unread ? <span className="size-2 shrink-0 rounded-full bg-primary" aria-label="Unread" /> : null}
+                    </span>
+                    <span className="block truncate text-xs text-muted-foreground">{item.description}</span>
+                  </span>
+                  <time dateTime={item.date} className="shrink-0 text-right text-xs text-muted-foreground">
+                    {when(item.date)}
+                  </time>
+                </>
+              );
               return (
                 <li key={item.id}>
-                  <Link
-                    href={item.href}
-                    className="group flex min-h-16 items-center gap-3 px-3 py-3 transition-colors hover:bg-accent/60 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring sm:px-4"
-                  >
-                    <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-secondary text-foreground">
-                      <HugeiconsIcon icon={ICONS[item.kind]} size={17} />
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="flex items-center gap-2">
-                        <span className="truncate text-sm font-medium">{item.title}</span>
-                        {unread ? <span className="size-2 shrink-0 rounded-full bg-primary" aria-label="Unread" /> : null}
-                      </span>
-                      <span className="block truncate text-xs text-muted-foreground">{item.description}</span>
-                    </span>
-                    <time dateTime={item.date} className="shrink-0 text-right text-xs text-muted-foreground">
-                      {when(item.date)}
-                    </time>
-                  </Link>
+                  {canOpen(user, item.href) ? (
+                    <Link
+                      href={item.href}
+                      className="group flex min-h-16 items-center gap-3 px-3 py-3 transition-colors hover:bg-accent/60 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring sm:px-4"
+                    >
+                      {body}
+                    </Link>
+                  ) : (
+                    <div className="flex min-h-16 items-center gap-3 px-3 py-3 sm:px-4">{body}</div>
+                  )}
                 </li>
               );
             })}

@@ -23,6 +23,8 @@ export interface Cashier {
   hasLink: boolean;
   linkUses: number;
   linkMaxUses: number;
+  /** Pages this cashier may open besides the Register and Account (see lib/cashier-pages). */
+  pages: string[];
 }
 
 export interface Product {

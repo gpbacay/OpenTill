@@ -3,7 +3,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toDateInput } from "@/lib/periods";
-import { REPORT_TYPES, ReportType, periodLabel, rangeLabel, reportHref } from "@/lib/reports";
+import { ReportType, periodLabel, rangeLabel, reportHref, reportTypesFor } from "@/lib/reports";
+import { useAuth } from "@/contexts/auth-context";
+import { isCashier } from "@/lib/local-auth";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -11,6 +13,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 /** Make this month's report on demand. Reports for every month and year are also built automatically. */
 export function GenerateReportDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const router = useRouter();
+  const types = reportTypesFor(isCashier(useAuth().user));
   const [type, setType] = useState<ReportType>("sales");
   const period = toDateInput(new Date().toISOString()).slice(0, 7);
 
@@ -40,7 +43,7 @@ export function GenerateReportDialog({ open, onClose }: { open: boolean; onClose
               onChange={(event) => setType(event.target.value as ReportType)}
               className="h-8 w-full rounded-lg bg-input px-2 text-sm"
             >
-              {REPORT_TYPES.map((t) => (
+              {types.map((t) => (
                 <option key={t.value} value={t.value}>
                   {t.label}
                 </option>

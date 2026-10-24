@@ -6,7 +6,9 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { ArrowUpRight01Icon } from "@hugeicons/core-free-icons";
 import { Area, AreaChart, CartesianGrid, XAxis } from "recharts";
 import { Order, Product, Tenant, stockState } from "@/lib/types";
+import { useAuth } from "@/contexts/auth-context";
 import { useOps } from "@/contexts/ops-context";
+import { isCashier } from "@/lib/local-auth";
 import { DateRange, inRange, presetRange, rangeQuery, toDateInput } from "@/lib/periods";
 import { money } from "@/lib/money";
 import { Button } from "@/components/ui/button";
@@ -14,6 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DateRangeFilter } from "@/components/data-table/DateRangeFilter";
 import { FilterBar, ResetFiltersButton } from "@/components/data-table/controls";
 import { AddMenu } from "@/components/layout/AddMenu";
+import { canOpen } from "@/components/layout/Sidebar";
 import { DashboardPageSkeleton } from "@/components/loading/PageSkeletons";
 import {
   ChartContainer,
@@ -35,7 +38,7 @@ const chartConfig = {
 
 const MAX_DAILY_POINTS = 92;
 
-/** A dashboard card whose corner arrow jumps to the page behind it. */
+/** A dashboard card whose corner arrow jumps to the page behind it (when this user can open that page). */
 function DashCard({
   title,
   href,
@@ -50,13 +53,16 @@ function DashCard({
   className?: string;
   children: ReactNode;
 }) {
+  const { user } = useAuth();
   return (
     <Card className={`relative border-0 shadow-none ${className ?? ""}`}>
-      <Button asChild size="icon-sm" variant="ghost" className="absolute top-3 right-3 rounded-full text-muted-foreground hover:bg-secondary hover:text-foreground">
-        <Link href={href} aria-label={open} title={open}>
-          <HugeiconsIcon icon={ArrowUpRight01Icon} size={16} />
-        </Link>
-      </Button>
+      {canOpen(user, href) ? (
+        <Button asChild size="icon-sm" variant="ghost" className="absolute top-3 right-3 rounded-full text-muted-foreground hover:bg-secondary hover:text-foreground">
+          <Link href={href} aria-label={open} title={open}>
+            <HugeiconsIcon icon={ArrowUpRight01Icon} size={16} />
+          </Link>
+        </Button>
+      ) : null}
       <CardHeader className="pr-12">
         <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
       </CardHeader>
@@ -74,6 +80,11 @@ export default function BentoDashboard({
   activeTenant,
 }: BentoDashboardProps) {
   const { expenses, suppliers, movements, ready } = useOps();
+  const { user } = useAuth();
+  // Cashiers get a sales-only dashboard: no expenses, profit, stock value or suppliers.
+  const cashier = isCashier(user);
+  const inventoryOpen = canOpen(user, "/inventory");
+  const salesOpen = canOpen(user, "/records");
   const [range, setRange] = useState<DateRange>(() => presetRange("month"));
   const currency = activeTenant.currency;
   const query = rangeQuery(range);
@@ -90,6 +101,7 @@ export default function BentoDashboard({
   const spent = useMemo(() => expenses.filter((e) => inRange(e.date, range)), [expenses, range]);
 
   const salesTotal = sum(sales, (o) => o.total);
+  const itemsSold = sum(sales, (o) => sum(o.items ?? [], (i) => i.quantity));
   const expenseTotal = sum(spent, (e) => e.amount);
   const left = salesTotal - expenseTotal;
   const stockValue = sum(catalog, (p) => Math.max(0, p.stock) * (p.costPrice ?? 0));
@@ -170,24 +182,43 @@ export default function BentoDashboard({
             {sales.length > 0 ? ` · ${money(currency, salesTotal / sales.length)} average` : ""}
           </p>
         </DashCard>
-        <DashCard title="Expenses" href={`/expenses?${query}`} open="Open expenses for this date range">
-          <p className="text-2xl font-bold tabular-nums">{money(currency, expenseTotal)}</p>
-          <p className="text-xs text-muted-foreground">
-            {spent.length} {spent.length === 1 ? "entry" : "entries"}
-          </p>
-        </DashCard>
-        <DashCard title="Left after expenses" href={`/expenses?${query}`} open="Open expenses for this date range">
-          <p className={`text-2xl font-bold tabular-nums ${left < 0 ? "text-destructive" : ""}`}>{money(currency, left)}</p>
-          <p className="text-xs text-muted-foreground">Sales minus expenses</p>
-        </DashCard>
-        <DashCard title="Stock value now" href="/inventory" open="Open inventory">
-          <p className="text-2xl font-bold tabular-nums">{money(currency, stockValue)}</p>
-          <p className="text-xs text-muted-foreground">{catalog.length} products</p>
-        </DashCard>
+        {cashier ? (
+          <>
+            <DashCard title="Items sold" href={`/records?${query}`} open="Open sales for this date range">
+              <p className="text-2xl font-bold tabular-nums">{itemsSold}</p>
+              <p className="text-xs text-muted-foreground">units across {sales.length} {sales.length === 1 ? "order" : "orders"}</p>
+            </DashCard>
+            <DashCard title="Discounts" href={`/records?${query}`} open="Open sales for this date range">
+              <p className="text-2xl font-bold tabular-nums">{money(currency, sum(sales, (o) => o.discountAmount ?? 0))}</p>
+              <p className="text-xs text-muted-foreground">given in this date range</p>
+            </DashCard>
+            <DashCard title="Products" href="/orders" open="Open the register">
+              <p className="text-2xl font-bold tabular-nums">{catalog.length}</p>
+              <p className="text-xs text-muted-foreground">{lowStockAll.length} running low</p>
+            </DashCard>
+          </>
+        ) : (
+          <>
+            <DashCard title="Expenses" href={`/expenses?${query}`} open="Open expenses for this date range">
+              <p className="text-2xl font-bold tabular-nums">{money(currency, expenseTotal)}</p>
+              <p className="text-xs text-muted-foreground">
+                {spent.length} {spent.length === 1 ? "entry" : "entries"}
+              </p>
+            </DashCard>
+            <DashCard title="Left after expenses" href={`/expenses?${query}`} open="Open expenses for this date range">
+              <p className={`text-2xl font-bold tabular-nums ${left < 0 ? "text-destructive" : ""}`}>{money(currency, left)}</p>
+              <p className="text-xs text-muted-foreground">Sales minus expenses</p>
+            </DashCard>
+            <DashCard title="Stock value now" href="/inventory" open="Open inventory">
+              <p className="text-2xl font-bold tabular-nums">{money(currency, stockValue)}</p>
+              <p className="text-xs text-muted-foreground">{catalog.length} products</p>
+            </DashCard>
+          </>
+        )}
       </div>
 
       <div className="grid gap-3 lg:grid-cols-3">
-        <DashCard title="Sales and expenses" href={`/records?${query}`} open="Open sales for this date range" className="lg:col-span-2">
+        <DashCard title={cashier ? "Sales" : "Sales and expenses"} href={`/records?${query}`} open="Open sales for this date range" className="lg:col-span-2">
           {trend.length === 0 || (salesTotal === 0 && expenseTotal === 0) ? (
             <p className="py-10 text-sm text-muted-foreground">Nothing recorded in this date range.</p>
           ) : (
@@ -197,7 +228,9 @@ export default function BentoDashboard({
                 <XAxis dataKey="label" tickLine={false} axisLine={false} minTickGap={24} />
                 <ChartTooltip content={<ChartTooltipContent />} />
                 <Area dataKey="sales" type="monotone" fill="var(--color-sales)" stroke="var(--color-sales)" fillOpacity={0.2} />
-                <Area dataKey="expenses" type="monotone" fill="var(--color-expenses)" stroke="var(--color-expenses)" fillOpacity={0.12} />
+                {cashier ? null : (
+                  <Area dataKey="expenses" type="monotone" fill="var(--color-expenses)" stroke="var(--color-expenses)" fillOpacity={0.12} />
+                )}
               </AreaChart>
             </ChartContainer>
           )}
@@ -214,15 +247,24 @@ export default function BentoDashboard({
             <ul className="space-y-1">
               {lowStock.map((product) => (
                 <li key={product.id}>
-                  <Link
-                    href="/inventory?status=restock"
-                    className="-mx-2 flex items-baseline justify-between gap-3 rounded-md px-2 py-1 hover:bg-accent"
-                  >
-                    <span className="truncate text-sm">{product.name}</span>
-                    <span className="shrink-0 text-sm tabular-nums text-amber-400">
-                      {product.stock <= 0 ? "Out" : `${product.stock} left`}
+                  {inventoryOpen ? (
+                    <Link
+                      href="/inventory?status=restock"
+                      className="-mx-2 flex items-baseline justify-between gap-3 rounded-md px-2 py-1 hover:bg-accent"
+                    >
+                      <span className="truncate text-sm">{product.name}</span>
+                      <span className="shrink-0 text-sm tabular-nums text-amber-400">
+                        {product.stock <= 0 ? "Out" : `${product.stock} left`}
+                      </span>
+                    </Link>
+                  ) : (
+                    <span className="flex items-baseline justify-between gap-3 py-1">
+                      <span className="truncate text-sm">{product.name}</span>
+                      <span className="shrink-0 text-sm tabular-nums text-amber-400">
+                        {product.stock <= 0 ? "Out" : `${product.stock} left`}
+                      </span>
                     </span>
-                  </Link>
+                  )}
                 </li>
               ))}
             </ul>
@@ -231,7 +273,7 @@ export default function BentoDashboard({
       </div>
 
       <div className="grid gap-3 lg:grid-cols-3">
-        <DashCard title="Recent sales" href={`/records?${query}`} open="Open sales for this date range" className="lg:col-span-2">
+        <DashCard title="Recent sales" href={`/records?${query}`} open="Open sales for this date range" className={cashier ? "lg:col-span-3" : "lg:col-span-2"}>
           {recent.length === 0 ? (
             <p className="text-sm text-muted-foreground">
               No sales in this date range.{" "}
@@ -241,26 +283,37 @@ export default function BentoDashboard({
             </p>
           ) : (
               <ul className="space-y-1">
-                {recent.map((order) => (
-                  <li key={order.id}>
-                    <Link
-                      href={`/records?${query}&sale=${encodeURIComponent(order.id)}`}
-                      className="-mx-2 flex items-center justify-between rounded-md px-2 py-2 hover:bg-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring"
-                      aria-label={`Open sale ${order.id.slice(-8)}`}
-                    >
+                {recent.map((order) => {
+                  const body = (
+                    <>
                       <div>
                         <p className="text-sm">{order.customerName || "Walk-in"}</p>
                         <p className="text-xs text-muted-foreground">{new Date(order.date).toLocaleString()}</p>
                       </div>
                       <p className="text-sm font-medium tabular-nums">{money(currency, order.total)}</p>
-                    </Link>
-                  </li>
-                ))}
+                    </>
+                  );
+                  return (
+                    <li key={order.id}>
+                      {salesOpen ? (
+                        <Link
+                          href={`/records?${query}&sale=${encodeURIComponent(order.id)}`}
+                          className="-mx-2 flex items-center justify-between rounded-md px-2 py-2 hover:bg-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring"
+                          aria-label={`Open sale ${order.id.slice(-8)}`}
+                        >
+                          {body}
+                        </Link>
+                      ) : (
+                        <div className="flex items-center justify-between py-2">{body}</div>
+                      )}
+                    </li>
+                  );
+                })}
               </ul>
           )}
         </DashCard>
 
-        <DashCard title="Suppliers" href="/suppliers" open="Open suppliers">
+        {cashier ? null : <DashCard title="Suppliers" href="/suppliers" open="Open suppliers">
           <p className="text-2xl font-bold tabular-nums">{activeSuppliers.length}</p>
           <p className="mb-3 text-xs text-muted-foreground">active suppliers</p>
           {deliveries.length === 0 ? (
@@ -275,7 +328,7 @@ export default function BentoDashboard({
               ))}
             </ul>
           )}
-        </DashCard>
+        </DashCard>}
       </div>
     </div>
   );

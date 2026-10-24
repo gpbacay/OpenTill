@@ -76,6 +76,7 @@ async function main() {
   assert(r.json.length === 1 && r.json[0].id === "t1", "cashier sees only their store");
   r = await call(cashier, "GET", "/api/products");
   assert(r.status === 200 && r.json.length === 1, "cashier reads products");
+  assert(!("costPrice" in r.json[0]) && !("supplierId" in r.json[0]), "cashier doesn't see cost price or supplier");
 
   // categories: per store, renaming one renames it on the store's products
   r = await call(admin, "PUT", "/api/categories/c1", { tenantId: "t1", name: "  Drinks  " });
@@ -138,7 +139,26 @@ async function main() {
   assert(r.status === 201 || r.status === 200, "cashier rings a sale");
   r = await call(admin, "GET", "/api/orders");
   assert(r.json.length === 1 && r.json[0].cashierName === "Cathy", "admin sees the cashier's order");
-  for (const [m, p] of [["GET", "/api/orders"], ["GET", "/api/cashiers"], ["POST", "/api/cashiers"], ["PUT", "/api/tenants/t1"], ["DELETE", "/api/tenants/t1"], ["PUT", "/api/products/p1"], ["DELETE", "/api/products/p1"], ["GET", "/api/suppliers"], ["GET", "/api/expenses"], ["PUT", "/api/suppliers/s1"], ["GET", "/api/stock-movements"]] as const) {
+  r = await call(admin, "POST", "/api/orders/sync", { orders: [{ ...order, id: "o-admin", cashierName: "Cathy" }], items: [] });
+  assert(r.status === 201 || r.status === 200, "admin rings a sale (even under the cashier's name)");
+  r = await call(cashier, "GET", "/api/orders");
+  assert(r.status === 200 && r.json.length === 1 && r.json[0].id === "o1", "cashier sees only the sales they rang up");
+  r = await call(admin, "GET", "/api/orders");
+  assert(r.json.length === 2, "admin sees every sale");
+  r = await call(admin, "GET", "/api/cashiers");
+  assert(r.json[0].pages.includes("/records") && r.json[0].pages.length === 6, "cashier starts with every page");
+  r = await call(admin, "PATCH", "/api/cashiers/" + cid, { pages: ["/settings"] });
+  assert(r.status === 400, "admin can't give a cashier a back-office page");
+  r = await call(admin, "PATCH", "/api/cashiers/" + cid, { pages: ["/help"] });
+  assert(r.status === 200 && r.json.pages.join() === "/help", "admin turns off the cashier's sales pages");
+  r = await call(cashier, "GET", "/api/auth/me");
+  assert(r.json.pages.join() === "/help", "the cashier's session carries their pages");
+  r = await call(cashier, "GET", "/api/orders");
+  assert(r.status === 403, "no sales pages, no sales data");
+  r = await call(admin, "PATCH", "/api/cashiers/" + cid, { pages: ["/", "/records"] });
+  r = await call(cashier, "GET", "/api/orders");
+  assert(r.status === 200, "turning a sales page back on restores it");
+  for (const [m, p] of [["GET", "/api/suppliers"], ["GET", "/api/expenses"], ["GET", "/api/stock-movements"], ["GET", "/api/columns"], ["GET", "/api/cashiers"], ["POST", "/api/cashiers"], ["PUT", "/api/tenants/t1"], ["DELETE", "/api/tenants/t1"], ["PUT", "/api/products/p1"], ["DELETE", "/api/products/p1"], ["PUT", "/api/expenses/e1"], ["PUT", "/api/suppliers/s1"], ["PUT", "/api/stock-movements/m1"], ["PUT", "/api/columns/x1"]] as const) {
     r = await call(cashier, m, p, {});
     assert(r.status === 403, `cashier blocked: ${m} ${p}`);
   }

@@ -3,11 +3,12 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { useAuth } from "@/contexts/auth-context";
 import { useOps } from "@/contexts/ops-context";
+import { isCashier } from "@/lib/local-auth";
 import { usePos } from "@/contexts/pos-context";
 import { presetRange, rangeFromParams, toDateInput } from "@/lib/periods";
 import {
-  REPORT_TYPES,
   Report,
   allReports,
   buildReport,
@@ -18,6 +19,7 @@ import {
   rangeLabel,
   reportHref,
   reportKey,
+  reportTypesFor,
   typeLabel,
 } from "@/lib/reports";
 import { Badge } from "@/components/ui/badge";
@@ -31,7 +33,6 @@ import { TablePageSkeleton } from "@/components/loading/PageSkeletons";
 import { ReportActions } from "./ReportDocument";
 import { GenerateReportDialog } from "./GenerateReportDialog";
 
-const TYPES = [{ value: "all", label: "All reports" }, ...REPORT_TYPES];
 const SPANS = [
   { value: "all", label: "Monthly and yearly" },
   { value: "month", label: "Monthly" },
@@ -42,6 +43,7 @@ const SPANS = [
 export function useReportData() {
   const { activeTenant, tenantSyncedOrders } = usePos();
   const { expenses, movements, suppliers, ready } = useOps();
+  const types = reportTypesFor(isCashier(useAuth().user));
   const data = useMemo(
     () => ({ orders: tenantSyncedOrders, expenses, movements, suppliers }),
     [tenantSyncedOrders, expenses, movements, suppliers]
@@ -50,12 +52,12 @@ export function useReportData() {
     () => ({ name: activeTenant?.name ?? "", currency: activeTenant?.currency ?? "PHP" }),
     [activeTenant?.name, activeTenant?.currency]
   );
-  return { tenant: activeTenant, data, store, ready: ready.expenses && ready.movements && ready.suppliers };
+  return { tenant: activeTenant, data, store, types, ready: ready.expenses && ready.movements && ready.suppliers };
 }
 
 
 export function ReportsView() {
-  const { tenant, data, store, ready } = useReportData();
+  const { tenant, data, store, types, ready } = useReportData();
   const params = useSearchParams();
   const [query, setQuery] = useState("");
   const [type, setType] = useState(() => params.get("type") ?? "all");
@@ -65,7 +67,7 @@ export function ReportsView() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
 
-  const reports = useMemo(() => allReports(data, store), [data, store]);
+  const reports = useMemo(() => allReports(data, store, types), [data, store, types]);
   const rows = useMemo(
     () =>
       reports.filter((r) => {
@@ -80,9 +82,11 @@ export function ReportsView() {
       }),
     [reports, type, span, range, query]
   );
+  // Admins see this month's profit and loss; cashiers see this month's sales.
+  const headline = types.some((t) => t.value === "profit") ? "profit" : "sales";
   const thisMonth = useMemo(
-    () => buildReport("profit", toDateInput(new Date().toISOString()).slice(0, 7), data, store),
-    [data, store]
+    () => buildReport(headline, toDateInput(new Date().toISOString()).slice(0, 7), data, store),
+    [headline, data, store]
   );
 
   const columns: Column<Report>[] = [
@@ -142,13 +146,13 @@ export function ReportsView() {
     <div className="flex h-full min-h-0 flex-col">
       <SplitView panel={panel}>
         <div className="hidden shrink-0 grid-cols-3 gap-3 sm:grid">
-          {thisMonth.summary.map((s) => (
+          {thisMonth.summary.slice(0, 3).map((s) => (
             <StatTile key={s.label} label={s.label} value={formatValue(s.value, s.kind, store.currency)} hint="This month" />
           ))}
         </div>
         <FilterBar active={filtersActive} actions={<Button onClick={() => setGenerating(true)}>Generate report</Button>}>
           <SearchBox value={query} onChange={setQuery} placeholder="Search reports…" />
-          <FilterSelect label="Report type" value={type} onChange={setType} options={TYPES} />
+          <FilterSelect label="Report type" value={type} onChange={setType} options={[{ value: "all", label: "All reports" }, ...types]} />
           <FilterSelect label="Period" value={span} onChange={setSpan} options={SPANS} />
           <DateRangeFilter value={range} onChange={setRange} />
           <ViewBySelect value={view} onChange={setView} />
@@ -174,7 +178,7 @@ export function ReportsView() {
             />
           )}
           resetKey={`${query}|${type}|${span}|${range.from}|${range.to}`}
-          empty={reports.length === 0 ? "Reports appear here once you have sales, expenses or restocks." : "Nothing matches those filters."}
+          empty={reports.length === 0 ? `Reports appear here once you have ${headline === "profit" ? "sales, expenses or restocks" : "sales"}.` : "Nothing matches those filters."}
         />
       </SplitView>
     </div>

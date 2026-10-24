@@ -3,7 +3,7 @@
 import { Suspense, useMemo } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { PERIOD, REPORT_TYPES, ReportType, buildReport } from "@/lib/reports";
+import { PERIOD, ReportType, buildReport } from "@/lib/reports";
 import { useReportData } from "@/components/reports/ReportsView";
 import { ReportActions, ReportDocument } from "@/components/reports/ReportDocument";
 import { Toolbar } from "@/components/data-table/controls";
@@ -13,8 +13,8 @@ function ReportPage() {
   const params = useSearchParams();
   const type = params.get("type") as ReportType | null;
   const period = params.get("period") ?? "";
-  const { tenant, data, store, ready } = useReportData();
-  const valid = REPORT_TYPES.some((t) => t.value === type) && PERIOD.test(period);
+  const { tenant, data, store, types, ready } = useReportData();
+  const valid = types.some((t) => t.value === type) && PERIOD.test(period);
   const report = useMemo(() => (valid && type ? buildReport(type, period, data, store) : null), [valid, type, period, data, store]);
 
   if (!tenant) return null;

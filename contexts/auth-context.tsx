@@ -66,6 +66,7 @@ function asUser(value: LocalUser): LocalUser {
     avatar: value.avatar ?? "",
     role: value.role ?? "ADMIN",
     tenantId: value.tenantId ?? null,
+    pages: value.pages ?? null,
   };
 }
 

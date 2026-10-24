@@ -6,7 +6,8 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { ArrowLeft01Icon, ArrowRight01Icon } from "@hugeicons/core-free-icons";
 import { usePos } from "@/contexts/pos-context";
 import { Button } from "@/components/ui/button";
-import { titleFromPath } from "@/components/layout/Sidebar";
+import { canOpen, titleFromPath } from "@/components/layout/Sidebar";
+import { useAuth } from "@/contexts/auth-context";
 
 interface Crumb {
   label: string;
@@ -16,6 +17,7 @@ interface Crumb {
 export function Breadcrumbs() {
   const pathname = usePathname();
   const { products } = usePos();
+  const { user } = useAuth();
   const parts = pathname.split("/").filter(Boolean);
   const productRoute = parts[0] === "inventory" && parts[1] === "product" && parts[2];
   let crumbs: Crumb[];
@@ -43,6 +45,8 @@ export function Breadcrumbs() {
     ];
   }
 
+  // A cashier without the Dashboard (say) gets that crumb as plain text, not a link.
+  crumbs = crumbs.map((crumb) => (crumb.href && !canOpen(user, crumb.href) ? { label: crumb.label } : crumb));
   const current = crumbs[crumbs.length - 1];
   const parent = crumbs.length > 1 ? crumbs[crumbs.length - 2] : null;
 

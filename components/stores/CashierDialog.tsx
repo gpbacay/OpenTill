@@ -8,6 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { CASHIER_PAGES, cashierPages } from "@/lib/cashier-pages";
 import { FieldError, check, clearError, invalid } from "@/components/FieldError";
 import { PasswordInput } from "@/components/PasswordInput";
 import { collect, numberError, numericInput, passwordError, required, usernameError, type FieldErrors } from "@/lib/validation";
@@ -30,6 +32,7 @@ export function CashierDialog({
   const [currentPassword, setCurrentPassword] = useState("");
   const [tenantId, setTenantId] = useState("");
   const [maxUses, setMaxUses] = useState("1");
+  const [pages, setPages] = useState<string[]>([]);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [serverError, setServerError] = useState("");
   const [pending, setPending] = useState(false);
@@ -42,6 +45,7 @@ export function CashierDialog({
     setCurrentPassword("");
     setUsername(editing?.username ?? "");
     setMaxUses(String(editing?.linkMaxUses ?? 1));
+    setPages(cashierPages(editing?.pages));
     setTenantId(editing?.tenantId ?? activeTenant?.id ?? tenants[0]?.id ?? "");
   }, [target]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -66,6 +70,7 @@ export function CashierDialog({
       username: username.trim().toLowerCase(),
       tenantId,
       maxUses: Number(maxUses),
+      pages,
       ...(password ? { password, currentPassword } : {}),
     });
     setPending(false);
@@ -80,7 +85,7 @@ export function CashierDialog({
           <DialogTitle>{editing ? "Edit cashier" : "Add cashier"}</DialogTitle>
         </DialogHeader>
         <p className="text-sm text-muted-foreground">
-          Cashiers can only use the Register of their store. You set their password; they can't change it.
+          Cashiers use the Register of their store and only see the sales they ring up. You set their password; they can't change it.
         </p>
         <form onSubmit={submit} noValidate className="space-y-3">
           <div className="space-y-1">
@@ -171,6 +176,24 @@ export function CashierDialog({
               1 means one phone or computer: the first one to open the link. It can use it again, but other devices can't.
             </p>
           </div>
+          <fieldset className="space-y-2">
+            <legend className="text-sm font-medium">Pages</legend>
+            <p className="text-xs text-muted-foreground">
+              The Register and their Account are always on. Costs, expenses, profit, suppliers and settings are never shown to cashiers.
+            </p>
+            <div className="divide-y divide-border rounded-lg border border-border">
+              {CASHIER_PAGES.map((page) => (
+                <label key={page.href} htmlFor={`cashier-page-${page.href}`} className="flex cursor-pointer items-center justify-between gap-3 px-3 py-2 text-sm">
+                  {page.label}
+                  <Switch
+                    id={`cashier-page-${page.href}`}
+                    checked={pages.includes(page.href)}
+                    onCheckedChange={(on) => setPages((current) => (on ? [...current, page.href] : current.filter((p) => p !== page.href)))}
+                  />
+                </label>
+              ))}
+            </div>
+          </fieldset>
           {serverError ? <p role="alert" className="text-sm text-destructive">{serverError}</p> : null}
           <DialogFooter>
             <Button type="submit" disabled={pending}>

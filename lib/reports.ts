@@ -13,6 +13,10 @@ export const REPORT_TYPES: { value: ReportType; label: string }[] = [
   { value: "restocks", label: "Restocks" },
 ];
 
+/** Report types for a cashier: sales only, no costs, expenses or profit. */
+export const reportTypesFor = (cashier: boolean) =>
+  cashier ? REPORT_TYPES.filter((t) => t.value === "sales" || t.value === "products") : REPORT_TYPES;
+
 type Kind = "text" | "number" | "money";
 
 /**
@@ -228,9 +232,9 @@ function periodsWithRecords(type: ReportType, data: ReportData) {
 }
 
 /** One report per type for every month and year with records, newest first. */
-export function allReports(data: ReportData, store: { name: string; currency: string }) {
+export function allReports(data: ReportData, store: { name: string; currency: string }, types = REPORT_TYPES) {
   // ponytail: builds every report up front (types x periods x records); fine for a shop's history, build lazily if it gets slow.
-  return REPORT_TYPES.flatMap((t) => periodsWithRecords(t.value, data).map((period) => buildReport(t.value, period, data, store))).sort(
+  return types.flatMap((t) => periodsWithRecords(t.value, data).map((period) => buildReport(t.value, period, data, store))).sort(
     (a, b) =>
       periodBounds(b.period).to.localeCompare(periodBounds(a.period).to) ||
       a.period.length - b.period.length ||

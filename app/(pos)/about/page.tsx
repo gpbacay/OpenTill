@@ -4,6 +4,9 @@ import Link from "next/link";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { CloudIcon, Database01Icon, Store02Icon, Wifi01Icon } from "@hugeicons/core-free-icons";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/contexts/auth-context";
+import { isCashier } from "@/lib/local-auth";
+import { canOpen } from "@/components/layout/Sidebar";
 import pkg from "@/package.json";
 
 const POINTS = [
@@ -14,6 +17,7 @@ const POINTS = [
 ];
 
 export default function AboutPage() {
+  const { user } = useAuth();
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto py-2">
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
@@ -44,12 +48,16 @@ export default function AboutPage() {
             <p className="text-sm text-muted-foreground">Guides and answers to common questions.</p>
           </div>
           <div className="flex gap-2">
-            <Button asChild variant="secondary">
-              <Link href="/settings">Settings</Link>
-            </Button>
-            <Button asChild>
-              <Link href="/help">Help center</Link>
-            </Button>
+            {isCashier(user) ? null : (
+              <Button asChild variant="secondary">
+                <Link href="/settings">Settings</Link>
+              </Button>
+            )}
+            {canOpen(user, "/help") ? (
+              <Button asChild>
+                <Link href="/help">Help center</Link>
+              </Button>
+            ) : null}
           </div>
         </section>
       </div>

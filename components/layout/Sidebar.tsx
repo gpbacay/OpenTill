@@ -23,7 +23,8 @@ import {
 } from "@hugeicons/core-free-icons";
 import { useAuth } from "@/contexts/auth-context";
 import { usePos } from "@/contexts/pos-context";
-import { isCashier } from "@/lib/local-auth";
+import { isCashier, type LocalUser } from "@/lib/local-auth";
+import { ALWAYS_OPEN, cashierPages } from "@/lib/cashier-pages";
 import { useRealtimeStatus } from "@/lib/realtime";
 import { useRecentActivity } from "@/hooks/use-recent-activity";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -66,8 +67,12 @@ export const MENU_ITEMS = [
   { id: "about", href: "/about", label: "About", icon: InformationCircleIcon, primary: false },
 ] as const;
 
-/** Cashier accounts only get the register (plus their own account page). */
-export const CASHIER_PATHS = ["/orders", "/account"];
+/** Whether `user` may open `href` (query string ignored). Cashiers get the Register, Account and the pages their admin turned on. */
+export function canOpen(user: LocalUser | null | undefined, href: string) {
+  if (!isCashier(user)) return true;
+  const path = href.split("?")[0];
+  return [...ALWAYS_OPEN, ...cashierPages(user?.pages)].some((p) => path === p || path.startsWith(`${p}/`));
+}
 
 export function sectionFromPath(pathname: string) {
   const match = MENU_ITEMS.find((item) => item.href !== "/" && pathname.startsWith(item.href));
@@ -184,7 +189,7 @@ export default function AppSidebar() {
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
-              {MENU_ITEMS.filter((item) => !isCashier(user) || CASHIER_PATHS.includes(item.href)).map((item) => {
+              {MENU_ITEMS.filter((item) => canOpen(user, item.href)).map((item) => {
                 const active = activeSection === item.id;
                 return (
                   <SidebarMenuItem key={item.id}>

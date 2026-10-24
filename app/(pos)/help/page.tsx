@@ -5,6 +5,8 @@ import Link from "next/link";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { ArrowDown01Icon } from "@hugeicons/core-free-icons";
 import { SearchBox, matches } from "@/components/data-table/controls";
+import { canOpen } from "@/components/layout/Sidebar";
+import { useAuth } from "@/contexts/auth-context";
 
 interface Article {
   q: string;
@@ -62,13 +64,15 @@ const TOPICS: { title: string; articles: Article[] }[] = [
     title: "Offline, sync and account",
     articles: [
       { q: "Does OpenTill work without internet?", a: "Yes. Everything is saved on this device first and synced when the connection returns. Settings shows the connection and anything still waiting to be sent.", href: "/settings" },
+      { q: "I'm a cashier. Why don't I see Inventory, Expenses or Settings?", a: "Cashier accounts run the register and see the pages their admin turned on for them, such as the Dashboard, Sales, Reports and Recent activity, showing the sales they rang up. Product costs, stock changes, suppliers, expenses, profit and settings stay with your admin, so ask them if you need another page." },
       { q: "How do I change my name, photo or password?", a: "Open Account from the menu. Your photo is saved as soon as you pick it.", href: "/account" },
-      { q: "Can I swipe between pages on my phone?", a: "Yes. Swipe left or right to move between Dashboard, Suppliers, Inventory and Sales." },
+      { q: "Can I swipe between pages on my phone?", a: "Yes. Swipe left or right to move between the pages in the bottom bar: Dashboard, Suppliers, Inventory and Sales (for cashiers: Dashboard, Sales, Reports and Activity)." },
     ],
   },
 ];
 
 export default function HelpPage() {
+  const { user } = useAuth();
   const [query, setQuery] = useState("");
   const topics = TOPICS.map((topic) => ({
     ...topic,
@@ -89,10 +93,15 @@ export default function HelpPage() {
 
         {topics.length === 0 ? (
           <p className="py-12 text-center text-sm text-muted-foreground">
-            Nothing matches “{query.trim()}”. Try another word, or see{" "}
-            <Link href="/about" className="text-foreground underline-offset-4 hover:underline">
-              About OpenTill
-            </Link>
+            Nothing matches “{query.trim()}”. Try another word
+            {canOpen(user, "/about") ? (
+              <>
+                , or see{" "}
+                <Link href="/about" className="text-foreground underline-offset-4 hover:underline">
+                  About OpenTill
+                </Link>
+              </>
+            ) : null}
             .
           </p>
         ) : (
@@ -109,7 +118,7 @@ export default function HelpPage() {
                     </summary>
                     <div className="space-y-2 px-4 pb-4 text-sm text-muted-foreground">
                       <p>{article.a}</p>
-                      {article.href ? (
+                      {article.href && canOpen(user, article.href) ? (
                         <Link href={article.href} className="inline-block font-medium text-foreground underline-offset-4 hover:underline">
                           Go there →
                         </Link>
