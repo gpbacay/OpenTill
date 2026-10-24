@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { Cashier } from "@/lib/types";
+import { isOnline } from "@/lib/offline";
 
 export interface CashierInput {
   name?: string;
@@ -39,7 +40,7 @@ export function useCashiers() {
       setCashiers(await res.json());
       setError("");
     } catch (err) {
-      setError(navigator.onLine && err instanceof Error ? err.message : "You're offline. Cashier accounts need a connection.");
+      setError(isOnline() && err instanceof Error ? err.message : "You're offline. Cashier accounts need a connection.");
       setCashiers((prev) => prev ?? []);
     }
   }, []);

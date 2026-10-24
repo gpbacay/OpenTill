@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import { isOnline } from "@/lib/offline";
 
 /**
  * One shared Server-Sent Events stream (/api/events). Subscribers re-fetch when a topic changes.
@@ -30,7 +31,7 @@ function runAll() {
 
 /** No live stream (serverless hosting): ask the server which topics changed since last time and refresh only those. */
 async function poll() {
-  if (connected || !navigator.onLine || document.visibilityState !== "visible") return;
+  if (connected || !isOnline() || document.visibilityState !== "visible") return;
   polls += 1;
   if (polls % FULL_REFRESH_EVERY === 0) return runAll();
   try {
@@ -92,7 +93,7 @@ export function subscribe(topics: string[], fn: () => void) {
 }
 
 function status(): RealtimeStatus {
-  if (typeof navigator !== "undefined" && !navigator.onLine) return "offline";
+  if (!isOnline()) return "offline";
   return connected ? "live" : "polling";
 }
 

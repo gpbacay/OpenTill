@@ -19,7 +19,9 @@ export const metadata: Metadata = {
       { url: "/icon-light.png", type: "image/png", media: "(prefers-color-scheme: light)" },
       { url: "/icon-dark.png", type: "image/png", media: "(prefers-color-scheme: dark)" },
     ],
+    apple: "/icon-192.png",
   },
+  appleWebApp: { capable: true, title: "OpenTill" },
 };
 
 // "resizes-content": when a phone keyboard opens, the page shrinks to the space above it (Chrome, Android),

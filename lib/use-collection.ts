@@ -2,28 +2,13 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { subscribe } from "@/lib/realtime";
+import { isOnline } from "@/lib/offline";
+import { load, save } from "@/lib/device-store";
 
 type Row = { id: string; tenantId: string };
 type Outbox = { upserts: string[]; deletes: string[] };
 
 const key = (userId: string, name: string, part: string) => `opentill_${userId}_${name}_${part}`;
-
-function read<T>(storageKey: string, fallback: T): T {
-  try {
-    const raw = localStorage.getItem(storageKey);
-    return raw === null ? fallback : (JSON.parse(raw) as T);
-  } catch {
-    return fallback;
-  }
-}
-
-function write(storageKey: string, value: unknown) {
-  try {
-    localStorage.setItem(storageKey, JSON.stringify(value));
-  } catch {
-    /* storage full or blocked: the in-memory copy still works this session */
-  }
-}
 
 /**
  * A tenant-scoped list that works offline. Reads come from a local copy (instant, survives the API being down);
@@ -45,7 +30,7 @@ export function useCollection<T extends Row>(userId: string, name: string, path:
     (next: T[]) => {
       itemsRef.current = next;
       setItems(next);
-      write(key(userId, name, "items"), next);
+      save(key(userId, name, "items"), next);
     },
     [userId, name]
   );
@@ -54,13 +39,13 @@ export function useCollection<T extends Row>(userId: string, name: string, path:
     (box: Outbox) => {
       outboxRef.current = box;
       setPending(box.upserts.length + box.deletes.length);
-      write(key(userId, name, "outbox"), box);
+      save(key(userId, name, "outbox"), box);
     },
     [userId, name]
   );
 
   flushRef.current = async () => {
-    if (!enabled || !navigator.onLine) return;
+    if (!enabled || !isOnline()) return;
     if (busyRef.current) {
       rerunRef.current = true;
       return;
@@ -116,17 +101,25 @@ export function useCollection<T extends Row>(userId: string, name: string, path:
   };
 
   useEffect(() => {
-    itemsRef.current = read<T[]>(key(userId, name, "items"), []);
-    setItems(itemsRef.current);
-    const box = read<Outbox>(key(userId, name, "outbox"), { upserts: [], deletes: [] });
-    outboxRef.current = box;
-    setPending(box.upserts.length + box.deletes.length);
-    setReady(true);
+    let cancelled = false;
+    let unsubscribe = () => {};
     const refresh = () => void flushRef.current();
-    refresh();
-    window.addEventListener("online", refresh);
-    const unsubscribe = subscribe([topic], refresh);
+    void Promise.all([
+      load<T[]>(key(userId, name, "items"), []),
+      load<Outbox>(key(userId, name, "outbox"), { upserts: [], deletes: [] }),
+    ]).then(([stored, box]) => {
+      if (cancelled) return;
+      itemsRef.current = stored;
+      setItems(stored);
+      outboxRef.current = box;
+      setPending(box.upserts.length + box.deletes.length);
+      setReady(true);
+      refresh();
+      window.addEventListener("online", refresh);
+      unsubscribe = subscribe([topic], refresh);
+    });
     return () => {
+      cancelled = true;
       window.removeEventListener("online", refresh);
       unsubscribe();
     };

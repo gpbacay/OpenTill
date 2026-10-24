@@ -9,6 +9,8 @@ import { PosProvider, usePos } from "@/contexts/pos-context";
 import { OpsProvider } from "@/contexts/ops-context";
 import AppSidebar, { MENU_ITEMS, canOpen } from "@/components/layout/Sidebar";
 import { isCashier } from "@/lib/local-auth";
+import { ALWAYS_OPEN } from "@/lib/cashier-pages";
+import { enableOfflinePages } from "@/lib/offline";
 import Header from "@/components/layout/Header";
 import { AddMenu } from "@/components/layout/AddMenu";
 import { TenantOnboarding } from "@/components/TenantOnboarding";
@@ -182,6 +184,11 @@ export default function PosLayout({ children }: { children: React.ReactNode }) {
       router.replace("/login");
     }
   }, [ready, user, router]);
+
+  // Save every page on the device so the app opens offline. Pages a cashier can't use just redirect, so save them all.
+  useEffect(() => {
+    void enableOfflinePages([...new Set([...MENU_ITEMS.map((item) => item.href), ...ALWAYS_OPEN, "/reports/view", "/login"])]);
+  }, []);
 
   if (!ready || !user) {
     return <AppShellSkeleton />;

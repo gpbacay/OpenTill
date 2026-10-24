@@ -21,6 +21,7 @@ import {
   writeLocalSession,
   type LocalUser,
 } from "@/lib/local-auth";
+import "@/lib/offline"; // installed first, so even sign-in requests track whether the API is reachable
 
 interface AccountUpdate {
   name: string;

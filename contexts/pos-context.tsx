@@ -13,6 +13,8 @@ import { useRouter } from "next/navigation";
 import { Tenant, Product, Order, OrderItem, HeldCart, StockMovement } from "@/lib/types";
 import { subscribe } from "@/lib/realtime";
 import { writeLocalSession } from "@/lib/local-auth";
+import { isOnline as apiReachable, useOnline } from "@/lib/offline";
+import { load, save } from "@/lib/device-store";
 
 export interface CartItem {
   product: Product;
@@ -88,7 +90,7 @@ function storeKey(userId: string, name: string) {
 }
 
 function writeOutbox(userId: string, outbox: Outbox) {
-  localStorage.setItem(storeKey(userId, "outbox"), JSON.stringify(outbox));
+  save(storeKey(userId, "outbox"), outbox);
 }
 
 async function api(input: string, init?: RequestInit) {
@@ -118,7 +120,7 @@ export function PosProvider({
   const [syncedOrders, setSyncedOrders] = useState<Order[]>([]);
   const [offlineQueue, setOfflineQueue] = useState<{ order: Order; items: OrderItem[] }[]>([]);
   const [heldCarts, setHeldCarts] = useState<HeldCart[]>([]);
-  const [isOnline, setIsOnline] = useState(true);
+  const isOnline = useOnline();
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncProgress, setSyncProgress] = useState(0);
   const [isDarkMode, setIsDarkMode] = useState(true);
@@ -135,39 +137,37 @@ export function PosProvider({
   const syncingRef = useRef(false);
   const flushRef = useRef<() => Promise<void>>(async () => {});
 
-  // Load this account's store after mount. Theme stays on the device.
+  // Load this account's store from the device after mount. Theme stays on the device.
   useEffect(() => {
+    let cancelled = false;
     const key = (name: string) => storeKey(userId, name);
-    const stored = {
-      tenants: readStorage<Tenant[]>(key("tenants"), []),
-      products: readStorage<Product[]>(key("products"), []),
-      orders: readStorage<Order[]>(key("orders"), []),
-    };
-    const savedTenantId = readStorage(key("active_tenant_id"), "");
-    const nextTenantId = stored.tenants.some((tenant) => tenant.id === savedTenantId)
-      ? savedTenantId
-      : stored.tenants[0]?.id ?? "";
-    setTenants(stored.tenants);
-    setProducts(stored.products);
-    setSyncedOrders(stored.orders);
-    setActiveTenantId(nextTenantId);
-    setOfflineQueue(readStorage<{ order: Order; items: OrderItem[] }[]>(key("offline_queue"), []));
-    setHeldCarts(readStorage(key("held_carts"), []));
-    setIsDarkMode(readStorage("opentill_theme_dark", true));
-    outboxRef.current = readStorage(key("outbox"), EMPTY_OUTBOX);
-    setIsOnline(navigator.onLine);
-    setScope(userId);
-  }, [userId]);
-
-  useEffect(() => {
-    const apply = () => setIsOnline(navigator.onLine);
-    window.addEventListener("online", apply);
-    window.addEventListener("offline", apply);
+    void Promise.all([
+      load<Tenant[]>(key("tenants"), []),
+      load<Product[]>(key("products"), []),
+      load<Order[]>(key("orders"), []),
+      load<{ order: Order; items: OrderItem[] }[]>(key("offline_queue"), []),
+      load<HeldCart[]>(key("held_carts"), []),
+      load<Outbox>(key("outbox"), EMPTY_OUTBOX),
+    ]).then(([storedTenants, storedProducts, storedOrders, queue, held, outbox]) => {
+      if (cancelled) return;
+      const savedTenantId = readStorage(key("active_tenant_id"), "");
+      const nextTenantId = storedTenants.some((tenant) => tenant.id === savedTenantId)
+        ? savedTenantId
+        : storedTenants[0]?.id ?? "";
+      setTenants(storedTenants);
+      setProducts(storedProducts);
+      setSyncedOrders(storedOrders);
+      setActiveTenantId(nextTenantId);
+      setOfflineQueue(queue);
+      setHeldCarts(held);
+      setIsDarkMode(readStorage("opentill_theme_dark", true));
+      outboxRef.current = outbox;
+      setScope(userId);
+    });
     return () => {
-      window.removeEventListener("online", apply);
-      window.removeEventListener("offline", apply);
+      cancelled = true;
     };
-  }, []);
+  }, [userId]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -181,7 +181,7 @@ export function PosProvider({
 
   useEffect(() => {
     if (!hydrated) return;
-    localStorage.setItem(storeKey(userId, "tenants"), JSON.stringify(tenants));
+    save(storeKey(userId, "tenants"), tenants);
   }, [tenants, hydrated, userId]);
 
   useEffect(() => {
@@ -192,26 +192,22 @@ export function PosProvider({
 
   useEffect(() => {
     if (!hydrated) return;
-    try {
-      localStorage.setItem(storeKey(userId, "products"), JSON.stringify(products));
-    } catch {
-      // Storage full (product photos are the big part): the server copy is still saved; only the offline cache lags.
-    }
+    save(storeKey(userId, "products"), products);
   }, [products, hydrated, userId]);
 
   useEffect(() => {
     if (!hydrated) return;
-    localStorage.setItem(storeKey(userId, "orders"), JSON.stringify(syncedOrders));
+    save(storeKey(userId, "orders"), syncedOrders);
   }, [syncedOrders, hydrated, userId]);
 
   useEffect(() => {
     if (!hydrated) return;
-    localStorage.setItem(storeKey(userId, "offline_queue"), JSON.stringify(offlineQueue));
+    save(storeKey(userId, "offline_queue"), offlineQueue);
   }, [offlineQueue, hydrated, userId]);
 
   useEffect(() => {
     if (!hydrated) return;
-    localStorage.setItem(storeKey(userId, "held_carts"), JSON.stringify(heldCarts));
+    save(storeKey(userId, "held_carts"), heldCarts);
   }, [heldCarts, hydrated, userId]);
 
   const remember = (kind: keyof Outbox, id: string, add: boolean) => {
@@ -222,7 +218,7 @@ export function PosProvider({
   };
 
   flushRef.current = async () => {
-    if (!navigator.onLine || syncingRef.current) return;
+    if (!apiReachable() || syncingRef.current) return;
     const box = outboxRef.current;
     const hasWork =
       offlineQueueRef.current.length > 0 ||
