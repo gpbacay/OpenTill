@@ -140,7 +140,7 @@ export function DataTable<T>({
   selectedKey,
   empty,
   resetKey,
-  pageSizes = [10, 25, 50],
+  pageSizes = [10, 25, 50, 100],
   selectable = true,
   isRowDisabled,
   bulkActions,
@@ -154,7 +154,7 @@ export function DataTable<T>({
   const [ordered, moveColumn] = useColumnOrder(givenColumns, columnOrderKey);
   const [dragging, setDragging] = useState<string | null>(null);
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(pageSizes[0]);
+  const [pageSize, setPageSize] = useState(pageSizes[pageSizes.length - 1]);
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [opened, setOpened] = useState<Set<string>>(new Set());
 
@@ -166,7 +166,8 @@ export function DataTable<T>({
   // The grouped column's value is already in each group header.
   const columns = ordered.filter((column) => column !== groupColumn);
   const groups = groupRows(rows, groupColumn);
-  const pages = paginate(groups, opened, pageSize);
+  // Grouped rows show all at once: closed groups already keep the list short.
+  const pages = paginate(groups, opened, groupColumn ? Infinity : pageSize);
   const pageCount = pages.length;
   const current = Math.min(page, pageCount);
   const sections = pages[current - 1];
@@ -190,12 +191,12 @@ export function DataTable<T>({
         type="button"
         aria-expanded={open}
         onClick={() => toggleGroup(section.key!)}
-        className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium hover:bg-accent/60"
+        className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm font-semibold hover:bg-accent/60"
       >
-        <HugeiconsIcon icon={ArrowDown01Icon} size={14} className={`shrink-0 text-muted-foreground transition-transform ${open ? "" : "-rotate-90"}`} />
+        <HugeiconsIcon icon={ArrowDown01Icon} size={16} className={`shrink-0 text-muted-foreground transition-transform ${open ? "" : "-rotate-90"}`} />
         <span className="sr-only">{groupColumn.header}</span>
         <span className="truncate text-foreground">{section.key}</span>
-        <span className="ml-auto rounded-full bg-muted px-2 tabular-nums text-muted-foreground">{section.count}</span>
+        <span className="ml-auto rounded-full bg-muted px-2 text-xs font-medium tabular-nums text-muted-foreground">{section.count}</span>
       </button>
     );
   };
@@ -498,7 +499,11 @@ export function DataTable<T>({
       )}
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 px-3 py-2 text-xs text-muted-foreground shadow-[0_-1px_0_var(--input)]">
         <span className="flex items-center gap-2">
-          {visible.length === 0 ? `${rows.length} results` : `${start + 1}–${start + visible.length} of ${shown}`}
+          {groupColumn
+            ? `${rows.length} results in ${groups.length} ${groups.length === 1 ? "group" : "groups"}`
+            : visible.length === 0
+              ? `${rows.length} results`
+              : `${start + 1}–${start + visible.length} of ${shown}`}
           {groupColumn && groups.length > 1 ? (
             <Button
               size="sm"
@@ -509,6 +514,7 @@ export function DataTable<T>({
             </Button>
           ) : null}
         </span>
+        {groupColumn ? null : (
         <div className="flex items-center gap-2">
           <label className="flex items-center gap-1.5">
             <span>Rows</span>
@@ -541,6 +547,7 @@ export function DataTable<T>({
             Next
           </Button>
         </div>
+        )}
       </div>
     </div>
   );

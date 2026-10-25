@@ -19,7 +19,7 @@ export function RegisterCatalog({ products, activeTenant, onAddToSale }: Registe
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [view, setView] = useViewMode("register", "cards");
-  const [groupBy, setGroupBy] = useGroupBy("register");
+  const [groupBy, setGroupBy] = useGroupBy();
   const [message, setMessage] = useState("");
 
   const tenantProducts = useMemo(

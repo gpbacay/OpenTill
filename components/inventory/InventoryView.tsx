@@ -55,8 +55,8 @@ export function InventoryView() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [stockView, setStockView] = useViewMode("inventory", "cards");
   const [historyView, setHistoryView] = useViewMode("stock-history", "table");
-  const [stockGroup, setStockGroup] = useGroupBy("inventory");
-  const [historyGroup, setHistoryGroup] = useGroupBy("stock-history");
+  const [stockGroup, setStockGroup] = useGroupBy();
+  const [historyGroup, setHistoryGroup] = useGroupBy();
 
   const tenantId = activeTenant?.id;
   const catalog = useMemo(() => products.filter((p) => p.tenantId === tenantId), [products, tenantId]);

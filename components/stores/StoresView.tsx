@@ -23,7 +23,7 @@ export function StoresView() {
   const [business, setBusiness] = useState("all");
   const [currency, setCurrency] = useState("all");
   const [view, setView] = useViewMode("stores", "table");
-  const [groupBy, setGroupBy] = useGroupBy("stores");
+  const [groupBy, setGroupBy] = useGroupBy();
   const [target, setTarget] = useState<Tenant | "new" | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [error, setError] = useState("");

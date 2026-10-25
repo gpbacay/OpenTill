@@ -28,7 +28,7 @@ export function SuppliersView() {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("all");
   const [view, setView] = useViewMode("suppliers", "cards");
-  const [groupBy, setGroupBy] = useGroupBy("suppliers");
+  const [groupBy, setGroupBy] = useGroupBy();
   const [target, setTarget] = useState<Supplier | "new" | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const currency = activeTenant?.currency ?? "PHP";

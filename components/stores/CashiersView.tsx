@@ -43,7 +43,7 @@ export function CashiersView() {
   const [query, setQuery] = useState("");
   const [store, setStore] = useState("all");
   const [view, setView] = useViewMode("cashiers", "table");
-  const [groupBy, setGroupBy] = useGroupBy("cashiers");
+  const [groupBy, setGroupBy] = useGroupBy();
   const [target, setTarget] = useState<Cashier | "new" | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [actionError, setActionError] = useState("");

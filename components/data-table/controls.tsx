@@ -196,9 +196,8 @@ function useSaved<V extends string>(key: string, fallback: V, valid: (saved: str
 export const useViewMode = (page: string, fallback: ViewMode) =>
   useSaved(`opentill_view_${page}`, fallback, (saved): saved is ViewMode => saved === "table" || saved === "cards");
 
-/** Column id rows are grouped by on one page ("" for none), remembered on this device. Category by default. */
-export const useGroupBy = (page: string, fallback = "category") =>
-  useSaved(`opentill_group_${page}`, fallback, (saved): saved is string => true);
+/** Column id rows are grouped by ("" for none). Every visit starts at Category, so a past "None" never sticks. */
+export const useGroupBy = (fallback = "category") => useState(fallback);
 
 /** "View by column": groups the table's rows under collapsible headers, one per value of the chosen column. */
 export function GroupBySelect({

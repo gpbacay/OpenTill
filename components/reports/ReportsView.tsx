@@ -64,7 +64,7 @@ export function ReportsView() {
   const [type, setType] = useState(() => params.get("type") ?? "all");
   const [span, setSpan] = useState("all");
   const [view, setView] = useViewMode("reports", "cards");
-  const [groupBy, setGroupBy] = useGroupBy("reports");
+  const [groupBy, setGroupBy] = useGroupBy();
   const [range, setRange] = useState(() => rangeFromParams(params, "all"));
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);

@@ -39,7 +39,7 @@ export function SalesView() {
   const [payment, setPayment] = useState("all");
   const [cashier, setCashier] = useState("all");
   const [view, setView] = useViewMode("sales", "table");
-  const [groupBy, setGroupBy] = useGroupBy("sales");
+  const [groupBy, setGroupBy] = useGroupBy();
   const [range, setRange] = useState(() => rangeFromParams(params, "month"));
   const [selectedId, setSelectedId] = useState<string | null>(() => params.get("sale"));
   const currency = activeTenant?.currency ?? "PHP";

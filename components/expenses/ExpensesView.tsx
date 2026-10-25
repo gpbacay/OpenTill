@@ -33,7 +33,7 @@ export function ExpensesView() {
   const [range, setRange] = useState(() => rangeFromParams(params, "month"));
   const [supplier, setSupplier] = useState("all");
   const [view, setView] = useViewMode("expenses", "table");
-  const [groupBy, setGroupBy] = useGroupBy("expenses");
+  const [groupBy, setGroupBy] = useGroupBy();
   const [target, setTarget] = useState<Expense | "new" | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const currency = activeTenant?.currency ?? "PHP";
