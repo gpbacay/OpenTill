@@ -71,6 +71,7 @@ export function RegisterCatalog({ products, activeTenant, onAddToSale }: Registe
   };
 
   const columns: Column<Product>[] = [
+    { id: "category", header: "Category", cell: (product) => product.category || "—" },
     {
       id: "name",
       header: "Product",
@@ -81,7 +82,6 @@ export function RegisterCatalog({ products, activeTenant, onAddToSale }: Registe
       header: "SKU",
       cell: (product) => <span className="text-xs text-muted-foreground">{product.sku}</span>,
     },
-    { id: "category", header: "Category", cell: (product) => product.category || "—" },
     {
       id: "stock",
       header: "Available",
@@ -161,7 +161,9 @@ export function RegisterCatalog({ products, activeTenant, onAddToSale }: Registe
         columns={columns}
         rowKey={(product) => product.id}
         view={view}
+        cardTitle="name"
         cardValue="price"
+        columnOrderKey="register"
         image={(product) => product.image}
         isRowDisabled={(product) => product.stock <= 0}
         resetKey={`${activeTenant.id}|${search}|${selectedCategory}`}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState, type DragEvent, type KeyboardEvent, type ReactNode } from "react";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { ArrowDown01Icon, Image01Icon } from "@hugeicons/core-free-icons";
 import { Button } from "@/components/ui/button";
@@ -33,8 +33,12 @@ interface DataTableProps<T> {
   bulkActions?: (chosen: T[], clear: () => void) => ReactNode;
   /** Table rows, or cards (first column as the heading, the rest as labelled fields). */
   view?: "table" | "cards";
+  /** Column used as a card's heading. Defaults to the first column. */
+  cardTitle?: string;
   /** Column shown large under a card's heading (e.g. price or total). */
   cardValue?: string;
+  /** Lets people drag table headers to reorder columns, remembered on this device under this key. */
+  columnOrderKey?: string;
   /** Row photo: a cover on cards and a thumbnail in the table. Return "" or undefined for a placeholder. */
   image?: (row: T) => string | undefined;
 }
@@ -43,10 +47,36 @@ interface DataTableProps<T> {
 // touch screens). The select-all checkbox in the header is always visible so a selection can always be undone.
 const REVEAL = "opacity-0 group-hover/row:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100";
 
+/** Column order saved on this device. Columns not in the saved order (e.g. newly added custom ones) go last. */
+function useColumnOrder<T>(columns: Column<T>[], key?: string) {
+  const storageKey = `opentill_columns_${key}`;
+  const [saved, setSaved] = useState<string[]>([]);
+  useEffect(() => {
+    if (!key) return;
+    try {
+      const raw = JSON.parse(localStorage.getItem(storageKey) ?? "[]");
+      if (Array.isArray(raw)) setSaved(raw);
+    } catch {}
+  }, [key, storageKey]);
+
+  const rank = (id: string) => (saved.includes(id) ? saved.indexOf(id) : Infinity);
+  const ordered = key ? [...columns].sort((a, b) => rank(a.id) - rank(b.id)) : columns;
+
+  const move = (id: string, to: number) => {
+    const ids = ordered.map((column) => column.id).filter((other) => other !== id);
+    ids.splice(Math.max(0, Math.min(to, ids.length)), 0, id);
+    setSaved(ids);
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(ids));
+    } catch {}
+  };
+  return [ordered, move] as const;
+}
+
 /** Sticky-header table (or card grid) with pagination and row selection. Rows arrive already searched and filtered. */
 export function DataTable<T>({
   rows,
-  columns,
+  columns: givenColumns,
   rowKey,
   onRowClick,
   selectedKey,
@@ -57,9 +87,13 @@ export function DataTable<T>({
   isRowDisabled,
   bulkActions,
   view = "table",
+  cardTitle,
   cardValue,
+  columnOrderKey,
   image,
 }: DataTableProps<T>) {
+  const [columns, moveColumn] = useColumnOrder(givenColumns, columnOrderKey);
+  const [dragging, setDragging] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(pageSizes[0]);
   const [picked, setPicked] = useState<Set<string>>(new Set());
@@ -188,11 +222,11 @@ export function DataTable<T>({
             >
               {visible.map((row) => {
                 const item = rowState(row);
+                const title = columns.find((column) => column.id === cardTitle) ?? columns[0];
                 const highlight = columns.find((column) => column.id === cardValue);
                 // Empty fields ("—") are noise on a card; the table still shows them.
                 const fields = columns
-                  .slice(1)
-                  .filter((column) => column !== highlight)
+                  .filter((column) => column !== title && column !== highlight)
                   .map((column) => ({ column, value: column.cell(row) }))
                   .filter(({ value }) => value !== "—" && value !== "" && value != null);
                 const src = image?.(row);
@@ -222,7 +256,7 @@ export function DataTable<T>({
                     ) : null}
                     {selectable ? <span className="absolute top-2 right-2 rounded-md bg-card/90 p-1">{item.checkbox}</span> : null}
                     <div className="flex flex-1 flex-col gap-2 p-3">
-                      <div className={`min-w-0 font-medium ${selectable && !image ? "pr-8" : ""}`}>{columns[0]?.cell(row)}</div>
+                      <div className={`min-w-0 font-medium ${selectable && !image ? "pr-8" : ""}`}>{title?.cell(row)}</div>
                       {highlight ? (
                         <p className="flex items-baseline justify-between gap-2">
                           <span className="text-lg font-semibold tabular-nums">{highlight.cell(row)}</span>
@@ -261,12 +295,43 @@ export function DataTable<T>({
                   <span className="sr-only">Photo</span>
                 </th>
               ) : null}
-              {columns.map((column) => (
+              {columns.map((column, index) => (
                 <th
                   key={column.id}
                   scope="col"
+                  {...(columnOrderKey
+                    ? {
+                        draggable: true,
+                        tabIndex: 0,
+                        title: "Drag to move this column (or Alt + ← / →)",
+                        onDragStart: (event: DragEvent) => {
+                          event.dataTransfer.effectAllowed = "move";
+                          setDragging(column.id);
+                        },
+                        onDragEnd: () => setDragging(null),
+                        onDragOver: (event: DragEvent) => {
+                          if (dragging) event.preventDefault();
+                        },
+                        onDrop: (event: DragEvent) => {
+                          event.preventDefault();
+                          if (dragging && dragging !== column.id) moveColumn(dragging, index);
+                          setDragging(null);
+                        },
+                        onKeyDown: (event: KeyboardEvent) => {
+                          if (!event.altKey || (event.key !== "ArrowLeft" && event.key !== "ArrowRight")) return;
+                          event.preventDefault();
+                          moveColumn(column.id, index + (event.key === "ArrowLeft" ? -1 : 1));
+                          // Keep focus on the moved header so it can be nudged again.
+                          const row = event.currentTarget.parentElement;
+                          requestAnimationFrame(() => row?.querySelector<HTMLElement>(`[data-column="${column.id}"]`)?.focus());
+                        },
+                      }
+                    : {})}
+                  data-column={column.id}
                   className={`sticky top-0 z-10 whitespace-nowrap bg-card px-3 py-2.5 text-xs font-medium text-muted-foreground shadow-[0_1px_0_var(--input)] ${
                     column.align === "right" ? "text-right" : "text-left"
+                  } ${columnOrderKey ? "cursor-grab outline-none select-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset active:cursor-grabbing" : ""} ${
+                    dragging === column.id ? "opacity-50" : ""
                   }`}
                 >
                   {column.header}

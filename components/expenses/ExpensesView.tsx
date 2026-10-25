@@ -64,8 +64,8 @@ export function ExpensesView() {
   }, [expenses, tenantSyncedOrders]);
 
   const columns: Column<Expense>[] = [
-    { id: "date", header: "Date", cell: (e) => <span className="whitespace-nowrap">{new Date(e.date).toLocaleDateString()}</span> },
     { id: "category", header: "Category", cell: (e) => e.category },
+    { id: "date", header: "Date", cell: (e) => <span className="whitespace-nowrap">{new Date(e.date).toLocaleDateString()}</span> },
     { id: "description", header: "Description", cell: (e) => <span className="block min-w-40">{e.description || "—"}</span> },
     { id: "supplier", header: "Supplier", cell: (e) => supplierName(e.supplierId) },
     { id: "pay", header: "Paid with", cell: (e) => PAY_LABEL[e.paymentMethod] ?? e.paymentMethod },
@@ -152,7 +152,9 @@ export function ExpensesView() {
         columns={columns}
         rowKey={(e) => e.id}
         view={view}
+        cardTitle="date"
         cardValue="amount"
+        columnOrderKey="expenses"
         onRowClick={(e, checked) => setSelectedId((current) => (checked ? e.id : current === e.id ? null : current))}
         selectedKey={selectedId}
         bulkActions={(chosen, clear) => (

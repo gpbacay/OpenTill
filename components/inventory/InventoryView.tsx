@@ -97,6 +97,7 @@ export function InventoryView() {
   );
 
   const stockColumns: Column<Product>[] = [
+    { id: "category", header: "Category", cell: (p) => p.category },
     {
       id: "name",
       header: "Product",
@@ -107,7 +108,6 @@ export function InventoryView() {
         </div>
       ),
     },
-    { id: "category", header: "Category", cell: (p) => p.category },
     { id: "supplier", header: "Supplier", cell: (p) => supplierName(p.supplierId) },
     { id: "cost", header: "Cost", align: "right", cell: (p) => money(currency, p.costPrice ?? 0) },
     { id: "price", header: "Price", align: "right", cell: (p) => money(currency, p.price) },
@@ -291,7 +291,9 @@ export function InventoryView() {
           columns={stockColumns}
           rowKey={(p) => p.id}
           view={stockView}
+          cardTitle="name"
           cardValue="price"
+          columnOrderKey="inventory"
           image={(p) => p.image}
           onRowClick={(p, checked) => setSelectedId((current) => (checked ? p.id : current === p.id ? null : current))}
           selectedKey={selectedId}
