@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button";
 import { DataTable, type Column } from "@/components/data-table/DataTable";
 import { DetailPanel, Fields, SplitView } from "@/components/data-table/DetailPanel";
 import { DeleteButton } from "@/components/data-table/bulk";
-import { FilterBar, FilterSelect, ResetFiltersButton, SearchBox, StatTile, ViewBySelect, matches, useViewMode } from "@/components/data-table/controls";
+import { PlusSignIcon } from "@hugeicons/core-free-icons";
+import { ToolbarButton, FilterBar, FilterSelect, ResetFiltersButton, SearchBox, StatTile, ViewBySelect, GroupBySelect, useGroupBy, matches, useViewMode } from "@/components/data-table/controls";
 import { TablePageSkeleton } from "@/components/loading/PageSkeletons";
 import { CashierDialog } from "./CashierDialog";
 import { CashierInviteDialog } from "./CashierInviteDialog";
@@ -42,6 +43,7 @@ export function CashiersView() {
   const [query, setQuery] = useState("");
   const [store, setStore] = useState("all");
   const [view, setView] = useViewMode("cashiers", "table");
+  const [groupBy, setGroupBy] = useGroupBy("cashiers");
   const [target, setTarget] = useState<Cashier | "new" | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [actionError, setActionError] = useState("");
@@ -107,7 +109,12 @@ export function CashiersView() {
       ),
     },
     { id: "store", header: "Store", cell: (c) => storeName(c.tenantId) },
-    { id: "activity", header: "Status", cell: (c) => <Activity lastSeenAt={c.lastSeenAt} now={now} /> },
+    {
+      id: "activity",
+      header: "Status",
+      cell: (c) => <Activity lastSeenAt={c.lastSeenAt} now={now} />,
+      group: (c) => (activity(c.lastSeenAt, now).active ? "Active now" : c.lastSeenAt ? "Away" : "Never signed in"),
+    },
     { id: "created", header: "Added", cell: (c) => new Date(c.createdAt).toLocaleDateString() },
   ];
 
@@ -157,10 +164,11 @@ export function CashiersView() {
           <StatTile label="Cashiers" value={cashiers.length} />
           <StatTile label="Stores with a cashier" value={new Set(cashiers.map((c) => c.tenantId)).size} />
         </div>
-        <FilterBar active={filtersActive} actions={<Button onClick={() => setTarget("new")}>Add cashier</Button>}>
+        <FilterBar active={filtersActive} actions={<ToolbarButton icon={PlusSignIcon} label="Add cashier" short="Add" onClick={() => setTarget("new")} />}>
           <SearchBox value={query} onChange={setQuery} placeholder="Search name, username…" />
           <FilterSelect label="Store" value={store} onChange={setStore} options={[{ value: "all", label: "All stores" }, ...tenants.map((t) => ({ value: t.id, label: t.name }))]} />
           <ViewBySelect value={view} onChange={setView} />
+          <GroupBySelect columns={columns} value={groupBy} onChange={setGroupBy} />
           {filtersActive ? <ResetFiltersButton onClick={resetFilters} /> : null}
         </FilterBar>
         {shownError ? (
@@ -169,6 +177,7 @@ export function CashiersView() {
         <DataTable
           rows={rows}
           columns={columns}
+            groupBy={groupBy}
           rowKey={(c) => c.id}
           view={view}
           cardValue="store"

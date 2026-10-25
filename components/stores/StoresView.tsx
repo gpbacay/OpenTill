@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button";
 import { DataTable, type Column } from "@/components/data-table/DataTable";
 import { DetailPanel, Fields, SplitView } from "@/components/data-table/DetailPanel";
 import { ExportButton } from "@/components/data-table/bulk";
-import { FilterBar, FilterSelect, ResetFiltersButton, SearchBox, StatTile, ViewBySelect, matches, useViewMode } from "@/components/data-table/controls";
+import { PlusSignIcon } from "@hugeicons/core-free-icons";
+import { ToolbarButton, FilterBar, FilterSelect, ResetFiltersButton, SearchBox, StatTile, ViewBySelect, GroupBySelect, useGroupBy, matches, useViewMode } from "@/components/data-table/controls";
 import { DeleteStoresDialog } from "./DeleteStoresDialog";
 import { StoreDialog } from "./StoreDialog";
 import { useCashiers } from "./use-cashiers";
@@ -22,6 +23,7 @@ export function StoresView() {
   const [business, setBusiness] = useState("all");
   const [currency, setCurrency] = useState("all");
   const [view, setView] = useViewMode("stores", "table");
+  const [groupBy, setGroupBy] = useGroupBy("stores");
   const [target, setTarget] = useState<Tenant | "new" | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [error, setError] = useState("");
@@ -135,11 +137,12 @@ export function StoresView() {
           <StatTile label="Products" value={products.length} />
           <StatTile label="Cashiers" value={cashiers ? cashiers.length : "—"} />
         </div>
-        <FilterBar active={filtersActive} actions={<Button onClick={() => setTarget("new")}>Add store</Button>}>
+        <FilterBar active={filtersActive} actions={<ToolbarButton icon={PlusSignIcon} label="Add store" short="Add" onClick={() => setTarget("new")} />}>
           <SearchBox value={query} onChange={setQuery} placeholder="Search store name, business…" />
           <FilterSelect label="Business" value={business} onChange={setBusiness} options={[{ value: "all", label: "All businesses" }, ...businesses.map((b) => ({ value: b, label: b }))]} />
           <FilterSelect label="Currency" value={currency} onChange={setCurrency} options={[{ value: "all", label: "All currencies" }, ...currencies.map((c) => ({ value: c, label: c }))]} />
           <ViewBySelect value={view} onChange={setView} />
+          <GroupBySelect columns={columns} value={groupBy} onChange={setGroupBy} />
           {filtersActive ? <ResetFiltersButton onClick={resetFilters} /> : null}
         </FilterBar>
         {error ? (
@@ -148,6 +151,7 @@ export function StoresView() {
         <DataTable
           rows={rows}
           columns={columns}
+            groupBy={groupBy}
           rowKey={(t) => t.id}
           view={view}
           cardValue="products"

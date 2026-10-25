@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { ImageAdd01Icon } from "@hugeicons/core-free-icons";
+import { ImageAdd01Icon, PlusSignIcon } from "@hugeicons/core-free-icons";
 import { useOps } from "@/contexts/ops-context";
 import { usePos } from "@/contexts/pos-context";
 import { money } from "@/lib/money";
@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DeleteButton, ExportButton } from "@/components/data-table/bulk";
 import { DataTable, type Column } from "@/components/data-table/DataTable";
-import { FilterSelect, ResetFiltersButton, SearchBox, StatTile, FilterBar, ViewBySelect, matches, useViewMode } from "@/components/data-table/controls";
+import { ToolbarButton, FilterSelect, ResetFiltersButton, SearchBox, StatTile, FilterBar, ViewBySelect, GroupBySelect, useGroupBy, matches, useViewMode } from "@/components/data-table/controls";
 import { ColumnManager, customColumnDefs, customFieldRows, customText } from "@/components/data-table/custom-columns";
 import { DetailPanel, Fields, PanelSection, SplitView } from "@/components/data-table/DetailPanel";
 import { ProductDialog } from "./ProductDialog";
@@ -55,6 +55,8 @@ export function InventoryView() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [stockView, setStockView] = useViewMode("inventory", "cards");
   const [historyView, setHistoryView] = useViewMode("stock-history", "table");
+  const [stockGroup, setStockGroup] = useGroupBy("inventory");
+  const [historyGroup, setHistoryGroup] = useGroupBy("stock-history");
 
   const tenantId = activeTenant?.id;
   const catalog = useMemo(() => products.filter((p) => p.tenantId === tenantId), [products, tenantId]);
@@ -129,7 +131,7 @@ export function InventoryView() {
   ];
 
   const historyColumns: Column<StockMovement>[] = [
-    { id: "date", header: "Date", cell: (m) => <span className="whitespace-nowrap">{new Date(m.date).toLocaleString()}</span> },
+    { id: "date", header: "Date", cell: (m) => <span className="whitespace-nowrap">{new Date(m.date).toLocaleString()}</span>, group: (m) => new Date(m.date).toLocaleDateString() },
     { id: "product", header: "Product", cell: (m) => m.productName },
     { id: "type", header: "Type", cell: (m) => <Badge variant="secondary">{TYPE_LABEL[m.type] ?? m.type}</Badge> },
     {
@@ -261,7 +263,7 @@ export function InventoryView() {
           tab === "stock" ? (
             <>
               <ColumnManager table="products" />
-              <Button onClick={() => setProductTarget("new")}>Add product</Button>
+              <ToolbarButton icon={PlusSignIcon} label="Add product" short="Add" onClick={() => setProductTarget("new")} />
             </>
           ) : null
         }
@@ -282,6 +284,11 @@ export function InventoryView() {
           <FilterSelect label="Change type" value={type} onChange={setType} options={TYPE_OPTIONS} />
         )}
         <ViewBySelect value={tab === "stock" ? stockView : historyView} onChange={tab === "stock" ? setStockView : setHistoryView} />
+        <GroupBySelect
+          columns={tab === "stock" ? stockColumns : historyColumns}
+          value={tab === "stock" ? stockGroup : historyGroup}
+          onChange={tab === "stock" ? setStockGroup : setHistoryGroup}
+        />
         {filtersActive ? <ResetFiltersButton onClick={resetFilters} /> : null}
       </FilterBar>
 
@@ -289,6 +296,7 @@ export function InventoryView() {
         <DataTable
           rows={stockRows}
           columns={stockColumns}
+          groupBy={stockGroup}
           rowKey={(p) => p.id}
           view={stockView}
           cardTitle="name"
@@ -322,6 +330,7 @@ export function InventoryView() {
         <DataTable
           rows={historyRows}
           columns={historyColumns}
+          groupBy={historyGroup}
           rowKey={(m) => m.id}
           view={historyView}
           cardValue="qty"

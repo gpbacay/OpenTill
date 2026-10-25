@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type DragEvent, type KeyboardEvent, type ReactNode } from "react";
+import { Fragment, isValidElement, useEffect, useState, type DragEvent, type KeyboardEvent, type ReactNode } from "react";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { ArrowDown01Icon, Image01Icon } from "@hugeicons/core-free-icons";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,8 @@ export interface Column<T> {
   cell: (row: T) => ReactNode;
   align?: "right";
   className?: string;
+  /** Group label when rows are grouped by this column. Defaults to the cell's text, with groups sorted A–Z; when given, groups keep the rows' order (e.g. newest day first). */
+  group?: (row: T) => string;
 }
 
 interface DataTableProps<T> {
@@ -39,6 +41,8 @@ interface DataTableProps<T> {
   cardValue?: string;
   /** Lets people drag table headers to reorder columns, remembered on this device under this key. */
   columnOrderKey?: string;
+  /** Column id to group rows under collapsible headers. Ignored when no column has this id. */
+  groupBy?: string;
   /** Row photo: a cover on cards and a thumbnail in the table. Return "" or undefined for a placeholder. */
   image?: (row: T) => string | undefined;
 }
@@ -73,6 +77,60 @@ function useColumnOrder<T>(columns: Column<T>[], key?: string) {
   return [ordered, move] as const;
 }
 
+/** Plain text of a rendered cell, so any column can group rows. */
+function textOf(node: ReactNode): string {
+  if (node == null || typeof node === "boolean") return "";
+  if (typeof node === "string" || typeof node === "number") return String(node);
+  if (Array.isArray(node)) return node.map(textOf).filter(Boolean).join(" ");
+  if (isValidElement<{ children?: ReactNode }>(node)) return textOf(node.props.children);
+  return "";
+}
+
+type Group<T> = { key: string | null; rows: T[] };
+type Section<T> = Group<T> & { count: number };
+
+function groupRows<T>(rows: T[], column?: Column<T>): Group<T>[] {
+  if (!column) return [{ key: null, rows }];
+  const groups = new Map<string, T[]>();
+  for (const row of rows) {
+    const key = (column.group?.(row) ?? textOf(column.cell(row))).trim() || "—";
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key)!.push(row);
+  }
+  const list = [...groups].map(([key, rows]) => ({ key, rows }));
+  return column.group ? list : list.sort((a, b) => a.key.localeCompare(b.key, undefined, { numeric: true }));
+}
+
+/**
+ * Pages of at most `size` rows. Groups are closed unless their key is in `opened`; a closed group keeps its header but no
+ * rows, and a group cut by a page break repeats its header on the next page. Ungrouped rows are one group with a null
+ * key (no header, always open).
+ */
+export function paginate<T>(groups: Group<T>[], opened: Set<string>, size: number): Section<T>[][] {
+  const pages: Section<T>[][] = [[]];
+  let n = 0;
+  for (const group of groups) {
+    const open = group.key === null || opened.has(group.key);
+    if (open && group.rows.length && n === size) {
+      pages.push([]);
+      n = 0;
+    }
+    let section: Section<T> = { key: group.key, count: group.rows.length, rows: [] };
+    pages[pages.length - 1].push(section);
+    if (!open) continue;
+    for (const row of group.rows) {
+      if (n === size) {
+        section = { ...section, rows: [] };
+        pages.push([section]);
+        n = 0;
+      }
+      section.rows.push(row);
+      n++;
+    }
+  }
+  return pages;
+}
+
 /** Sticky-header table (or card grid) with pagination and row selection. Rows arrive already searched and filtered. */
 export function DataTable<T>({
   rows,
@@ -90,21 +148,57 @@ export function DataTable<T>({
   cardTitle,
   cardValue,
   columnOrderKey,
+  groupBy,
   image,
 }: DataTableProps<T>) {
-  const [columns, moveColumn] = useColumnOrder(givenColumns, columnOrderKey);
+  const [ordered, moveColumn] = useColumnOrder(givenColumns, columnOrderKey);
   const [dragging, setDragging] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(pageSizes[0]);
   const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [opened, setOpened] = useState<Set<string>>(new Set());
 
-  useEffect(() => setPage(1), [resetKey, pageSize]);
+  useEffect(() => setPage(1), [resetKey, pageSize, groupBy]);
   useEffect(() => setPicked(new Set()), [resetKey]);
+  useEffect(() => setOpened(new Set()), [groupBy]);
 
-  const pageCount = Math.max(1, Math.ceil(rows.length / pageSize));
+  const groupColumn = ordered.find((column) => column.id === groupBy);
+  // The grouped column's value is already in each group header.
+  const columns = ordered.filter((column) => column !== groupColumn);
+  const groups = groupRows(rows, groupColumn);
+  const pages = paginate(groups, opened, pageSize);
+  const pageCount = pages.length;
   const current = Math.min(page, pageCount);
-  const start = (current - 1) * pageSize;
-  const visible = rows.slice(start, start + pageSize);
+  const sections = pages[current - 1];
+  const visible = sections.flatMap((section) => section.rows);
+  const start = pages.slice(0, current - 1).flat().reduce((sum, section) => sum + section.rows.length, 0);
+  const shown = pages.flat().reduce((sum, section) => sum + section.rows.length, 0);
+
+  const toggleGroup = (key: string) =>
+    setOpened((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+
+  const groupHeader = (section: Section<T>) => {
+    if (section.key === null || !groupColumn) return null;
+    const open = opened.has(section.key);
+    return (
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => toggleGroup(section.key!)}
+        className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium hover:bg-accent/60"
+      >
+        <HugeiconsIcon icon={ArrowDown01Icon} size={14} className={`shrink-0 text-muted-foreground transition-transform ${open ? "" : "-rotate-90"}`} />
+        <span className="sr-only">{groupColumn.header}</span>
+        <span className="truncate text-foreground">{section.key}</span>
+        <span className="ml-auto rounded-full bg-muted px-2 tabular-nums text-muted-foreground">{section.count}</span>
+      </button>
+    );
+  };
 
   const available = rows.filter((row) => !isRowDisabled?.(row));
   const availableOnPage = visible.filter((row) => !isRowDisabled?.(row));
@@ -212,15 +306,18 @@ export function DataTable<T>({
               Select all on this page
             </label>
           ) : null}
-          {visible.length === 0 ? (
+          {rows.length === 0 ? (
             <p className="px-3 py-16 text-center text-sm text-muted-foreground">{empty}</p>
           ) : (
+            sections.map((section) => (
+            <div key={section.key ?? ""} className="mb-3 last:mb-0">
+            {section.key !== null ? <div className="mb-2 overflow-hidden rounded-lg bg-muted/30">{groupHeader(section)}</div> : null}
             <ul
               className={`grid gap-3 ${
                 image ? "grid-cols-2 md:grid-cols-3" : "grid-cols-1 sm:grid-cols-2 xl:grid-cols-3"
               }`}
             >
-              {visible.map((row) => {
+              {section.rows.map((row) => {
                 const item = rowState(row);
                 const title = columns.find((column) => column.id === cardTitle) ?? columns[0];
                 const highlight = columns.find((column) => column.id === cardValue);
@@ -278,6 +375,8 @@ export function DataTable<T>({
                 );
               })}
             </ul>
+            </div>
+            ))
           )}
         </div>
       ) : (
@@ -295,7 +394,11 @@ export function DataTable<T>({
                   <span className="sr-only">Photo</span>
                 </th>
               ) : null}
-              {columns.map((column, index) => (
+              {columns.map((column, shownIndex) => {
+                // Moves are positions in the full order, which still includes the hidden grouped column.
+                const index = ordered.indexOf(column);
+                const neighbor = (key: string) => columns[shownIndex + (key === "ArrowLeft" ? -1 : 1)];
+                return (
                 <th
                   key={column.id}
                   scope="col"
@@ -320,7 +423,9 @@ export function DataTable<T>({
                         onKeyDown: (event: KeyboardEvent) => {
                           if (!event.altKey || (event.key !== "ArrowLeft" && event.key !== "ArrowRight")) return;
                           event.preventDefault();
-                          moveColumn(column.id, index + (event.key === "ArrowLeft" ? -1 : 1));
+                          const target = neighbor(event.key);
+                          if (!target) return;
+                          moveColumn(column.id, ordered.indexOf(target));
                           // Keep focus on the moved header so it can be nudged again.
                           const row = event.currentTarget.parentElement;
                           requestAnimationFrame(() => row?.querySelector<HTMLElement>(`[data-column="${column.id}"]`)?.focus());
@@ -336,18 +441,28 @@ export function DataTable<T>({
                 >
                   {column.header}
                 </th>
-              ))}
+                );
+              })}
             </tr>
           </thead>
           <tbody>
-            {visible.length === 0 ? (
+            {rows.length === 0 ? (
               <tr>
                 <td colSpan={columns.length + (selectable ? 1 : 0) + (image ? 1 : 0)} className="px-3 py-16 text-center text-sm text-muted-foreground">
                   {empty}
                 </td>
               </tr>
             ) : (
-              visible.map((row) => {
+              sections.map((section) => (
+              <Fragment key={section.key ?? ""}>
+              {section.key !== null ? (
+                <tr>
+                  <td colSpan={columns.length + (selectable ? 1 : 0) + (image ? 1 : 0)} className="bg-muted/30 p-0 shadow-[0_1px_0_var(--input)]">
+                    {groupHeader(section)}
+                  </td>
+                </tr>
+              ) : null}
+              {section.rows.map((row) => {
                 const item = rowState(row);
                 return (
                   <tr key={item.key} {...item.props}>
@@ -373,15 +488,26 @@ export function DataTable<T>({
                     ))}
                   </tr>
                 );
-              })
+              })}
+              </Fragment>
+              ))
             )}
           </tbody>
         </table>
       </div>
       )}
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 px-3 py-2 text-xs text-muted-foreground shadow-[0_-1px_0_var(--input)]">
-        <span>
-          {rows.length === 0 ? "0 results" : `${start + 1}–${start + visible.length} of ${rows.length}`}
+        <span className="flex items-center gap-2">
+          {visible.length === 0 ? `${rows.length} results` : `${start + 1}–${start + visible.length} of ${shown}`}
+          {groupColumn && groups.length > 1 ? (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setOpened(opened.size ? new Set() : new Set(groups.map((group) => group.key!)))}
+            >
+              {opened.size ? "Collapse all" : "Expand all"}
+            </Button>
+          ) : null}
         </span>
         <div className="flex items-center gap-2">
           <label className="flex items-center gap-1.5">

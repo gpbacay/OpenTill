@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
-import { HugeiconsIcon } from "@hugeicons/react";
+import { useEffect, useState, type ComponentProps, type ReactNode } from "react";
+import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
 import { ArrowDown01Icon, FilterHorizontalIcon, MultiplicationSignIcon } from "@hugeicons/core-free-icons";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -113,6 +113,34 @@ export function FilterBar({
   );
 }
 
+/**
+ * FilterBar action, compact on phones so it fits beside the filter button: icon plus `short` (or `count`), or the icon
+ * alone. Icon and full label from md up.
+ */
+export function ToolbarButton({
+  icon,
+  label,
+  short,
+  count,
+  className = "",
+  ...props
+}: ComponentProps<typeof Button> & { icon: IconSvgElement; label: string; short?: string; count?: number }) {
+  const full = count ? `${label} (${count})` : label;
+  const phone = short ?? (count ? String(count) : undefined);
+  return (
+    <Button
+      aria-label={full}
+      title={full}
+      className={`max-md:h-9 max-md:rounded-xl ${phone ? "max-md:px-3" : "max-md:w-9 max-md:px-0"} ${className}`}
+      {...props}
+    >
+      <HugeiconsIcon icon={icon} size={16} />
+      <span className="max-md:hidden">{full}</span>
+      {phone ? <span className="tabular-nums md:hidden">{phone}</span> : null}
+    </Button>
+  );
+}
+
 export function ResetFiltersButton({ onClick }: { onClick: () => void }) {
   return (
     <Button
@@ -145,23 +173,54 @@ export const matches = (query: string, ...fields: (string | undefined | null)[])
 
 export type ViewMode = "table" | "cards";
 
-/** Table or card view for one page, remembered on this device. */
-export function useViewMode(page: string, fallback: ViewMode) {
-  const key = `opentill_view_${page}`;
-  const [view, setView] = useState<ViewMode>(fallback);
+/** A choice remembered on this device. */
+function useSaved<V extends string>(key: string, fallback: V, valid: (saved: string) => saved is V) {
+  const [value, setValue] = useState<V>(fallback);
   useEffect(() => {
     try {
       const saved = localStorage.getItem(key);
-      if (saved === "table" || saved === "cards") setView(saved);
+      if (saved !== null && valid(saved)) setValue(saved);
     } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
-  const change = (next: ViewMode) => {
-    setView(next);
+  const change = (next: V) => {
+    setValue(next);
     try {
       localStorage.setItem(key, next);
     } catch {}
   };
-  return [view, change] as const;
+  return [value, change] as const;
+}
+
+/** Table or card view for one page, remembered on this device. */
+export const useViewMode = (page: string, fallback: ViewMode) =>
+  useSaved(`opentill_view_${page}`, fallback, (saved): saved is ViewMode => saved === "table" || saved === "cards");
+
+/** Column id rows are grouped by on one page ("" for none), remembered on this device. Category by default. */
+export const useGroupBy = (page: string, fallback = "category") =>
+  useSaved(`opentill_group_${page}`, fallback, (saved): saved is string => true);
+
+/** "View by column": groups the table's rows under collapsible headers, one per value of the chosen column. */
+export function GroupBySelect({
+  columns,
+  value,
+  onChange,
+}: {
+  columns: { id: string; header: string }[];
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <FilterSelect
+      label="View by column"
+      value={columns.some((column) => column.id === value) ? value : ""}
+      onChange={onChange}
+      options={[
+        { value: "", label: "View by column: None" },
+        ...columns.map((column) => ({ value: column.id, label: `View by column: ${column.header}` })),
+      ]}
+    />
+  );
 }
 
 export function ViewBySelect({ value, onChange }: { value: ViewMode; onChange: (value: ViewMode) => void }) {

@@ -13,7 +13,8 @@ import { Button } from "@/components/ui/button";
 import { DeleteButton, ExportButton } from "@/components/data-table/bulk";
 import { DataTable, type Column } from "@/components/data-table/DataTable";
 import { DateRangeFilter } from "@/components/data-table/DateRangeFilter";
-import { FilterSelect, ResetFiltersButton, SearchBox, StatTile, FilterBar, ViewBySelect, matches, useViewMode } from "@/components/data-table/controls";
+import { PlusSignIcon } from "@hugeicons/core-free-icons";
+import { ToolbarButton, FilterSelect, ResetFiltersButton, SearchBox, StatTile, FilterBar, ViewBySelect, GroupBySelect, useGroupBy, matches, useViewMode } from "@/components/data-table/controls";
 import { ColumnManager, customColumnDefs, customFieldRows, customText } from "@/components/data-table/custom-columns";
 import { DetailPanel, Fields, SplitView } from "@/components/data-table/DetailPanel";
 import { ExpenseDialog } from "./ExpenseDialog";
@@ -32,6 +33,7 @@ export function ExpensesView() {
   const [range, setRange] = useState(() => rangeFromParams(params, "month"));
   const [supplier, setSupplier] = useState("all");
   const [view, setView] = useViewMode("expenses", "table");
+  const [groupBy, setGroupBy] = useGroupBy("expenses");
   const [target, setTarget] = useState<Expense | "new" | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const currency = activeTenant?.currency ?? "PHP";
@@ -65,7 +67,7 @@ export function ExpensesView() {
 
   const columns: Column<Expense>[] = [
     { id: "category", header: "Category", cell: (e) => e.category },
-    { id: "date", header: "Date", cell: (e) => <span className="whitespace-nowrap">{new Date(e.date).toLocaleDateString()}</span> },
+    { id: "date", header: "Date", cell: (e) => <span className="whitespace-nowrap">{new Date(e.date).toLocaleDateString()}</span>, group: (e) => new Date(e.date).toLocaleDateString() },
     { id: "description", header: "Description", cell: (e) => <span className="block min-w-40">{e.description || "—"}</span> },
     { id: "supplier", header: "Supplier", cell: (e) => supplierName(e.supplierId) },
     { id: "pay", header: "Paid with", cell: (e) => PAY_LABEL[e.paymentMethod] ?? e.paymentMethod },
@@ -130,7 +132,7 @@ export function ExpensesView() {
         actions={
           <>
             <ColumnManager table="expenses" />
-            <Button onClick={() => setTarget("new")}>Add expense</Button>
+            <ToolbarButton icon={PlusSignIcon} label="Add expense" short="Add" onClick={() => setTarget("new")} />
           </>
         }
       >
@@ -144,12 +146,14 @@ export function ExpensesView() {
           options={[{ value: "all", label: "All suppliers" }, { value: "none", label: "No supplier" }, ...suppliers.map((s) => ({ value: s.id, label: s.name }))]}
         />
         <ViewBySelect value={view} onChange={setView} />
+        <GroupBySelect columns={columns} value={groupBy} onChange={setGroupBy} />
         {filtersActive ? <ResetFiltersButton onClick={resetFilters} /> : null}
         <span className="text-sm text-muted-foreground">Showing {money(currency, shown)}</span>
       </FilterBar>
       <DataTable
         rows={rows}
         columns={columns}
+          groupBy={groupBy}
         rowKey={(e) => e.id}
         view={view}
         cardTitle="date"

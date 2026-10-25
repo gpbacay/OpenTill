@@ -7,7 +7,7 @@ import { money } from "@/lib/money";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { DataTable, type Column } from "@/components/data-table/DataTable";
-import { FilterBar, FilterSelect, ResetFiltersButton, ViewBySelect, useViewMode } from "@/components/data-table/controls";
+import { FilterBar, FilterSelect, ResetFiltersButton, ViewBySelect, GroupBySelect, useGroupBy, useViewMode } from "@/components/data-table/controls";
 
 interface RegisterCatalogProps {
   products: Product[];
@@ -19,6 +19,7 @@ export function RegisterCatalog({ products, activeTenant, onAddToSale }: Registe
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [view, setView] = useViewMode("register", "cards");
+  const [groupBy, setGroupBy] = useGroupBy("register");
   const [message, setMessage] = useState("");
 
   const tenantProducts = useMemo(
@@ -148,6 +149,7 @@ export function RegisterCatalog({ products, activeTenant, onAddToSale }: Registe
           }))}
         />
         <ViewBySelect value={view} onChange={setView} />
+        <GroupBySelect columns={columns} value={groupBy} onChange={setGroupBy} />
         {filtersActive ? <ResetFiltersButton onClick={resetFilters} /> : null}
       </FilterBar>
       {match && match.stock <= 0 ? (
@@ -159,6 +161,7 @@ export function RegisterCatalog({ products, activeTenant, onAddToSale }: Registe
       <DataTable
         rows={filteredProducts}
         columns={columns}
+          groupBy={groupBy}
         rowKey={(product) => product.id}
         view={view}
         cardTitle="name"

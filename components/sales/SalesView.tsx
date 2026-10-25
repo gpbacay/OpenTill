@@ -14,7 +14,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DeleteButton, ExportButton } from "@/components/data-table/bulk";
 import { DataTable, type Column } from "@/components/data-table/DataTable";
 import { DateRangeFilter } from "@/components/data-table/DateRangeFilter";
-import { FilterSelect, ResetFiltersButton, SearchBox, StatTile, FilterBar, Toolbar, ViewBySelect, matches, useViewMode } from "@/components/data-table/controls";
+import { FilterSelect, ResetFiltersButton, SearchBox, StatTile, FilterBar, Toolbar, ViewBySelect, GroupBySelect, useGroupBy, matches, useViewMode } from "@/components/data-table/controls";
 
 const STATUS = [
   { value: "all", label: "All sales" },
@@ -39,6 +39,7 @@ export function SalesView() {
   const [payment, setPayment] = useState("all");
   const [cashier, setCashier] = useState("all");
   const [view, setView] = useViewMode("sales", "table");
+  const [groupBy, setGroupBy] = useGroupBy("sales");
   const [range, setRange] = useState(() => rangeFromParams(params, "month"));
   const [selectedId, setSelectedId] = useState<string | null>(() => params.get("sale"));
   const currency = activeTenant?.currency ?? "PHP";
@@ -80,7 +81,7 @@ export function SalesView() {
   };
 
   const columns: Column<Order>[] = [
-    { id: "date", header: "Date", cell: (o) => <span className="whitespace-nowrap">{new Date(o.date).toLocaleString()}</span> },
+    { id: "date", header: "Date", cell: (o) => <span className="whitespace-nowrap">{new Date(o.date).toLocaleString()}</span>, group: (o) => new Date(o.date).toLocaleDateString() },
     { id: "receipt", header: "Receipt", cell: (o) => <span className="text-xs text-muted-foreground">{o.id.slice(-8)}</span> },
     { id: "customer", header: "Customer", cell: (o) => o.customerName || "Walk-in" },
     { id: "cashier", header: "Cashier", cell: (o) => o.cashierName || "—" },
@@ -161,11 +162,13 @@ export function SalesView() {
             <FilterSelect label="Payment" value={payment} onChange={setPayment} options={PAYMENT} />
             <FilterSelect label="Cashier" value={cashier} onChange={setCashier} options={[{ value: "all", label: "All cashiers" }, ...cashiers.map((c) => ({ value: c, label: c }))]} />
             <ViewBySelect value={view} onChange={setView} />
+            <GroupBySelect columns={columns} value={groupBy} onChange={setGroupBy} />
             {filtersActive ? <ResetFiltersButton onClick={resetFilters} /> : null}
           </FilterBar>
           <DataTable
             rows={rows}
             columns={columns}
+              groupBy={groupBy}
             rowKey={(o) => o.id}
             view={view}
             cardValue="total"

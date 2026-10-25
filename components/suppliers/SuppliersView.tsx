@@ -9,7 +9,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DeleteButton, ExportButton } from "@/components/data-table/bulk";
 import { DataTable, type Column } from "@/components/data-table/DataTable";
-import { FilterSelect, ResetFiltersButton, SearchBox, StatTile, FilterBar, ViewBySelect, matches, useViewMode } from "@/components/data-table/controls";
+import { PlusSignIcon } from "@hugeicons/core-free-icons";
+import { ToolbarButton, FilterSelect, ResetFiltersButton, SearchBox, StatTile, FilterBar, ViewBySelect, GroupBySelect, useGroupBy, matches, useViewMode } from "@/components/data-table/controls";
 import { ColumnManager, customColumnDefs, customFieldRows, customText } from "@/components/data-table/custom-columns";
 import { DetailPanel, Fields, PanelSection, SplitView } from "@/components/data-table/DetailPanel";
 import { SupplierDialog } from "./SupplierDialog";
@@ -27,6 +28,7 @@ export function SuppliersView() {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("all");
   const [view, setView] = useViewMode("suppliers", "cards");
+  const [groupBy, setGroupBy] = useGroupBy("suppliers");
   const [target, setTarget] = useState<Supplier | "new" | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const currency = activeTenant?.currency ?? "PHP";
@@ -175,18 +177,20 @@ export function SuppliersView() {
         actions={
           <>
             <ColumnManager table="suppliers" />
-            <Button onClick={() => setTarget("new")}>Add supplier</Button>
+            <ToolbarButton icon={PlusSignIcon} label="Add supplier" short="Add" onClick={() => setTarget("new")} />
           </>
         }
       >
         <SearchBox value={query} onChange={setQuery} placeholder="Search name, contact, phone…" />
         <FilterSelect label="Status" value={status} onChange={setStatus} options={STATUS} />
         <ViewBySelect value={view} onChange={setView} />
+        <GroupBySelect columns={columns} value={groupBy} onChange={setGroupBy} />
         {filtersActive ? <ResetFiltersButton onClick={resetFilters} /> : null}
       </FilterBar>
       <DataTable
         rows={rows}
         columns={columns}
+          groupBy={groupBy}
         rowKey={(s) => s.id}
         view={view}
         cardValue="spent"

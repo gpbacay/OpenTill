@@ -28,7 +28,8 @@ import { ExportButton } from "@/components/data-table/bulk";
 import { DataTable, type Column } from "@/components/data-table/DataTable";
 import { DateRangeFilter } from "@/components/data-table/DateRangeFilter";
 import { DetailPanel, Fields, SplitView } from "@/components/data-table/DetailPanel";
-import { FilterSelect, ResetFiltersButton, SearchBox, StatTile, FilterBar, ViewBySelect, matches, useViewMode } from "@/components/data-table/controls";
+import { FileAddIcon } from "@hugeicons/core-free-icons";
+import { ToolbarButton, FilterSelect, ResetFiltersButton, SearchBox, StatTile, FilterBar, ViewBySelect, GroupBySelect, useGroupBy, matches, useViewMode } from "@/components/data-table/controls";
 import { TablePageSkeleton } from "@/components/loading/PageSkeletons";
 import { ReportActions } from "./ReportDocument";
 import { GenerateReportDialog } from "./GenerateReportDialog";
@@ -63,6 +64,7 @@ export function ReportsView() {
   const [type, setType] = useState(() => params.get("type") ?? "all");
   const [span, setSpan] = useState("all");
   const [view, setView] = useViewMode("reports", "cards");
+  const [groupBy, setGroupBy] = useGroupBy("reports");
   const [range, setRange] = useState(() => rangeFromParams(params, "all"));
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
@@ -150,18 +152,20 @@ export function ReportsView() {
             <StatTile key={s.label} label={s.label} value={formatValue(s.value, s.kind, store.currency)} hint="This month" />
           ))}
         </div>
-        <FilterBar active={filtersActive} actions={<Button onClick={() => setGenerating(true)}>Generate report</Button>}>
+        <FilterBar active={filtersActive} actions={<ToolbarButton icon={FileAddIcon} label="Generate report" short="Generate" onClick={() => setGenerating(true)} />}>
           <SearchBox value={query} onChange={setQuery} placeholder="Search reports…" />
           <FilterSelect label="Report type" value={type} onChange={setType} options={[{ value: "all", label: "All reports" }, ...types]} />
           <FilterSelect label="Period" value={span} onChange={setSpan} options={SPANS} />
           <DateRangeFilter value={range} onChange={setRange} />
           <ViewBySelect value={view} onChange={setView} />
+          <GroupBySelect columns={columns} value={groupBy} onChange={setGroupBy} />
           {filtersActive ? <ResetFiltersButton onClick={resetFilters} /> : null}
         </FilterBar>
         <GenerateReportDialog open={generating} onClose={() => setGenerating(false)} />
         <DataTable
           rows={rows}
           columns={columns}
+            groupBy={groupBy}
           rowKey={reportKey}
           view={view}
           cardValue="total"

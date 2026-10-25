@@ -11,7 +11,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NumberInput } from "@/components/NumberInput";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { Cancel01Icon, Delete02Icon, LayoutThreeColumnIcon, PencilEdit02Icon, Tick02Icon } from "@hugeicons/core-free-icons";
 import type { Column } from "./DataTable";
+import { ToolbarButton } from "./controls";
 
 type WithCustom = { custom?: Record<string, string> };
 
@@ -76,7 +79,7 @@ export function CustomFieldInputs({
   );
 }
 
-/** "Columns" button: add and remove the user's extra columns for one table. Setting them up is the admin's job. */
+/** "Columns" button: add, rename and remove the user's extra columns for one table. Setting them up is the admin's job. */
 export function ColumnManager({ table }: { table: CustomColumnTable }) {
   return isCashier(useAuth().user) ? null : <ColumnEditor table={table} />;
 }
@@ -88,15 +91,42 @@ function ColumnEditor({ table }: { table: CustomColumnTable }) {
   const [label, setLabel] = useState("");
   const [type, setType] = useState<CustomColumn["type"]>("text");
   const [error, setError] = useState("");
+  const [editing, setEditing] = useState<string | null>(null);
+  const [draft, setDraft] = useState("");
   if (!activeTenant) return null;
   const columns = columnsFor(table);
+
+  /** Error when another column already has this name, else "". */
+  const clash = (name: string, except?: string) =>
+    columns.some((column) => column.id !== except && column.label.toLowerCase() === name.toLowerCase())
+      ? `There is already a "${name}" column.`
+      : "";
+
+  const startEdit = (column: CustomColumn) => {
+    setEditing(column.id);
+    setDraft(column.label);
+    setError("");
+  };
+
+  const rename = (event: React.FormEvent, column: CustomColumn) => {
+    event.preventDefault();
+    const name = draft.trim();
+    if (!name) return;
+    const problem = clash(name, column.id);
+    setError(problem);
+    if (problem) return;
+    // Values are stored by column id, so renaming keeps them.
+    if (name !== column.label) saveColumn({ ...column, label: name });
+    setEditing(null);
+  };
 
   const add = (event: React.FormEvent) => {
     event.preventDefault();
     const name = label.trim();
     if (!name) return;
-    if (columns.some((column) => column.label.toLowerCase() === name.toLowerCase())) {
-      setError(`There is already a "${name}" column.`);
+    const problem = clash(name);
+    if (problem) {
+      setError(problem);
       return;
     }
     saveColumn({
@@ -113,9 +143,7 @@ function ColumnEditor({ table }: { table: CustomColumnTable }) {
 
   return (
     <>
-      <Button variant="secondary" onClick={() => setOpen(true)}>
-        Columns{columns.length > 0 ? ` (${columns.length})` : ""}
-      </Button>
+      <ToolbarButton variant="secondary" icon={LayoutThreeColumnIcon} label="Columns" count={columns.length} onClick={() => setOpen(true)} />
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <DialogHeader>
@@ -126,22 +154,75 @@ function ColumnEditor({ table }: { table: CustomColumnTable }) {
           </DialogHeader>
           <ul className="space-y-1">
             {columns.length === 0 ? <li className="text-sm text-muted-foreground">No custom columns yet.</li> : null}
-            {columns.map((column) => (
-              <li key={column.id} className="flex items-center justify-between rounded-md px-2 py-1.5 hover:bg-accent">
-                <span className="text-sm">
-                  {column.label} <span className="text-xs text-muted-foreground">{column.type}</span>
-                </span>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => {
-                    if (window.confirm(`Remove the "${column.label}" column? Its values are hidden but kept.`)) deleteColumn(column.id);
-                  }}
-                >
-                  Remove
-                </Button>
-              </li>
-            ))}
+            {columns.map((column) =>
+              editing === column.id ? (
+                <li key={column.id}>
+                  <form onSubmit={(event) => rename(event, column)} className="flex items-center gap-1 rounded-md bg-accent px-2 py-1">
+                    <Input
+                      autoFocus
+                      aria-label={`New name for ${column.label}`}
+                      value={draft}
+                      onChange={(event) => setDraft(event.target.value)}
+                      onKeyDown={(event) => {
+                        // Escape cancels the rename instead of closing the dialog.
+                        if (event.key === "Escape") {
+                          event.stopPropagation();
+                          setEditing(null);
+                          setError("");
+                        }
+                      }}
+                      maxLength={40}
+                      className="h-7 min-w-0 flex-1"
+                    />
+                    <Button type="submit" size="icon-sm" variant="ghost" aria-label="Save name" title="Save name" disabled={!draft.trim()}>
+                      <HugeiconsIcon icon={Tick02Icon} size={16} />
+                    </Button>
+                    <Button
+                      type="button"
+                      size="icon-sm"
+                      variant="ghost"
+                      aria-label="Cancel"
+                      title="Cancel"
+                      onClick={() => {
+                        setEditing(null);
+                        setError("");
+                      }}
+                    >
+                      <HugeiconsIcon icon={Cancel01Icon} size={16} />
+                    </Button>
+                  </form>
+                </li>
+              ) : (
+                <li key={column.id} className="flex items-center justify-between gap-2 rounded-md px-2 py-1 hover:bg-accent">
+                  <span className="min-w-0 truncate text-sm">
+                    {column.label} <span className="text-xs text-muted-foreground">{column.type}</span>
+                  </span>
+                  <span className="flex shrink-0 gap-1">
+                    <Button
+                      size="icon-sm"
+                      variant="ghost"
+                      aria-label={`Rename ${column.label}`}
+                      title="Rename"
+                      onClick={() => startEdit(column)}
+                    >
+                      <HugeiconsIcon icon={PencilEdit02Icon} size={16} />
+                    </Button>
+                    <Button
+                      size="icon-sm"
+                      variant="ghost"
+                      className="text-destructive"
+                      aria-label={`Remove ${column.label}`}
+                      title="Remove"
+                      onClick={() => {
+                        if (window.confirm(`Remove the "${column.label}" column? Its values are hidden but kept.`)) deleteColumn(column.id);
+                      }}
+                    >
+                      <HugeiconsIcon icon={Delete02Icon} size={16} />
+                    </Button>
+                  </span>
+                </li>
+              )
+            )}
           </ul>
           <form onSubmit={add} className="flex flex-wrap items-end gap-2">
             <div className="min-w-0 flex-1 space-y-1">
