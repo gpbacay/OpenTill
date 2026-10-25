@@ -21,6 +21,8 @@ interface Setting {
   description: string;
   /** Extra words people might search for. */
   keywords?: string;
+  /** Id of the row's switch, so the title toggles it too. */
+  labelFor?: string;
   /** Control on the right of the row. */
   control?: ReactNode;
   /** Full-width content under the row. */
@@ -46,6 +48,8 @@ export default function SettingsPage() {
     activeTenant,
     isDarkMode,
     setIsDarkMode,
+    autoHideNav,
+    setAutoHideNav,
     isOnline,
     isSyncing,
     offlineQueue,
@@ -64,7 +68,17 @@ export default function SettingsPage() {
       title: "Dark theme",
       description: "Use light text on a dark background. Saved on this device.",
       keywords: "light mode dark mode colors appearance",
+      labelFor: "dark-theme",
       control: <Switch id="dark-theme" checked={isDarkMode} onCheckedChange={(checked) => setIsDarkMode(checked)} />,
+    },
+    {
+      id: "bottom-bar",
+      section: "Appearance",
+      title: "Auto-hide bottom bar",
+      description: "On phones, hide the bottom bar after a few seconds. Touch or scroll the screen to bring it back. Saved on this device.",
+      keywords: "navigation nav bar tabs hide show phone mobile",
+      labelFor: "auto-hide-nav",
+      control: <Switch id="auto-hide-nav" checked={autoHideNav} onCheckedChange={setAutoHideNav} />,
     },
     {
       id: "stores",
@@ -166,8 +180,8 @@ export default function SettingsPage() {
                     <div key={s.id} className="space-y-4 p-4">
                       <div className="flex items-center justify-between gap-4">
                         <div className="min-w-0">
-                          {s.id === "theme" ? (
-                            <Label htmlFor="dark-theme" className="text-sm font-medium">
+                          {s.labelFor ? (
+                            <Label htmlFor={s.labelFor} className="text-sm font-medium">
                               {s.title}
                             </Label>
                           ) : (

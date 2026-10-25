@@ -81,7 +81,12 @@ export function OpsProvider({ userId, children }: { userId: string; children: Re
         },
         saveColumn: columns.upsert,
         deleteColumn: columns.remove,
-        columnsFor: (table) => tenantColumns.filter((column) => column.tableName === table),
+        // Brand is a built-in product field; an old custom "Brand" column (cached offline, or a database not yet
+        // migrated) would show twice.
+        columnsFor: (table) =>
+          tenantColumns.filter(
+            (column) => column.tableName === table && !(table === "products" && column.label.trim().toLowerCase() === "brand")
+          ),
         saveCategory: categories.upsert,
         deleteCategory: categories.remove,
       };

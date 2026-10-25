@@ -98,6 +98,7 @@ function ColumnEditor({ table }: { table: CustomColumnTable }) {
 
   /** Error when another column already has this name, else "". */
   const clash = (name: string, except?: string) =>
+    (table === "products" && name.toLowerCase() === "brand") ||
     columns.some((column) => column.id !== except && column.label.toLowerCase() === name.toLowerCase())
       ? `There is already a "${name}" column.`
       : "";

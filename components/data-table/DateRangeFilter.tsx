@@ -1,8 +1,18 @@
 "use client";
 
+import { useMemo } from "react";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { ArrowDown01Icon, Calendar03Icon } from "@hugeicons/core-free-icons";
-import { DateRange, RANGE_PRESETS, RangePreset, presetRange } from "@/lib/periods";
+import { DateRange, RANGE_PRESETS, RangePreset, presetRange, rangeFromParams } from "@/lib/periods";
+import { useFilter } from "./controls";
+
+/** A page's date range, remembered like its other filters. A preset is kept by name, so "This month" follows the calendar. */
+export function useRangeFilter(key: string, params: { get: (key: string) => string | null }, fallback: RangePreset) {
+  const linked = ["from", "to", "preset"].some((name) => params.get(name)) ? rangeFromParams(params, fallback) : undefined;
+  const [saved, setRange] = useFilter<DateRange>(`${key}_range`, presetRange(fallback), linked);
+  const range = useMemo(() => (saved.preset === "custom" ? saved : presetRange(saved.preset)), [saved]);
+  return [range, setRange] as const;
+}
 
 function formatDay(value: string) {
   if (!value) return "";

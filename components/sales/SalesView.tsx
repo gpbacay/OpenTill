@@ -4,9 +4,9 @@ import { useMemo, useState } from "react";
 import { usePos } from "@/contexts/pos-context";
 import { useOps } from "@/contexts/ops-context";
 import { money } from "@/lib/money";
-import { inRange, presetRange, rangeFromParams } from "@/lib/periods";
+import { inRange, presetRange } from "@/lib/periods";
 import { useSearchParams } from "next/navigation";
-import { Order } from "@/lib/types";
+import { Order, Product } from "@/lib/types";
 import { DetailPanel, Fields, SplitView } from "@/components/data-table/DetailPanel";
 import { AnalyticsPanel } from "@/components/AnalyticsPanel";
 import { PrintReceipt } from "@/components/PrintReceipt";
@@ -14,8 +14,8 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DeleteButton, ExportButton } from "@/components/data-table/bulk";
 import { DataTable, type Column } from "@/components/data-table/DataTable";
-import { DateRangeFilter } from "@/components/data-table/DateRangeFilter";
-import { FilterSelect, ResetFiltersButton, SearchBox, StatTile, FilterBar, Toolbar, ViewBySelect, GroupBySelect, useGroupBy, matches, useViewMode } from "@/components/data-table/controls";
+import { DateRangeFilter, useRangeFilter } from "@/components/data-table/DateRangeFilter";
+import { FilterSelects, passesFilters, type RowFilter, ResetFiltersButton, SearchBox, StatTile, FilterBar, Toolbar, ViewBySelect, GroupBySelect, useGroupBy, useFilter, matches, useViewMode } from "@/components/data-table/controls";
 
 const STATUS = [
   { value: "all", label: "All sales" },
@@ -35,14 +35,14 @@ export function SalesView() {
   const { activeTenant, tenantSyncedOrders, products } = usePos();
   const productColumns = useOps().columnsFor("products");
   const params = useSearchParams();
-  const [tab, setTab] = useState<"sales" | "reports">("sales");
-  const [query, setQuery] = useState("");
-  const [status, setStatus] = useState("all");
-  const [payment, setPayment] = useState("all");
-  const [cashier, setCashier] = useState("all");
+  const [tab, setTab] = useFilter<"sales" | "reports">("sales_tab", "sales");
+  const [query, setQuery] = useFilter("sales_query", "");
+  const [status, setStatus] = useFilter("sales_status", "all");
+  const [payment, setPayment] = useFilter("sales_payment", "all");
+  const [cashier, setCashier] = useFilter("sales_cashier", "all");
   const [view, setView] = useViewMode("sales", "table");
-  const [groupBy, setGroupBy] = useGroupBy();
-  const [range, setRange] = useState(() => rangeFromParams(params, "month"));
+  const [groupBy, setGroupBy] = useGroupBy("sales");
+  const [range, setRange] = useRangeFilter("sales", params, "month");
   const [selectedId, setSelectedId] = useState<string | null>(() => params.get("sale"));
   const currency = activeTenant?.currency ?? "PHP";
 
@@ -51,23 +51,28 @@ export function SalesView() {
     [tenantSyncedOrders]
   );
 
-  /** A sale's values for one product column: each distinct value across its items, from the products as they are now. */
+  /** A sale's values for one product field: each distinct value across its items, from the products as they are now. */
   const productValues = useMemo(() => {
     const byId = new Map(products.map((p) => [p.id, p]));
-    return (o: Order, columnId: string) =>
-      [...new Set((o.items ?? []).map((i) => byId.get(i.productId)?.custom?.[columnId]).filter(Boolean))].join(", ");
+    return (o: Order, pick: (p: Product) => string | undefined) =>
+      [...new Set((o.items ?? []).map((i) => { const p = byId.get(i.productId); return p && pick(p); }).filter(Boolean))].join(", ");
   }, [products]);
+  const brands = (o: Order) => productValues(o, (p) => p.brand);
+  const custom = (o: Order, columnId: string) => productValues(o, (p) => p.custom?.[columnId]);
 
+  const filters: RowFilter<Order>[] = [
+    { id: "status", label: "Status", value: status, onChange: setStatus, options: STATUS, test: (o, v) => o.status === v },
+    { id: "payment", label: "Payment", value: payment, onChange: setPayment, options: PAYMENT, test: (o, v) => o.paymentMethod === v },
+    { id: "cashier", label: "Cashier", value: cashier, onChange: setCashier, options: [{ value: "all", label: "All cashiers" }, ...cashiers.map((c) => ({ value: c, label: c }))], test: (o, v) => o.cashierName === v },
+  ];
   const rows = useMemo(
     () =>
       tenantSyncedOrders
         .filter(
           (o) =>
             inRange(o.date, range) &&
-            (status === "all" || o.status === status) &&
-            (payment === "all" || o.paymentMethod === payment) &&
-            (cashier === "all" || o.cashierName === cashier) &&
-            matches(query, o.id, o.customerName, o.cashierName, ...(o.items ?? []).map((i) => i.name), ...productColumns.map((c) => productValues(o, c.id)))
+            passesFilters(o, filters) &&
+            matches(query, o.id, o.customerName, o.cashierName, ...(o.items ?? []).map((i) => i.name), brands(o), ...productColumns.map((c) => custom(o, c.id)))
         )
         .sort((a, b) => b.date.localeCompare(a.date)),
     [tenantSyncedOrders, range, status, payment, cashier, query, productColumns, productValues]
@@ -95,6 +100,7 @@ export function SalesView() {
     { id: "customer", header: "Customer", cell: (o) => o.customerName || "Walk-in" },
     { id: "cashier", header: "Cashier", cell: (o) => o.cashierName || "—" },
     { id: "items", header: "Items", align: "right", cell: (o) => (o.items ? o.items.reduce((s, i) => s + i.quantity, 0) : "—") },
+    { id: "brand", header: "Brand", cell: (o) => brands(o) || "—" },
     { id: "payment", header: "Payment", cell: (o) => PAY_LABEL[o.paymentMethod] ?? o.paymentMethod },
     { id: "discount", header: "Discount", align: "right", cell: (o) => (o.discountAmount ? money(currency, o.discountAmount) : "—") },
     { id: "total", header: "Total", align: "right", cell: (o) => <span className="font-medium">{money(currency, o.total)}</span> },
@@ -107,7 +113,7 @@ export function SalesView() {
     ...productColumns.map((c): Column<Order> => ({
       id: `custom-${c.id}`,
       header: c.label,
-      cell: (o) => productValues(o, c.id) || <span className="text-muted-foreground">—</span>,
+      cell: (o) => custom(o, c.id) || <span className="text-muted-foreground">—</span>,
     })),
   ];
 
@@ -140,28 +146,31 @@ export function SalesView() {
       </DetailPanel>
     ) : null;
 
+  const tabs = (
+    <Tabs
+      value={tab}
+      onValueChange={(v) => {
+        setTab(v as "sales" | "reports");
+        setSelectedId(null);
+      }}
+    >
+      <TabsList>
+        <TabsTrigger value="sales">Sales</TabsTrigger>
+        <TabsTrigger value="reports">Reports</TabsTrigger>
+      </TabsList>
+    </Tabs>
+  );
+
   return (
     <div className="flex h-full min-h-0 flex-col">
       <SplitView panel={panel}>
-      <Toolbar>
-        <Tabs
-          value={tab}
-          onValueChange={(v) => {
-            setTab(v as "sales" | "reports");
-            setSelectedId(null);
-          }}
-        >
-          <TabsList>
-            <TabsTrigger value="sales">Sales</TabsTrigger>
-            <TabsTrigger value="reports">Reports</TabsTrigger>
-          </TabsList>
-        </Tabs>
-      </Toolbar>
-
       {tab === "reports" ? (
-        <div className="min-h-0 flex-1">
-          <AnalyticsPanel orders={tenantSyncedOrders} activeTenant={activeTenant} />
-        </div>
+        <>
+          <Toolbar>{tabs}</Toolbar>
+          <div className="min-h-0 flex-1">
+            <AnalyticsPanel orders={tenantSyncedOrders} activeTenant={activeTenant} />
+          </div>
+        </>
       ) : (
         <>
           <div className="hidden shrink-0 grid-cols-3 gap-3 sm:grid">
@@ -169,12 +178,11 @@ export function SalesView() {
             <StatTile label="Orders" value={totals.count} />
             <StatTile label="Average sale" value={money(currency, totals.avg)} />
           </div>
-          <FilterBar active={filtersActive}>
+          {/* Tabs share the filter button's row so phones don't spend a row on each. */}
+          <FilterBar active={filtersActive} leading={tabs}>
             <SearchBox value={query} onChange={setQuery} placeholder="Search customer, cashier, item…" />
             <DateRangeFilter value={range} onChange={setRange} />
-            <FilterSelect label="Status" value={status} onChange={setStatus} options={STATUS} />
-            <FilterSelect label="Payment" value={payment} onChange={setPayment} options={PAYMENT} />
-            <FilterSelect label="Cashier" value={cashier} onChange={setCashier} options={[{ value: "all", label: "All cashiers" }, ...cashiers.map((c) => ({ value: c, label: c }))]} />
+            <FilterSelects filters={filters} />
             <ViewBySelect value={view} onChange={setView} />
             <GroupBySelect columns={columns} value={groupBy} onChange={setGroupBy} />
             {filtersActive ? <ResetFiltersButton onClick={resetFilters} /> : null}
@@ -183,6 +191,8 @@ export function SalesView() {
             rows={rows}
             columns={columns}
               groupBy={groupBy}
+              stateKey="sales"
+              rowFilters={filters}
             rowKey={(o) => o.id}
             view={view}
             cardValue="total"
@@ -193,8 +203,8 @@ export function SalesView() {
                 <span className="text-muted-foreground">Total {money(currency, chosen.filter((o) => o.status !== "FAILED").reduce((sum, o) => sum + o.total, 0))}</span>
                 <ExportButton
                   filename="sales.csv"
-                  headers={["Date", "ID", "Customer", "Cashier", "Payment", "Discount", "Total", "Status", ...productColumns.map((c) => c.label)]}
-                  rows={chosen.map((o) => [new Date(o.date).toLocaleString(), o.id, o.customerName ?? "Walk-in", o.cashierName ?? "", PAY_LABEL[o.paymentMethod] ?? o.paymentMethod, o.discountAmount ?? 0, o.total, o.status, ...productColumns.map((c) => productValues(o, c.id))])}
+                  headers={["Date", "ID", "Customer", "Cashier", "Payment", "Discount", "Total", "Status", "Brand", ...productColumns.map((c) => c.label)]}
+                  rows={chosen.map((o) => [new Date(o.date).toLocaleString(), o.id, o.customerName ?? "Walk-in", o.cashierName ?? "", PAY_LABEL[o.paymentMethod] ?? o.paymentMethod, o.discountAmount ?? 0, o.total, o.status, brands(o), ...productColumns.map((c) => custom(o, c.id))])}
                 />
               </>
             )}

@@ -39,6 +39,7 @@ export interface Product {
   stock: number;
   description: string;
   // Optional: products cached before these existed won't have them.
+  brand?: string;
   costPrice?: number;
   reorderLevel?: number;
   supplierId?: string | null;

@@ -9,7 +9,7 @@ import { DataTable, type Column } from "@/components/data-table/DataTable";
 import { DetailPanel, Fields, SplitView } from "@/components/data-table/DetailPanel";
 import { DeleteButton } from "@/components/data-table/bulk";
 import { PlusSignIcon } from "@hugeicons/core-free-icons";
-import { ToolbarButton, FilterBar, FilterSelect, ResetFiltersButton, SearchBox, StatTile, ViewBySelect, GroupBySelect, useGroupBy, matches, useViewMode } from "@/components/data-table/controls";
+import { ToolbarButton, FilterBar, FilterSelects, passesFilters, type RowFilter, ResetFiltersButton, SearchBox, StatTile, ViewBySelect, GroupBySelect, useGroupBy, useFilter, matches, useViewMode } from "@/components/data-table/controls";
 import { TablePageSkeleton } from "@/components/loading/PageSkeletons";
 import { CashierDialog } from "./CashierDialog";
 import { CashierInviteDialog } from "./CashierInviteDialog";
@@ -40,10 +40,10 @@ function Activity({ lastSeenAt, now }: { lastSeenAt: string | null; now: number 
 export function CashiersView() {
   const { tenants, handleUpdateTenant } = usePos();
   const { cashiers, error, create, update, remove, invite, resetLink } = useCashiers();
-  const [query, setQuery] = useState("");
-  const [store, setStore] = useState("all");
+  const [query, setQuery] = useFilter("cashiers_query", "");
+  const [store, setStore] = useFilter("cashiers_store", "all");
   const [view, setView] = useViewMode("cashiers", "table");
-  const [groupBy, setGroupBy] = useGroupBy();
+  const [groupBy, setGroupBy] = useGroupBy("cashiers");
   const [target, setTarget] = useState<Cashier | "new" | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [actionError, setActionError] = useState("");
@@ -56,10 +56,13 @@ export function CashiersView() {
   }, []);
   const storeName = (id: string) => tenants.find((t) => t.id === id)?.name ?? "Unknown store";
 
+  const filters: RowFilter<Cashier>[] = [
+    { id: "store", label: "Store", value: store, onChange: setStore, options: [{ value: "all", label: "All stores" }, ...tenants.map((t) => ({ value: t.id, label: t.name }))], test: (c, v) => c.tenantId === v },
+  ];
   const rows = useMemo(
     () =>
       (cashiers ?? [])
-        .filter((c) => (store === "all" || c.tenantId === store) && matches(query, c.id, c.name, c.username, storeName(c.tenantId)))
+        .filter((c) => passesFilters(c, filters) && matches(query, c.id, c.name, c.username, storeName(c.tenantId)))
         .sort((a, b) => a.username.localeCompare(b.username)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [cashiers, store, query, tenants]
@@ -166,7 +169,7 @@ export function CashiersView() {
         </div>
         <FilterBar active={filtersActive} actions={<ToolbarButton icon={PlusSignIcon} label="Add cashier" short="Add" onClick={() => setTarget("new")} />}>
           <SearchBox value={query} onChange={setQuery} placeholder="Search name, username…" />
-          <FilterSelect label="Store" value={store} onChange={setStore} options={[{ value: "all", label: "All stores" }, ...tenants.map((t) => ({ value: t.id, label: t.name }))]} />
+          <FilterSelects filters={filters} />
           <ViewBySelect value={view} onChange={setView} />
           <GroupBySelect columns={columns} value={groupBy} onChange={setGroupBy} />
           {filtersActive ? <ResetFiltersButton onClick={resetFilters} /> : null}
@@ -178,6 +181,8 @@ export function CashiersView() {
           rows={rows}
           columns={columns}
             groupBy={groupBy}
+            stateKey="cashiers"
+            rowFilters={filters}
           rowKey={(c) => c.id}
           view={view}
           cardValue="store"

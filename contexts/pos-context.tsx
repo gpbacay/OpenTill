@@ -36,11 +36,14 @@ interface PosContextValue {
   isSyncing: boolean;
   syncProgress: number;
   isDarkMode: boolean;
+  /** Hide the phone's bottom bar until the screen is touched or scrolled. Saved on this device. */
+  autoHideNav: boolean;
   mobileRegisterTab: "catalog" | "cart";
   mobileMenuOpen: boolean;
   setMobileRegisterTab: (tab: "catalog" | "cart") => void;
   setMobileMenuOpen: (open: boolean) => void;
   setIsDarkMode: (value: boolean | ((prev: boolean) => boolean)) => void;
+  setAutoHideNav: (value: boolean) => void;
   triggerOfflineSync: () => Promise<void>;
   handleAddToCart: (product: Product) => void;
   handleUpdateQuantity: (productId: string, action: "add" | "sub") => void;
@@ -124,6 +127,7 @@ export function PosProvider({
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncProgress, setSyncProgress] = useState(0);
   const [isDarkMode, setIsDarkMode] = useState(true);
+  const [autoHideNav, setAutoHideNav] = useState(false);
   const [mobileRegisterTab, setMobileRegisterTab] = useState<"catalog" | "cart">("catalog");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -161,6 +165,8 @@ export function PosProvider({
       setOfflineQueue(queue);
       setHeldCarts(held);
       setIsDarkMode(readStorage("opentill_theme_dark", true));
+      // New key: the old one saved "on" for every device whether or not anyone chose it, so the off default reaches them too.
+      setAutoHideNav(readStorage("opentill_auto_hide_nav_v2", false));
       outboxRef.current = outbox;
       setScope(userId);
     });
@@ -174,6 +180,10 @@ export function PosProvider({
     localStorage.setItem("opentill_theme_dark", JSON.stringify(isDarkMode));
     document.documentElement.classList.toggle("dark", isDarkMode);
   }, [isDarkMode, hydrated]);
+
+  useEffect(() => {
+    if (hydrated) localStorage.setItem("opentill_auto_hide_nav_v2", JSON.stringify(autoHideNav));
+  }, [autoHideNav, hydrated]);
 
   const activeTenant = useMemo(() => {
     return tenants.find((t) => t.id === activeTenantId) ?? null;
@@ -816,6 +826,8 @@ export function PosProvider({
     setMobileRegisterTab,
     setMobileMenuOpen,
     setIsDarkMode,
+    autoHideNav,
+    setAutoHideNav,
     triggerOfflineSync,
     handleAddToCart,
     handleUpdateQuantity,

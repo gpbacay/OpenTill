@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import Link from "next/link";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
@@ -16,7 +16,7 @@ import { canOpen } from "@/components/layout/Sidebar";
 import { isCashier } from "@/lib/local-auth";
 import { Button } from "@/components/ui/button";
 import { TablePageSkeleton } from "@/components/loading/PageSkeletons";
-import { ResetFiltersButton } from "@/components/data-table/controls";
+import { ResetFiltersButton, useFilter } from "@/components/data-table/controls";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const ICONS = {
@@ -55,7 +55,7 @@ export function ActivityView() {
   const { user } = useAuth();
   // Cashiers only get sales; the other kinds come from back-office records they can't read.
   const filters = isCashier(user) ? FILTERS.filter((option) => ["all", "unread", "sale"].includes(option.value)) : FILTERS;
-  const [filter, setFilter] = useState<ActivityFilter>("all");
+  const [filter, setFilter] = useFilter<ActivityFilter>("activity_kind", "all");
   const visibleActivities = useMemo(
     () =>
       activities.filter((item) => {

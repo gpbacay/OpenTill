@@ -29,7 +29,7 @@ interface Props {
   onClose: () => void;
 }
 
-const blank = { name: "", sku: "", category: "", supplierId: "", costPrice: "", price: "", stock: "", reorderLevel: "5", description: "" };
+const blank = { name: "", brand: "", sku: "", category: "", supplierId: "", costPrice: "", price: "", stock: "", reorderLevel: "5", description: "" };
 
 export function ProductDialog({ target, onClose }: Props) {
   const { products, activeTenant, handleAddProduct, handleUpdateProduct, handleDeleteProduct } = usePos();
@@ -53,6 +53,7 @@ export function ProductDialog({ target, onClose }: Props) {
     }
     setForm({
       name: target.name,
+      brand: target.brand ?? "",
       sku: target.sku,
       category: target.category,
       supplierId: target.supplierId ?? "",
@@ -84,6 +85,7 @@ export function ProductDialog({ target, onClose }: Props) {
     const ok = check(
       collect({
         "p-name": required(form.name, "Enter the product name.") ?? maxLength(form.name, 80, "Name"),
+        "p-brand": maxLength(form.brand, 60, "Brand"),
         "p-sku": /\s/.test(sku) ? "A SKU can't contain spaces." : clash ? `${sku.toUpperCase()} is already used by ${clash.name}.` : undefined,
         "p-category": required(form.category, setUp.length ? "Pick a category." : "Enter a category.") ?? maxLength(form.category, 40, "Category"),
         "p-cost": numberError(form.costPrice, "the cost", { min: 0 }),
@@ -103,6 +105,7 @@ export function ProductDialog({ target, onClose }: Props) {
       id: editing?.id ?? uid("prod"),
       tenantId: activeTenant.id,
       name: form.name.trim(),
+      brand: form.brand.trim(),
       sku:
         sku.toUpperCase() ||
         generateSku(
@@ -154,6 +157,11 @@ export function ProductDialog({ target, onClose }: Props) {
             <Label htmlFor="p-name" required>Name</Label>
             <Input id="p-name" {...invalid(errors, "p-name")} value={form.name} onChange={set("name")} autoFocus />
             <FieldError errors={errors} id="p-name" />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="p-brand">Brand</Label>
+            <Input id="p-brand" {...invalid(errors, "p-brand")} value={form.brand} onChange={set("brand")} />
+            <FieldError errors={errors} id="p-brand" />
           </div>
           <div className="grid grid-cols-2 gap-2">
             <div className="space-y-1">

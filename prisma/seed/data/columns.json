@@ -1,11 +1,5 @@
 [
   {
-    "key": "brand",
-    "tableName": "products",
-    "label": "Brand",
-    "type": "text"
-  },
-  {
     "key": "shelf",
     "tableName": "products",
     "label": "Shelf",

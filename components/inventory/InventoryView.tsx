@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DeleteButton, ExportButton } from "@/components/data-table/bulk";
 import { DataTable, type Column } from "@/components/data-table/DataTable";
-import { ToolbarButton, FilterSelect, ResetFiltersButton, SearchBox, StatTile, FilterBar, ViewBySelect, GroupBySelect, useGroupBy, matches, useViewMode } from "@/components/data-table/controls";
+import { ToolbarButton, FilterSelects, passesFilters, type RowFilter, ResetFiltersButton, SearchBox, StatTile, FilterBar, ViewBySelect, GroupBySelect, useGroupBy, useFilter, matches, useViewMode } from "@/components/data-table/controls";
 import { ColumnManager, customColumnDefs, customFieldRows, customText } from "@/components/data-table/custom-columns";
 import { DetailPanel, Fields, PanelSection, SplitView } from "@/components/data-table/DetailPanel";
 import { ProductDialog } from "./ProductDialog";
@@ -30,6 +30,9 @@ const STATUS_OPTIONS = [
   { value: "ok", label: "In stock" },
 ];
 
+const byStockLevel = (p: Product, value: string) => (value === "restock" ? stockState(p) !== "ok" : stockState(p) === value);
+const bySupplier = (row: { supplierId?: string | null }, value: string) => (row.supplierId ?? "") === (value === "none" ? "" : value);
+
 const TYPE_OPTIONS = [
   { value: "all", label: "All changes" },
   { value: "RESTOCK", label: "Restocks" },
@@ -44,19 +47,20 @@ export function InventoryView() {
   const { products, activeTenant, handleDeleteProduct } = usePos();
   const { suppliers, movements, columnsFor, ready } = useOps();
   const params = useSearchParams();
-  const [tab, setTab] = useState<"stock" | "history">("stock");
-  const [query, setQuery] = useState("");
-  const [category, setCategory] = useState("all");
-  const [status, setStatus] = useState(() => pickParam(params.get("status"), STATUS_OPTIONS.map((o) => o.value), "all"));
-  const [supplier, setSupplier] = useState("all");
-  const [type, setType] = useState("all");
+  const [tab, setTab] = useFilter<"stock" | "history">("inventory_tab", "stock");
+  const [query, setQuery] = useFilter("inventory_query", "");
+  const [category, setCategory] = useFilter("inventory_category", "all");
+  const linkedStatus = params.get("status");
+  const [status, setStatus] = useFilter("inventory_status", "all", linkedStatus ? pickParam(linkedStatus, STATUS_OPTIONS.map((o) => o.value), "all") : undefined);
+  const [supplier, setSupplier] = useFilter("inventory_supplier", "all");
+  const [type, setType] = useFilter("stock-history_type", "all");
   const [productTarget, setProductTarget] = useState<Product | "new" | null>(null);
   const [stockAction, setStockAction] = useState<StockAction | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [stockView, setStockView] = useViewMode("inventory", "cards");
   const [historyView, setHistoryView] = useViewMode("stock-history", "table");
-  const [stockGroup, setStockGroup] = useGroupBy();
-  const [historyGroup, setHistoryGroup] = useGroupBy();
+  const [stockGroup, setStockGroup] = useGroupBy("inventory");
+  const [historyGroup, setHistoryGroup] = useGroupBy("stock-history");
 
   const tenantId = activeTenant?.id;
   const catalog = useMemo(() => products.filter((p) => p.tenantId === tenantId), [products, tenantId]);
@@ -74,15 +78,29 @@ export function InventoryView() {
     [catalog]
   );
 
+  const stockFilters: RowFilter<Product>[] = [
+    { id: "category", label: "Category", value: category, onChange: setCategory, options: [{ value: "all", label: "All categories" }, ...categories.map((c) => ({ value: c, label: c }))], test: (p, v) => p.category === v },
+    { id: "status", label: "Stock level", value: status, onChange: setStatus, options: STATUS_OPTIONS, test: byStockLevel },
+    {
+      id: "supplier",
+      label: "Supplier",
+      value: supplier,
+      onChange: setSupplier,
+      options: [{ value: "all", label: "All suppliers" }, { value: "none", label: "No supplier" }, ...suppliers.map((s) => ({ value: s.id, label: s.name }))],
+      test: bySupplier,
+    },
+  ];
+  const historyFilters: RowFilter<StockMovement>[] = [
+    { id: "type", label: "Change type", value: type, onChange: setType, options: TYPE_OPTIONS, test: (m, v) => m.type === v },
+  ];
+
   const stockRows = useMemo(
     () =>
       catalog
         .filter(
           (p) =>
-            (category === "all" || p.category === category) &&
-            (status === "all" || (status === "restock" ? stockState(p) !== "ok" : stockState(p) === status)) &&
-            (supplier === "all" || (p.supplierId ?? "") === (supplier === "none" ? "" : supplier)) &&
-            matches(query, p.id, p.name, p.sku, p.category, supplierName(p.supplierId), customText(p))
+            passesFilters(p, stockFilters) &&
+            matches(query, p.id, p.name, p.brand, p.sku, p.category, supplierName(p.supplierId), customText(p))
         )
         .sort((a, b) => a.name.localeCompare(b.name)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -92,7 +110,7 @@ export function InventoryView() {
   const historyRows = useMemo(
     () =>
       movements
-        .filter((m) => (type === "all" || m.type === type) && matches(query, m.id, m.productName, m.note, supplierName(m.supplierId)))
+        .filter((m) => passesFilters(m, historyFilters) && matches(query, m.id, m.productName, m.note, supplierName(m.supplierId)))
         .sort((a, b) => b.date.localeCompare(a.date)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [movements, type, query, suppliers]
@@ -103,6 +121,7 @@ export function InventoryView() {
     {
       id: "name",
       header: "Product",
+      groupable: false,
       cell: (p) => (
         <div className="min-w-40">
           <p className="font-medium">{p.name}</p>
@@ -110,6 +129,7 @@ export function InventoryView() {
         </div>
       ),
     },
+    { id: "brand", header: "Brand", cell: (p) => p.brand || "—" },
     { id: "supplier", header: "Supplier", cell: (p) => supplierName(p.supplierId) },
     { id: "cost", header: "Cost", align: "right", cell: (p) => money(currency, p.costPrice ?? 0) },
     { id: "price", header: "Price", align: "right", cell: (p) => money(currency, p.price) },
@@ -188,6 +208,7 @@ export function InventoryView() {
         rows={[
           ["ID", <span key="product-id" className="break-all font-mono text-xs">{selected.id}</span>],
           ["Category", selected.category],
+          ["Brand", selected.brand || "—"],
           ["Supplier", supplierName(selected.supplierId)],
           ["Cost", money(currency, selected.costPrice ?? 0)],
           ["Price", `${money(currency, selected.price)} (${margin}% margin)`],
@@ -269,20 +290,7 @@ export function InventoryView() {
         }
       >
         <SearchBox value={query} onChange={setQuery} placeholder={tab === "stock" ? "Search name, SKU, brand…" : "Search history"} />
-        {tab === "stock" ? (
-          <>
-            <FilterSelect label="Category" value={category} onChange={setCategory} options={[{ value: "all", label: "All categories" }, ...categories.map((c) => ({ value: c, label: c }))]} />
-            <FilterSelect label="Stock level" value={status} onChange={setStatus} options={STATUS_OPTIONS} />
-            <FilterSelect
-              label="Supplier"
-              value={supplier}
-              onChange={setSupplier}
-              options={[{ value: "all", label: "All suppliers" }, { value: "none", label: "No supplier" }, ...suppliers.map((s) => ({ value: s.id, label: s.name }))]}
-            />
-          </>
-        ) : (
-          <FilterSelect label="Change type" value={type} onChange={setType} options={TYPE_OPTIONS} />
-        )}
+        {tab === "stock" ? <FilterSelects filters={stockFilters} /> : <FilterSelects filters={historyFilters} />}
         <ViewBySelect value={tab === "stock" ? stockView : historyView} onChange={tab === "stock" ? setStockView : setHistoryView} />
         <GroupBySelect
           columns={tab === "stock" ? stockColumns : historyColumns}
@@ -297,6 +305,7 @@ export function InventoryView() {
           rows={stockRows}
           columns={stockColumns}
           groupBy={stockGroup}
+          rowFilters={stockFilters}
           rowKey={(p) => p.id}
           view={stockView}
           cardTitle="name"
@@ -310,8 +319,8 @@ export function InventoryView() {
             <>
               <ExportButton
                 filename="products.csv"
-                headers={["ID", "Name", "SKU", "Category", "Supplier", "Cost", "Price", "In stock", "Warn at", ...customColumns.map((c) => c.label)]}
-                rows={chosen.map((p) => [p.id, p.name, p.sku, p.category, supplierName(p.supplierId), p.costPrice ?? 0, p.price, p.stock, reorderLevel(p), ...customColumns.map((c) => p.custom?.[c.id] ?? "")])}
+                headers={["ID", "Name", "Brand", "SKU", "Category", "Supplier", "Cost", "Price", "In stock", "Warn at", ...customColumns.map((c) => c.label)]}
+                rows={chosen.map((p) => [p.id, p.name, p.brand ?? "", p.sku, p.category, supplierName(p.supplierId), p.costPrice ?? 0, p.price, p.stock, reorderLevel(p), ...customColumns.map((c) => p.custom?.[c.id] ?? "")])}
               />
               <DeleteButton
                 count={chosen.length}
@@ -331,6 +340,8 @@ export function InventoryView() {
           rows={historyRows}
           columns={historyColumns}
           groupBy={historyGroup}
+          stateKey="stock-history"
+          rowFilters={historyFilters}
           rowKey={(m) => m.id}
           view={historyView}
           cardValue="qty"

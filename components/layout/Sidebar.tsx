@@ -50,21 +50,21 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 
-// `primary` items sit in the phone's bottom bar; Register is the bar's "+" button; the rest live in the hamburger menu.
+// The phone's bottom bar picks its tabs in app/(pos)/layout.tsx; the rest live in the hamburger menu.
 export const MENU_ITEMS = [
-  { id: "home", href: "/", label: "Dashboard", icon: Home01Icon, primary: true },
-  { id: "suppliers", href: "/suppliers", label: "Suppliers", icon: TruckDeliveryIcon, primary: true },
-  { id: "inventory", href: "/inventory", label: "Inventory", icon: Package01Icon, primary: true },
-  { id: "records", href: "/records", label: "Sales", icon: Invoice01Icon, primary: true },
-  { id: "orders", href: "/orders", label: "Register", icon: ShoppingCart01Icon, primary: false },
-  { id: "expenses", href: "/expenses", label: "Expenses", icon: Wallet01Icon, primary: false },
-  { id: "reports", href: "/reports", label: "Reports", icon: Analytics01Icon, primary: false },
-  { id: "activity", href: "/activity", label: "Recent activity", icon: Notification03Icon, primary: false },
-  { id: "stores", href: "/stores", label: "Stores", icon: Store01Icon, primary: false },
-  { id: "cashiers", href: "/cashiers", label: "Cashiers", icon: UserGroupIcon, primary: false },
-  { id: "settings", href: "/settings", label: "Settings", icon: Settings01Icon, primary: false },
-  { id: "help", href: "/help", label: "Help center", icon: HelpCircleIcon, primary: false },
-  { id: "about", href: "/about", label: "About", icon: InformationCircleIcon, primary: false },
+  { id: "home", href: "/", label: "Dashboard", icon: Home01Icon },
+  { id: "suppliers", href: "/suppliers", label: "Suppliers", icon: TruckDeliveryIcon },
+  { id: "inventory", href: "/inventory", label: "Inventory", icon: Package01Icon },
+  { id: "records", href: "/records", label: "Sales", icon: Invoice01Icon },
+  { id: "orders", href: "/orders", label: "Register", icon: ShoppingCart01Icon },
+  { id: "expenses", href: "/expenses", label: "Expenses", icon: Wallet01Icon },
+  { id: "reports", href: "/reports", label: "Reports", icon: Analytics01Icon },
+  { id: "activity", href: "/activity", label: "Recent activity", icon: Notification03Icon },
+  { id: "stores", href: "/stores", label: "Stores", icon: Store01Icon },
+  { id: "cashiers", href: "/cashiers", label: "Cashiers", icon: UserGroupIcon },
+  { id: "settings", href: "/settings", label: "Settings", icon: Settings01Icon },
+  { id: "help", href: "/help", label: "Help center", icon: HelpCircleIcon },
+  { id: "about", href: "/about", label: "About", icon: InformationCircleIcon },
 ] as const;
 
 /** Whether `user` may open `href` (query string ignored). Cashiers get the Register, Account and the pages their admin turned on. */

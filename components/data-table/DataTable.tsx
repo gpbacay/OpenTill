@@ -2,8 +2,20 @@
 
 import { Fragment, isValidElement, useEffect, useState, type DragEvent, type KeyboardEvent, type ReactNode } from "react";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { ArrowDown01Icon, Image01Icon } from "@hugeicons/core-free-icons";
+import { ArrowDown01Icon, FilterHorizontalIcon, Image01Icon, MultiplicationSignIcon, Search01Icon } from "@hugeicons/core-free-icons";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { passesFilters, useFilter, type RowFilter } from "./controls";
 
 export interface Column<T> {
   id: string;
@@ -13,6 +25,8 @@ export interface Column<T> {
   className?: string;
   /** Group label when rows are grouped by this column. Defaults to the cell's text, with groups sorted A–Z; when given, groups keep the rows' order (e.g. newest day first). */
   group?: (row: T) => string;
+  /** false hides it from "View by column", e.g. the name column of a list of those things: one group per row. */
+  groupable?: false;
 }
 
 interface DataTableProps<T> {
@@ -43,6 +57,10 @@ interface DataTableProps<T> {
   columnOrderKey?: string;
   /** Column id to group rows under collapsible headers. Ignored when no column has this id. */
   groupBy?: string;
+  /** Remembers each group's own search and filters on this device under this key. Defaults to `columnOrderKey`. */
+  stateKey?: string;
+  /** The page's filters, offered again inside each group with only the choices that group has. */
+  rowFilters?: RowFilter<T>[];
   /** Row photo: a cover on cards and a thumbnail in the table. Return "" or undefined for a placeholder. */
   image?: (row: T) => string | undefined;
 }
@@ -51,7 +69,7 @@ interface DataTableProps<T> {
 // touch screens). The select-all checkbox in the header is always visible so a selection can always be undone.
 const REVEAL = "opacity-0 group-hover/row:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100";
 
-/** Column order saved on this device. Columns not in the saved order (e.g. newly added custom ones) go last. */
+/** Column order saved on this device. A column the saved order hasn't seen yet (e.g. a new one) goes right after the one it follows by default. */
 function useColumnOrder<T>(columns: Column<T>[], key?: string) {
   const storageKey = `opentill_columns_${key}`;
   const [saved, setSaved] = useState<string[]>([]);
@@ -63,8 +81,11 @@ function useColumnOrder<T>(columns: Column<T>[], key?: string) {
     } catch {}
   }, [key, storageKey]);
 
-  const rank = (id: string) => (saved.includes(id) ? saved.indexOf(id) : Infinity);
-  const ordered = key ? [...columns].sort((a, b) => rank(a.id) - rank(b.id)) : columns;
+  const ordered = key ? columns.filter((column) => saved.includes(column.id)).sort((a, b) => saved.indexOf(a.id) - saved.indexOf(b.id)) : [...columns];
+  if (key)
+    columns.forEach((column, i) => {
+      if (!saved.includes(column.id)) ordered.splice(i === 0 ? 0 : ordered.indexOf(columns[i - 1]) + 1, 0, column);
+    });
 
   const move = (id: string, to: number) => {
     const ids = ordered.map((column) => column.id).filter((other) => other !== id);
@@ -99,6 +120,21 @@ function groupRows<T>(rows: T[], column?: Column<T>): Group<T>[] {
   }
   const list = [...groups].map(([key, rows]) => ({ key, rows }));
   return column.group ? list : list.sort((a, b) => a.key.localeCompare(b.key, undefined, { numeric: true }));
+}
+
+/** One group's own search, and its own value for each of the page's filters (by filter id; missing means "all"). */
+type GroupFilter = { query: string; filters: Record<string, string> };
+
+function passes<T>(row: T, columns: Column<T>[], rowFilters: RowFilter<T>[], { query, filters }: GroupFilter) {
+  if (!passesFilters(row, rowFilters, filters)) return false;
+  const q = query.trim().toLowerCase();
+  return !q || columns.some((column) => textOf(column.cell(row)).toLowerCase().includes(q));
+}
+
+/** A page filter as offered inside one group: its "all" option plus only the choices some row of the group has. */
+function groupChoices<T>(rows: T[], filter: RowFilter<T>, chosen?: string) {
+  const [all, ...rest] = filter.options;
+  return [all, ...rest.filter((option) => option.value === chosen || rows.some((row) => filter.test(row, option.value)))];
 }
 
 /**
@@ -149,6 +185,8 @@ export function DataTable<T>({
   cardValue,
   columnOrderKey,
   groupBy,
+  stateKey,
+  rowFilters = [],
   image,
 }: DataTableProps<T>) {
   const [ordered, moveColumn] = useColumnOrder(givenColumns, columnOrderKey);
@@ -162,10 +200,26 @@ export function DataTable<T>({
   useEffect(() => setPicked(new Set()), [resetKey]);
   useEffect(() => setOpened(new Set()), [groupBy]);
 
-  const groupColumn = ordered.find((column) => column.id === groupBy);
+  const groupColumn = ordered.find((column) => column.id === groupBy && column.groupable !== false);
   // The grouped column's value is already in each group header.
   const columns = ordered.filter((column) => column !== groupColumn);
-  const groups = groupRows(rows, groupColumn);
+  const [groupFilters, setGroupFilters] = useFilter<Record<string, GroupFilter>>(`${stateKey ?? columnOrderKey ?? "table"}_${groupBy}_groups`, {});
+  // `filters ?? {}`: older saves held a single column filter instead.
+  const filterOf = (key: string): GroupFilter => ({ query: groupFilters[key]?.query ?? "", filters: groupFilters[key]?.filters ?? {} });
+  const setGroupFilter = (key: string, change: Partial<GroupFilter>) => {
+    const next = { ...filterOf(key), ...change };
+    next.filters = Object.fromEntries(Object.entries(next.filters).filter(([, value]) => value !== "all"));
+    const rest = Object.fromEntries(Object.entries(groupFilters).filter(([other]) => other !== key));
+    setGroupFilters(next.query || Object.keys(next.filters).length ? { ...rest, [key]: next } : rest);
+  };
+  const resetGroup = (key: string) => setGroupFilter(key, { query: "", filters: {} });
+  const allGroups = groupRows(rows, groupColumn);
+  const totals = new Map(allGroups.map((group) => [group.key, group.rows]));
+  // Each group narrows its own rows with its search and filter; the page's filters already ran.
+  const groups = allGroups.map((group) =>
+    group.key !== null && groupFilters[group.key] ? { ...group, rows: group.rows.filter((row) => passes(row, columns, rowFilters, filterOf(group.key!))) } : group
+  );
+  const listed = groups.flatMap((group) => group.rows);
   // Grouped rows show all at once: closed groups already keep the list short.
   const pages = paginate(groups, opened, groupColumn ? Infinity : pageSize);
   const pageCount = pages.length;
@@ -183,25 +237,129 @@ export function DataTable<T>({
       return next;
     });
 
+  /**
+   * Group row: open/close, plus (when open) the group's own search, the page's filters narrowed to this group, and a
+   * reset once either is used, right after its name on the one line.
+   */
   const groupHeader = (section: Section<T>) => {
     if (section.key === null || !groupColumn) return null;
-    const open = opened.has(section.key);
+    const key = section.key;
+    const open = opened.has(key);
+    const all = totals.get(key) ?? [];
+    const own = filterOf(key);
+    // A filter with one real choice left (or none) can't narrow this group, unless it is already set here.
+    const menus = open
+      ? rowFilters
+          .map((filter) => ({ filter, choices: groupChoices(all, filter, own.filters[filter.id]) }))
+          .filter(({ filter, choices }) => choices.length > 2 || own.filters[filter.id])
+      : [];
+    const setHere = menus.filter(({ filter }) => own.filters[filter.id]);
+    const filterLabel = setHere.length
+      ? setHere.map(({ filter, choices }) => `${filter.label}: ${choices.find((c) => c.value === own.filters[filter.id])?.label}`).join(", ")
+      : `Filter ${key}`;
+    const narrowed = Boolean(own.query || Object.keys(own.filters).length);
     return (
-      <button
-        type="button"
-        aria-expanded={open}
-        onClick={() => toggleGroup(section.key!)}
-        className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm font-semibold hover:bg-accent/60"
+      <div
+        className="flex items-center gap-2 pr-2 hover:bg-accent/60"
+        onClick={(event) => {
+          if (event.target === event.currentTarget) toggleGroup(key);
+        }}
       >
-        <HugeiconsIcon icon={ArrowDown01Icon} size={16} className={`shrink-0 text-muted-foreground transition-transform ${open ? "" : "-rotate-90"}`} />
-        <span className="sr-only">{groupColumn.header}</span>
-        <span className="truncate text-foreground">{section.key}</span>
-        <span className="ml-auto rounded-full bg-muted px-2 text-xs font-medium tabular-nums text-muted-foreground">{section.count}</span>
-      </button>
+        <button
+          type="button"
+          aria-expanded={open}
+          onClick={() => toggleGroup(key)}
+          className="flex min-w-0 items-center gap-2 py-2.5 pl-3 text-left text-sm font-semibold"
+        >
+          <HugeiconsIcon icon={ArrowDown01Icon} size={16} className={`shrink-0 text-muted-foreground transition-transform ${open ? "" : "-rotate-90"}`} />
+          <span className="sr-only">{groupColumn.header}</span>
+          <span className="truncate text-foreground">{key}</span>
+          <span className="shrink-0 rounded-full bg-muted px-2 text-xs font-medium tabular-nums text-muted-foreground">
+            {section.count < all.length ? `${section.count}/${all.length}` : all.length}
+          </span>
+        </button>
+        {open ? (
+          <>
+            <label className="relative shrink-0">
+              <HugeiconsIcon icon={Search01Icon} size={14} className="pointer-events-none absolute top-1/2 left-2 -translate-y-1/2 text-muted-foreground" />
+              <input
+                type="search"
+                value={own.query}
+                onChange={(event) => setGroupFilter(key, { query: event.target.value })}
+                placeholder="Search"
+                aria-label={`Search ${key}`}
+                // Narrow until used, so it never crowds the group name on phones.
+                className={`h-7 rounded-md bg-input pr-1.5 pl-7 text-xs outline-none transition-[width] focus-visible:ring-2 focus-visible:ring-ring ${own.query ? "w-32 sm:w-44" : "w-24 focus:w-32 sm:focus:w-44"}`}
+              />
+            </label>
+            {menus.length ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    title={filterLabel}
+                    aria-label={filterLabel}
+                    className={`flex size-7 shrink-0 items-center justify-center rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                      setHere.length ? "bg-primary text-primary-foreground" : "bg-input text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    <HugeiconsIcon icon={FilterHorizontalIcon} size={14} />
+                  </button>
+                </DropdownMenuTrigger>
+                {/* One short line per filter; its choices open beside it, so a long list never fills the screen. */}
+                <DropdownMenuContent align="start" className="w-auto min-w-44">
+                  <DropdownMenuLabel>Filter {key}</DropdownMenuLabel>
+                  {menus.map(({ filter, choices }) => (
+                    <DropdownMenuSub key={filter.id}>
+                      <DropdownMenuSubTrigger>
+                        {filter.label}
+                        {own.filters[filter.id] ? (
+                          <span className="ml-auto max-w-28 truncate pl-3 text-xs text-muted-foreground">
+                            {choices.find((choice) => choice.value === own.filters[filter.id])?.label}
+                          </span>
+                        ) : null}
+                      </DropdownMenuSubTrigger>
+                      <DropdownMenuSubContent className="max-h-72 overflow-y-auto">
+                        <DropdownMenuRadioGroup
+                          value={own.filters[filter.id] ?? choices[0].value}
+                          onValueChange={(value) => setGroupFilter(key, { filters: { ...own.filters, [filter.id]: value } })}
+                        >
+                          {choices.map((choice) => (
+                            <DropdownMenuRadioItem key={choice.value} value={choice.value}>
+                              {choice.label}
+                            </DropdownMenuRadioItem>
+                          ))}
+                        </DropdownMenuRadioGroup>
+                      </DropdownMenuSubContent>
+                    </DropdownMenuSub>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : null}
+            {narrowed ? (
+              <button
+                type="button"
+                onClick={() => resetGroup(key)}
+                title={`Reset filters for ${key}`}
+                aria-label={`Reset filters for ${key}`}
+                className="flex size-7 shrink-0 items-center justify-center rounded-md bg-input text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <HugeiconsIcon icon={MultiplicationSignIcon} size={14} />
+              </button>
+            ) : null}
+          </>
+        ) : null}
+      </div>
     );
   };
 
-  const available = rows.filter((row) => !isRowDisabled?.(row));
+  /** Shown inside an open group whose own search or filter leaves nothing. */
+  const noGroupMatch = (section: Section<T>) =>
+    section.key !== null && opened.has(section.key) && section.rows.length === 0 && groupFilters[section.key] ? (
+      <p className="px-3 py-3 text-center text-xs text-muted-foreground">Nothing in {section.key} matches.</p>
+    ) : null;
+
+  const available = listed.filter((row) => !isRowDisabled?.(row));
   const availableOnPage = visible.filter((row) => !isRowDisabled?.(row));
   // Only actionable rows still in the table count, so filtering or disabling a row never exposes a stale selection.
   const chosen = available.filter((row) => picked.has(rowKey(row)));
@@ -313,6 +471,7 @@ export function DataTable<T>({
             sections.map((section) => (
             <div key={section.key ?? ""} className="mb-3 last:mb-0">
             {section.key !== null ? <div className="mb-2 overflow-hidden rounded-lg bg-muted/30">{groupHeader(section)}</div> : null}
+            {noGroupMatch(section)}
             <ul
               className={`grid gap-3 ${
                 image ? "grid-cols-2 md:grid-cols-3" : "grid-cols-1 sm:grid-cols-2 xl:grid-cols-3"
@@ -463,6 +622,11 @@ export function DataTable<T>({
                   </td>
                 </tr>
               ) : null}
+              {noGroupMatch(section) ? (
+                <tr>
+                  <td colSpan={columns.length + (selectable ? 1 : 0) + (image ? 1 : 0)}>{noGroupMatch(section)}</td>
+                </tr>
+              ) : null}
               {section.rows.map((row) => {
                 const item = rowState(row);
                 return (
@@ -500,7 +664,7 @@ export function DataTable<T>({
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 px-3 py-2 text-xs text-muted-foreground shadow-[0_-1px_0_var(--input)]">
         <span className="flex items-center gap-2">
           {groupColumn
-            ? `${rows.length} results in ${groups.length} ${groups.length === 1 ? "group" : "groups"}`
+            ? `${listed.length} results in ${groups.length} ${groups.length === 1 ? "group" : "groups"}`
             : visible.length === 0
               ? `${rows.length} results`
               : `${start + 1}–${start + visible.length} of ${shown}`}

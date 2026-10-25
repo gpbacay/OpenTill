@@ -9,7 +9,7 @@ import { DataTable, type Column } from "@/components/data-table/DataTable";
 import { DetailPanel, Fields, SplitView } from "@/components/data-table/DetailPanel";
 import { ExportButton } from "@/components/data-table/bulk";
 import { PlusSignIcon } from "@hugeicons/core-free-icons";
-import { ToolbarButton, FilterBar, FilterSelect, ResetFiltersButton, SearchBox, StatTile, ViewBySelect, GroupBySelect, useGroupBy, matches, useViewMode } from "@/components/data-table/controls";
+import { ToolbarButton, FilterBar, FilterSelects, passesFilters, type RowFilter, ResetFiltersButton, SearchBox, StatTile, ViewBySelect, GroupBySelect, useGroupBy, useFilter, matches, useViewMode } from "@/components/data-table/controls";
 import { DeleteStoresDialog } from "./DeleteStoresDialog";
 import { StoreDialog } from "./StoreDialog";
 import { useCashiers } from "./use-cashiers";
@@ -19,11 +19,11 @@ const pct = (rate: number) => `${+(rate * 100).toFixed(2)}%`;
 export function StoresView() {
   const { tenants, activeTenant, products, syncedOrders, handleSwitchTenant, handleDeleteTenants } = usePos();
   const { cashiers, reload } = useCashiers();
-  const [query, setQuery] = useState("");
-  const [business, setBusiness] = useState("all");
-  const [currency, setCurrency] = useState("all");
+  const [query, setQuery] = useFilter("stores_query", "");
+  const [business, setBusiness] = useFilter("stores_business", "all");
+  const [currency, setCurrency] = useFilter("stores_currency", "all");
   const [view, setView] = useViewMode("stores", "table");
-  const [groupBy, setGroupBy] = useGroupBy();
+  const [groupBy, setGroupBy] = useGroupBy("stores");
   const [target, setTarget] = useState<Tenant | "new" | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [error, setError] = useState("");
@@ -45,13 +45,16 @@ export function StoresView() {
 
   const businesses = [...new Set(tenants.map((t) => t.businessType))].sort();
   const currencies = [...new Set(tenants.map((t) => t.currency))].sort();
+  const filters: RowFilter<Tenant>[] = [
+    { id: "business", label: "Business", value: business, onChange: setBusiness, options: [{ value: "all", label: "All businesses" }, ...businesses.map((b) => ({ value: b, label: b }))], test: (t, v) => t.businessType === v },
+    { id: "currency", label: "Currency", value: currency, onChange: setCurrency, options: [{ value: "all", label: "All currencies" }, ...currencies.map((c) => ({ value: c, label: c }))], test: (t, v) => t.currency === v },
+  ];
   const rows = useMemo(
     () =>
       tenants
         .filter(
           (t) =>
-            (business === "all" || t.businessType === business) &&
-            (currency === "all" || t.currency === currency) &&
+            passesFilters(t, filters) &&
             matches(query, t.id, t.name, t.businessType, t.currency)
         )
         .sort((a, b) => a.name.localeCompare(b.name)),
@@ -139,8 +142,7 @@ export function StoresView() {
         </div>
         <FilterBar active={filtersActive} actions={<ToolbarButton icon={PlusSignIcon} label="Add store" short="Add" onClick={() => setTarget("new")} />}>
           <SearchBox value={query} onChange={setQuery} placeholder="Search store name, business…" />
-          <FilterSelect label="Business" value={business} onChange={setBusiness} options={[{ value: "all", label: "All businesses" }, ...businesses.map((b) => ({ value: b, label: b }))]} />
-          <FilterSelect label="Currency" value={currency} onChange={setCurrency} options={[{ value: "all", label: "All currencies" }, ...currencies.map((c) => ({ value: c, label: c }))]} />
+          <FilterSelects filters={filters} />
           <ViewBySelect value={view} onChange={setView} />
           <GroupBySelect columns={columns} value={groupBy} onChange={setGroupBy} />
           {filtersActive ? <ResetFiltersButton onClick={resetFilters} /> : null}
@@ -152,6 +154,8 @@ export function StoresView() {
           rows={rows}
           columns={columns}
             groupBy={groupBy}
+            stateKey="stores"
+            rowFilters={filters}
           rowKey={(t) => t.id}
           view={view}
           cardValue="products"

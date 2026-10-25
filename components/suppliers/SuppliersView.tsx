@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { DeleteButton, ExportButton } from "@/components/data-table/bulk";
 import { DataTable, type Column } from "@/components/data-table/DataTable";
 import { PlusSignIcon } from "@hugeicons/core-free-icons";
-import { ToolbarButton, FilterSelect, ResetFiltersButton, SearchBox, StatTile, FilterBar, ViewBySelect, GroupBySelect, useGroupBy, matches, useViewMode } from "@/components/data-table/controls";
+import { ToolbarButton, FilterSelects, passesFilters, type RowFilter, ResetFiltersButton, SearchBox, StatTile, FilterBar, ViewBySelect, GroupBySelect, useGroupBy, useFilter, matches, useViewMode } from "@/components/data-table/controls";
 import { ColumnManager, customColumnDefs, customFieldRows, customText } from "@/components/data-table/custom-columns";
 import { DetailPanel, Fields, PanelSection, SplitView } from "@/components/data-table/DetailPanel";
 import { SupplierDialog } from "./SupplierDialog";
@@ -25,10 +25,10 @@ const STATUS = [
 export function SuppliersView() {
   const { products, activeTenant } = usePos();
   const { suppliers, movements, expenses, columnsFor, deleteSupplier, ready } = useOps();
-  const [query, setQuery] = useState("");
-  const [status, setStatus] = useState("all");
+  const [query, setQuery] = useFilter("suppliers_query", "");
+  const [status, setStatus] = useFilter("suppliers_status", "all");
   const [view, setView] = useViewMode("suppliers", "cards");
-  const [groupBy, setGroupBy] = useGroupBy();
+  const [groupBy, setGroupBy] = useGroupBy("suppliers");
   const [target, setTarget] = useState<Supplier | "new" | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const currency = activeTenant?.currency ?? "PHP";
@@ -51,12 +51,15 @@ export function SuppliersView() {
     return byId;
   }, [products, movements, activeTenant?.id]);
 
+  const filters: RowFilter<Supplier>[] = [
+    { id: "status", label: "Status", value: status, onChange: setStatus, options: STATUS, test: (s, v) => (v === "active") === s.active },
+  ];
   const rows = useMemo(
     () =>
       suppliers
         .filter(
           (s) =>
-            (status === "all" || (status === "active") === s.active) &&
+            passesFilters(s, filters) &&
             matches(query, s.id, s.name, s.contactPerson, s.phone, s.email, s.address, customText(s))
         )
         .sort((a, b) => a.name.localeCompare(b.name)),
@@ -182,7 +185,7 @@ export function SuppliersView() {
         }
       >
         <SearchBox value={query} onChange={setQuery} placeholder="Search name, contact, phone…" />
-        <FilterSelect label="Status" value={status} onChange={setStatus} options={STATUS} />
+        <FilterSelects filters={filters} />
         <ViewBySelect value={view} onChange={setView} />
         <GroupBySelect columns={columns} value={groupBy} onChange={setGroupBy} />
         {filtersActive ? <ResetFiltersButton onClick={resetFilters} /> : null}
@@ -191,6 +194,8 @@ export function SuppliersView() {
         rows={rows}
         columns={columns}
           groupBy={groupBy}
+          stateKey="suppliers"
+          rowFilters={filters}
         rowKey={(s) => s.id}
         view={view}
         cardValue="spent"

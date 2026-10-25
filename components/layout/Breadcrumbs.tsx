@@ -1,7 +1,8 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { ArrowLeft01Icon, ArrowRight01Icon } from "@hugeicons/core-free-icons";
 import { usePos } from "@/contexts/pos-context";
@@ -12,6 +13,37 @@ import { useAuth } from "@/contexts/auth-context";
 interface Crumb {
   label: string;
   href?: string;
+}
+
+/** Whether the browser has a page to go back or forward to. Uses the Navigation API where there is one; elsewhere it guesses. */
+function useHistoryMoves(pathname: string) {
+  const [moves, setMoves] = useState({ back: false, forward: false });
+  useEffect(() => {
+    const nav = (window as { navigation?: EventTarget & { canGoBack: boolean; canGoForward: boolean } }).navigation;
+    const update = () => setMoves(nav ? { back: nav.canGoBack, forward: nav.canGoForward } : { back: history.length > 1, forward: true });
+    update();
+    // Next pushes history inside React's insertion phase, where state can't change; update once that's done.
+    const later = () => queueMicrotask(update);
+    nav?.addEventListener("currententrychange", later);
+    return () => nav?.removeEventListener("currententrychange", later);
+  }, [pathname]);
+  return moves;
+}
+
+/** Back and forward follow where the person actually went, like the browser's own buttons. */
+export function HistoryButtons() {
+  const router = useRouter();
+  const moves = useHistoryMoves(usePathname());
+  return (
+    <>
+      <Button size="icon" variant="ghost" title="Back" aria-label="Back" disabled={!moves.back} onClick={() => router.back()}>
+        <HugeiconsIcon icon={ArrowLeft01Icon} size={17} />
+      </Button>
+      <Button size="icon" variant="ghost" title="Forward" aria-label="Forward" disabled={!moves.forward} onClick={() => router.forward()}>
+        <HugeiconsIcon icon={ArrowRight01Icon} size={17} />
+      </Button>
+    </>
+  );
 }
 
 export function Breadcrumbs() {
@@ -48,17 +80,9 @@ export function Breadcrumbs() {
   // A cashier without the Dashboard (say) gets that crumb as plain text, not a link.
   crumbs = crumbs.map((crumb) => (crumb.href && !canOpen(user, crumb.href) ? { label: crumb.label } : crumb));
   const current = crumbs[crumbs.length - 1];
-  const parent = crumbs.length > 1 ? crumbs[crumbs.length - 2] : null;
 
   return (
     <div className="flex min-w-0 flex-1 items-center gap-1">
-      {parent?.href ? (
-        <Button asChild size="icon" variant="ghost" className="shrink-0" title={`Back to ${parent.label}`}>
-          <Link href={parent.href} aria-label={`Back to ${parent.label}`}>
-            <HugeiconsIcon icon={ArrowLeft01Icon} size={17} />
-          </Link>
-        </Button>
-      ) : null}
 
       <h1 className="min-w-0 flex-1 truncate text-base font-semibold sm:hidden">{current.label}</h1>
 

@@ -10,6 +10,7 @@ export interface Product {
   tenantId: string;
   name: string;
   category: string;
+  brand: string;
   sku: string;
   price: number;
   stock: number;
@@ -77,6 +78,7 @@ export class ProductsService {
     return {
       name: body.name?.trim() || undefined,
       category: body.category?.trim() || undefined,
+      brand: body.brand === undefined ? undefined : String(body.brand ?? "").trim().slice(0, 60),
       // Optional: an empty SKU is fine and clears an existing one.
       sku: body.sku === undefined ? undefined : String(body.sku ?? "").trim().slice(0, 40),
       price: body.price !== undefined ? Math.max(0, parseFloat(body.price as any) || 0) : undefined,
@@ -99,6 +101,7 @@ export class ProductsService {
       tenantId: body.tenantId,
       name: edit.name || "New Product",
       category: edit.category || "General",
+      brand: edit.brand ?? "",
       sku: edit.sku ?? "",
       price: edit.price ?? 0,
       stock: 0, // opening stock arrives as an OPENING stock movement

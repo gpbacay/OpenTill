@@ -7,14 +7,14 @@ import { usePos } from "@/contexts/pos-context";
 import { isCashier } from "@/lib/local-auth";
 import { money } from "@/lib/money";
 import { useSearchParams } from "next/navigation";
-import { inPeriod, inRange, presetRange, rangeFromParams } from "@/lib/periods";
+import { inPeriod, inRange, presetRange } from "@/lib/periods";
 import { Expense } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { DeleteButton, ExportButton } from "@/components/data-table/bulk";
 import { DataTable, type Column } from "@/components/data-table/DataTable";
-import { DateRangeFilter } from "@/components/data-table/DateRangeFilter";
+import { DateRangeFilter, useRangeFilter } from "@/components/data-table/DateRangeFilter";
 import { PlusSignIcon } from "@hugeicons/core-free-icons";
-import { ToolbarButton, FilterSelect, ResetFiltersButton, SearchBox, StatTile, FilterBar, ViewBySelect, GroupBySelect, useGroupBy, matches, useViewMode } from "@/components/data-table/controls";
+import { ToolbarButton, FilterSelects, passesFilters, type RowFilter, ResetFiltersButton, SearchBox, StatTile, FilterBar, ViewBySelect, GroupBySelect, useGroupBy, useFilter, matches, useViewMode } from "@/components/data-table/controls";
 import { ColumnManager, customColumnDefs, customFieldRows, customText } from "@/components/data-table/custom-columns";
 import { DetailPanel, Fields, SplitView } from "@/components/data-table/DetailPanel";
 import { ExpenseDialog } from "./ExpenseDialog";
@@ -27,27 +27,37 @@ export function ExpensesView() {
   const cashier = isCashier(useAuth().user);
   const { activeTenant, tenantSyncedOrders } = usePos();
   const { expenses, suppliers, columnsFor, deleteExpense, ready } = useOps();
-  const [query, setQuery] = useState("");
-  const [category, setCategory] = useState("all");
+  const [query, setQuery] = useFilter("expenses_query", "");
+  const [category, setCategory] = useFilter("expenses_category", "all");
   const params = useSearchParams();
-  const [range, setRange] = useState(() => rangeFromParams(params, "month"));
-  const [supplier, setSupplier] = useState("all");
+  const [range, setRange] = useRangeFilter("expenses", params, "month");
+  const [supplier, setSupplier] = useFilter("expenses_supplier", "all");
   const [view, setView] = useViewMode("expenses", "table");
-  const [groupBy, setGroupBy] = useGroupBy();
+  const [groupBy, setGroupBy] = useGroupBy("expenses");
   const [target, setTarget] = useState<Expense | "new" | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const currency = activeTenant?.currency ?? "PHP";
   const supplierName = (id?: string | null) => suppliers.find((s) => s.id === id)?.name ?? "—";
 
   const categories = useMemo(() => [...new Set(expenses.map((e) => e.category))].sort(), [expenses]);
+  const filters: RowFilter<Expense>[] = [
+    { id: "category", label: "Category", value: category, onChange: setCategory, options: [{ value: "all", label: "All categories" }, ...categories.map((c) => ({ value: c, label: c }))], test: (e, v) => e.category === v },
+    {
+      id: "supplier",
+      label: "Supplier",
+      value: supplier,
+      onChange: setSupplier,
+      options: [{ value: "all", label: "All suppliers" }, { value: "none", label: "No supplier" }, ...suppliers.map((s) => ({ value: s.id, label: s.name }))],
+      test: (e, v) => (e.supplierId ?? "") === (v === "none" ? "" : v),
+    },
+  ];
   const rows = useMemo(
     () =>
       expenses
         .filter(
           (e) =>
             inRange(e.date, range) &&
-            (category === "all" || e.category === category) &&
-            (supplier === "all" || (e.supplierId ?? "") === (supplier === "none" ? "" : supplier)) &&
+            passesFilters(e, filters) &&
             matches(query, e.id, e.description, e.category, supplierName(e.supplierId), customText(e))
         )
         .sort((a, b) => b.date.localeCompare(a.date)),
@@ -138,13 +148,7 @@ export function ExpensesView() {
       >
         <SearchBox value={query} onChange={setQuery} placeholder="Search expenses…" />
         <DateRangeFilter value={range} onChange={setRange} />
-        <FilterSelect label="Category" value={category} onChange={setCategory} options={[{ value: "all", label: "All categories" }, ...categories.map((c) => ({ value: c, label: c }))]} />
-        <FilterSelect
-          label="Supplier"
-          value={supplier}
-          onChange={setSupplier}
-          options={[{ value: "all", label: "All suppliers" }, { value: "none", label: "No supplier" }, ...suppliers.map((s) => ({ value: s.id, label: s.name }))]}
-        />
+        <FilterSelects filters={filters} />
         <ViewBySelect value={view} onChange={setView} />
         <GroupBySelect columns={columns} value={groupBy} onChange={setGroupBy} />
         {filtersActive ? <ResetFiltersButton onClick={resetFilters} /> : null}
@@ -154,6 +158,7 @@ export function ExpensesView() {
         rows={rows}
         columns={columns}
           groupBy={groupBy}
+          rowFilters={filters}
         rowKey={(e) => e.id}
         view={view}
         cardTitle="date"

@@ -64,6 +64,35 @@ export function FilterSelect({
   );
 }
 
+/**
+ * A page filter, defined once: the page's dropdown, its check on rows, and the same choice inside each group of a
+ * grouped table (see DataTable `rowFilters`). The first option is the "all" one, which means off.
+ */
+export interface RowFilter<T> {
+  id: string;
+  label: string;
+  options: { value: string; label: string }[];
+  test: (row: T, value: string) => boolean;
+  value: string;
+  onChange: (value: string) => void;
+}
+
+const isOff = (value: string | undefined) => !value || value.toLowerCase() === "all";
+
+/** Whether a row passes the filters, at their own values or at `values` (by filter id) when given. */
+export const passesFilters = <T,>(row: T, filters: RowFilter<T>[], values?: Record<string, string>) =>
+  filters.every((filter) => {
+    const value = values ? values[filter.id] : filter.value;
+    return isOff(value) || filter.test(row, value);
+  });
+
+/** The page's dropdowns for its filters. */
+export function FilterSelects<T>({ filters }: { filters: RowFilter<T>[] }) {
+  return filters.map((filter) => (
+    <FilterSelect key={filter.id} label={filter.label} value={filter.value} onChange={filter.onChange} options={filter.options} />
+  ));
+}
+
 export function Toolbar({ children }: { children: ReactNode }) {
   return <div className="flex shrink-0 flex-wrap items-center gap-2">{children}</div>;
 }
@@ -196,8 +225,39 @@ function useSaved<V extends string>(key: string, fallback: V, valid: (saved: str
 export const useViewMode = (page: string, fallback: ViewMode) =>
   useSaved(`opentill_view_${page}`, fallback, (saved): saved is ViewMode => saved === "table" || saved === "cards");
 
-/** Column id rows are grouped by ("" for none). Every visit starts at Category, so a past "None" never sticks. */
-export const useGroupBy = (fallback = "category") => useState(fallback);
+const remembered = new Map<string, unknown>();
+
+/**
+ * A filter that survives leaving the page: kept in memory while the app is open (so coming back shows it at once) and on
+ * this device across reloads. A value from the URL (a dashboard link, say) wins over the saved one and replaces it.
+ */
+export function useFilter<V>(key: string, fallback: V, fromUrl?: V) {
+  const storageKey = `opentill_filter_${key}`;
+  const [value, setValue] = useState<V>(() => fromUrl ?? (remembered.has(storageKey) ? (remembered.get(storageKey) as V) : fallback));
+  const change = (next: V) => {
+    remembered.set(storageKey, next);
+    setValue(next);
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(next));
+    } catch {}
+  };
+  // Also runs when the key changes (e.g. a table grouped by another column), so each key shows its own value.
+  useEffect(() => {
+    if (fromUrl !== undefined) return change(fromUrl);
+    if (!remembered.has(storageKey)) {
+      try {
+        const saved = localStorage.getItem(storageKey);
+        if (saved !== null) remembered.set(storageKey, JSON.parse(saved));
+      } catch {}
+    }
+    setValue(remembered.has(storageKey) ? (remembered.get(storageKey) as V) : fallback);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storageKey]);
+  return [value, change] as const;
+}
+
+/** Column id rows are grouped by ("" for none), remembered per table like the other filters. */
+export const useGroupBy = (table: string, fallback = "category") => useFilter(`${table}_group`, fallback);
 
 /** "View by column": groups the table's rows under collapsible headers, one per value of the chosen column. */
 export function GroupBySelect({
@@ -205,10 +265,11 @@ export function GroupBySelect({
   value,
   onChange,
 }: {
-  columns: { id: string; header: string }[];
+  columns: { id: string; header: string; groupable?: false }[];
   value: string;
   onChange: (value: string) => void;
 }) {
+  columns = columns.filter((column) => column.groupable !== false);
   return (
     <FilterSelect
       label="View by column"

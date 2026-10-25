@@ -68,7 +68,7 @@ async function main() {
     id: id("prod", String(i + 1).padStart(3, "0")), tenantId, name: p.name, category: p.category, sku: p.sku,
     price: p.price, stock: p.stock, description: `${p.name} - ${p.category.toLowerCase()} part.`,
     costPrice: Math.round(p.price * (0.6 + rnd() * 0.15)), reorderLevel: p.price > 1000 ? 3 : 5,
-    supplierId: supplierId(p.supplier), custom: custom(p.custom),
+    supplierId: supplierId(p.supplier), brand: p.custom.brand ?? "", custom: custom(Object.fromEntries(Object.entries(p.custom).filter(([k]) => k !== "brand"))),
   }));
 
   // Orders spread across the window; the newest few are "queued", one is "failed", the rest are saved.

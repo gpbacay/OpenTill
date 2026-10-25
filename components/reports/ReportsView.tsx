@@ -7,7 +7,7 @@ import { useAuth } from "@/contexts/auth-context";
 import { useOps } from "@/contexts/ops-context";
 import { isCashier } from "@/lib/local-auth";
 import { usePos } from "@/contexts/pos-context";
-import { presetRange, rangeFromParams, toDateInput } from "@/lib/periods";
+import { presetRange, toDateInput } from "@/lib/periods";
 import {
   Report,
   allReports,
@@ -26,10 +26,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ExportButton } from "@/components/data-table/bulk";
 import { DataTable, type Column } from "@/components/data-table/DataTable";
-import { DateRangeFilter } from "@/components/data-table/DateRangeFilter";
+import { DateRangeFilter, useRangeFilter } from "@/components/data-table/DateRangeFilter";
 import { DetailPanel, Fields, SplitView } from "@/components/data-table/DetailPanel";
 import { FileAddIcon } from "@hugeicons/core-free-icons";
-import { ToolbarButton, FilterSelect, ResetFiltersButton, SearchBox, StatTile, FilterBar, ViewBySelect, GroupBySelect, useGroupBy, matches, useViewMode } from "@/components/data-table/controls";
+import { ToolbarButton, FilterSelects, passesFilters, type RowFilter, ResetFiltersButton, SearchBox, StatTile, FilterBar, ViewBySelect, GroupBySelect, useGroupBy, useFilter, matches, useViewMode } from "@/components/data-table/controls";
 import { TablePageSkeleton } from "@/components/loading/PageSkeletons";
 import { ReportActions } from "./ReportDocument";
 import { GenerateReportDialog } from "./GenerateReportDialog";
@@ -60,23 +60,26 @@ export function useReportData() {
 export function ReportsView() {
   const { tenant, data, store, types, ready } = useReportData();
   const params = useSearchParams();
-  const [query, setQuery] = useState("");
-  const [type, setType] = useState(() => params.get("type") ?? "all");
-  const [span, setSpan] = useState("all");
+  const [query, setQuery] = useFilter("reports_query", "");
+  const [type, setType] = useFilter("reports_type", "all", params.get("type") ?? undefined);
+  const [span, setSpan] = useFilter("reports_span", "all");
   const [view, setView] = useViewMode("reports", "cards");
-  const [groupBy, setGroupBy] = useGroupBy();
-  const [range, setRange] = useState(() => rangeFromParams(params, "all"));
+  const [groupBy, setGroupBy] = useGroupBy("reports");
+  const [range, setRange] = useRangeFilter("reports", params, "all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
 
   const reports = useMemo(() => allReports(data, store, types), [data, store, types]);
+  const filters: RowFilter<(typeof reports)[number]>[] = [
+    { id: "type", label: "Report type", value: type, onChange: setType, options: [{ value: "all", label: "All reports" }, ...types], test: (r, v) => r.type === v },
+    { id: "span", label: "Period", value: span, onChange: setSpan, options: SPANS, test: (r, v) => (v === "year") === isYear(r.period) },
+  ];
   const rows = useMemo(
     () =>
       reports.filter((r) => {
         const { from, to } = periodBounds(r.period);
         return (
-          (type === "all" || r.type === type) &&
-          (span === "all" || (span === "year") === isYear(r.period)) &&
+          passesFilters(r, filters) &&
           (!range.to || from <= range.to) &&
           (!range.from || to >= range.from) &&
           matches(query, r.title, typeLabel(r.type), periodLabel(r.period))
@@ -154,8 +157,7 @@ export function ReportsView() {
         </div>
         <FilterBar active={filtersActive} actions={<ToolbarButton icon={FileAddIcon} label="Generate report" short="Generate" onClick={() => setGenerating(true)} />}>
           <SearchBox value={query} onChange={setQuery} placeholder="Search reports…" />
-          <FilterSelect label="Report type" value={type} onChange={setType} options={[{ value: "all", label: "All reports" }, ...types]} />
-          <FilterSelect label="Period" value={span} onChange={setSpan} options={SPANS} />
+          <FilterSelects filters={filters} />
           <DateRangeFilter value={range} onChange={setRange} />
           <ViewBySelect value={view} onChange={setView} />
           <GroupBySelect columns={columns} value={groupBy} onChange={setGroupBy} />
@@ -166,6 +168,8 @@ export function ReportsView() {
           rows={rows}
           columns={columns}
             groupBy={groupBy}
+            stateKey="reports"
+            rowFilters={filters}
           rowKey={reportKey}
           view={view}
           cardValue="total"

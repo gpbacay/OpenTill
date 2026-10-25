@@ -9,7 +9,7 @@ import { usePos } from "@/contexts/pos-context";
 import { useRecentActivity } from "@/hooks/use-recent-activity";
 import { Button } from "@/components/ui/button";
 import { SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
-import { Breadcrumbs } from "@/components/layout/Breadcrumbs";
+import { Breadcrumbs, HistoryButtons } from "@/components/layout/Breadcrumbs";
 import { canOpen } from "@/components/layout/Sidebar";
 
 export default function Header() {
@@ -74,6 +74,7 @@ export default function Header() {
         >
           <HugeiconsIcon icon={isFullscreen ? MinimizeScreenIcon : FullScreenIcon} size={16} />
         </Button>
+        <HistoryButtons />
       </div>
     </header>
   );

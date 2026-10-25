@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { usePathname, useRouter } from "next/navigation";
@@ -20,7 +20,7 @@ import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { AppShellSkeleton } from "@/components/loading/PageSkeletons";
 import { useIsMobile } from "@/hooks/use-mobile";
 
-const TABS = MENU_ITEMS.filter((item) => item.primary);
+const TABS = ["home", "orders", "inventory", "records"].map((id) => MENU_ITEMS.find((item) => item.id === id)!);
 // Cashiers can't open Suppliers or Inventory, so their bar holds the pages they use instead.
 const CASHIER_TABS = MENU_ITEMS.filter((item) => ["home", "records", "reports", "activity"].includes(item.id));
 
@@ -42,6 +42,7 @@ function PosShell({ children }: { children: React.ReactNode }) {
     isSyncing,
     syncProgress,
     handleAddTenant,
+    autoHideNav,
   } = usePos();
   const pathname = usePathname();
   const router = useRouter();
@@ -57,6 +58,32 @@ function PosShell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (blocked) router.replace("/orders");
   }, [blocked, router]);
+
+  // Auto-hide: the bottom bar slides away after a few idle seconds and comes back on any touch or scroll.
+  const [navHidden, setNavHidden] = useState(false);
+  useEffect(() => {
+    if (!autoHideNav || !bottomBar) return;
+    let timer = 0;
+    const hide = () => {
+      // Keep it up while its "+" menu is open.
+      if (document.querySelector("[data-bottom-nav] [aria-expanded=true]")) timer = window.setTimeout(hide, 3000);
+      else setNavHidden(true);
+    };
+    const show = () => {
+      setNavHidden(false);
+      clearTimeout(timer);
+      timer = window.setTimeout(hide, 3000);
+    };
+    timer = window.setTimeout(hide, 3000);
+    window.addEventListener("pointerdown", show);
+    document.addEventListener("scroll", show, true); // capture: scroll doesn't bubble from the page's scroll areas
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener("pointerdown", show);
+      document.removeEventListener("scroll", show, true);
+      setNavHidden(false);
+    };
+  }, [autoHideNav, bottomBar]);
 
   // Swipe between the bottom bar's pages on phones. Touches near the screen edges stay with the browser's back gesture.
   const onTouchStart = (event: React.TouchEvent<HTMLElement>) => {
@@ -134,20 +161,29 @@ function PosShell({ children }: { children: React.ReactNode }) {
           </div>
         ) : null}
         <main
-          className={`flex min-h-0 flex-1 flex-col overflow-hidden px-3 sm:px-4 md:pb-4 ${bottomBar ? "pb-24" : "pb-4"}`}
+          className="flex min-h-0 flex-1 flex-col overflow-hidden px-3 pb-4 sm:px-4"
           onTouchStart={onTouchStart}
           onTouchEnd={onTouchEnd}
           onTouchCancel={() => (swipeStart.current = null)}
         >
           {children}
         </main>
-        {bottomBar ? <nav
+        {/* The bar sits in the page's flow rather than floating over a strip kept free for it; hiding it folds its row
+            away (0fr), so the page grows into the space instead of leaving an empty band behind. */}
+        {bottomBar ? (
+        <div
+          className={`grid shrink-0 transition-[grid-template-rows,opacity] duration-300 md:hidden ${
+            navHidden ? "pointer-events-none grid-rows-[0fr] opacity-0" : "grid-rows-[1fr]"
+          }`}
+        >
+        <div className="min-h-0 overflow-hidden">
+        <nav
           aria-label="Main"
           data-bottom-nav
-          className="fixed inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-40 flex items-center gap-2 md:hidden"
+          className="flex items-center gap-2 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
         >
           {/* Bar and "+" share one height and corner radius; tabs use the inner radius (outer minus the bar's padding). */}
-          <div style={{ gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))` }} className="grid h-16 flex-1 gap-1 rounded-2xl border border-border bg-card/90 p-1.5 shadow-lg backdrop-blur-md">
+          <div style={{ gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))` }} className="grid h-16 flex-1 gap-1 rounded-2xl border border-border bg-card p-1.5">
             {tabs.map((item) => {
               const active =
                 item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
@@ -166,8 +202,11 @@ function PosShell({ children }: { children: React.ReactNode }) {
               );
             })}
           </div>
-          <AddMenu side="top" align="end" iconSize={24} className="size-16 rounded-2xl shadow-lg" />
-        </nav> : null}
+          <AddMenu side="top" align="end" iconSize={24} className="size-16 rounded-2xl" />
+        </nav>
+        </div>
+        </div>
+        ) : null}
       </SidebarInset>
     </SidebarProvider>
     </OpsProvider>

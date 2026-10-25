@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 import Link from "next/link";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { ArrowUpRight01Icon } from "@hugeicons/core-free-icons";
@@ -9,11 +9,11 @@ import { Order, Product, Tenant, stockState } from "@/lib/types";
 import { useAuth } from "@/contexts/auth-context";
 import { useOps } from "@/contexts/ops-context";
 import { isCashier } from "@/lib/local-auth";
-import { DateRange, inRange, presetRange, rangeQuery, toDateInput } from "@/lib/periods";
+import { inRange, presetRange, rangeQuery, toDateInput } from "@/lib/periods";
 import { money } from "@/lib/money";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { DateRangeFilter } from "@/components/data-table/DateRangeFilter";
+import { DateRangeFilter, useRangeFilter } from "@/components/data-table/DateRangeFilter";
 import { FilterBar, ResetFiltersButton } from "@/components/data-table/controls";
 import { AddMenu } from "@/components/layout/AddMenu";
 import { canOpen } from "@/components/layout/Sidebar";
@@ -74,6 +74,9 @@ function DashCard({
 const sum = <T,>(rows: T[], pick: (row: T) => number) => rows.reduce((total, row) => total + pick(row), 0);
 const round = (n: number) => Math.round(n * 100) / 100;
 
+/** The dashboard has no URL filters; its range is only the saved one. */
+const NO_PARAMS = { get: () => null };
+
 export default function BentoDashboard({
   products,
   orders,
@@ -85,7 +88,7 @@ export default function BentoDashboard({
   const cashier = isCashier(user);
   const inventoryOpen = canOpen(user, "/inventory");
   const salesOpen = canOpen(user, "/records");
-  const [range, setRange] = useState<DateRange>(() => presetRange("month"));
+  const [range, setRange] = useRangeFilter("dashboard", NO_PARAMS, "month");
   const currency = activeTenant.currency;
   const query = rangeQuery(range);
 

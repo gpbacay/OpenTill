@@ -81,6 +81,7 @@ model Product {
   tenantId     String
   name         String
   category     String
+  brand        String  @default("")
   sku          String
   price        Float
   stock        Int
