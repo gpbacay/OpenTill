@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DeleteButton, ExportButton } from "@/components/data-table/bulk";
 import { DataTable, type Column } from "@/components/data-table/DataTable";
-import { ToolbarButton, FilterSelects, passesFilters, type RowFilter, ResetFiltersButton, SearchBox, StatTile, FilterBar, ViewBySelect, GroupBySelect, useGroupBy, useFilter, matches, useViewMode } from "@/components/data-table/controls";
+import { ToolbarButton, FilterSelects, brandFilter, passesFilters, type RowFilter, ResetFiltersButton, SearchBox, StatTile, FilterBar, ViewBySelect, GroupBySelect, useGroupBy, useFilter, matches, useViewMode } from "@/components/data-table/controls";
 import { ColumnManager, customColumnDefs, customFieldRows, customText } from "@/components/data-table/custom-columns";
 import { DetailPanel, Fields, PanelSection, SplitView } from "@/components/data-table/DetailPanel";
 import { ProductDialog } from "./ProductDialog";
@@ -53,6 +53,7 @@ export function InventoryView() {
   const linkedStatus = params.get("status");
   const [status, setStatus] = useFilter("inventory_status", "all", linkedStatus ? pickParam(linkedStatus, STATUS_OPTIONS.map((o) => o.value), "all") : undefined);
   const [supplier, setSupplier] = useFilter("inventory_supplier", "all");
+  const [brand, setBrand] = useFilter("inventory_brand", "all");
   const [type, setType] = useFilter("stock-history_type", "all");
   const [productTarget, setProductTarget] = useState<Product | "new" | null>(null);
   const [stockAction, setStockAction] = useState<StockAction | null>(null);
@@ -80,6 +81,7 @@ export function InventoryView() {
 
   const stockFilters: RowFilter<Product>[] = [
     { id: "category", label: "Category", value: category, onChange: setCategory, options: [{ value: "all", label: "All categories" }, ...categories.map((c) => ({ value: c, label: c }))], test: (p, v) => p.category === v },
+    brandFilter(catalog, brand, setBrand),
     { id: "status", label: "Stock level", value: status, onChange: setStatus, options: STATUS_OPTIONS, test: byStockLevel },
     {
       id: "supplier",
@@ -104,7 +106,7 @@ export function InventoryView() {
         )
         .sort((a, b) => a.name.localeCompare(b.name)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [catalog, category, status, supplier, query, suppliers]
+    [catalog, category, brand, status, supplier, query, suppliers]
   );
 
   const historyRows = useMemo(
@@ -240,13 +242,14 @@ export function InventoryView() {
     </DetailPanel>
   ) : null;
   if (!ready.suppliers || !ready.movements || !ready.columns) return <TablePageSkeleton stats={4} />;
-  const filtered = tab === "stock" ? `${query}|${category}|${status}|${supplier}` : `${query}|${type}`;
-  const filtersActive = query.trim() !== "" || (tab === "stock" ? category !== "all" || status !== "all" || supplier !== "all" : type !== "all");
+  const filtered = tab === "stock" ? `${query}|${category}|${brand}|${status}|${supplier}` : `${query}|${type}`;
+  const filtersActive = query.trim() !== "" || (tab === "stock" ? category !== "all" || brand !== "all" || status !== "all" || supplier !== "all" : type !== "all");
   const resetFilters = () => {
     setQuery("");
     setSelectedId(null);
     if (tab === "stock") {
       setCategory("all");
+      setBrand("all");
       setStatus("all");
       setSupplier("all");
     } else {

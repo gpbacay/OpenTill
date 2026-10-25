@@ -68,23 +68,40 @@ export function FilterSelect({
  * A page filter, defined once: the page's dropdown, its check on rows, and the same choice inside each group of a
  * grouped table (see DataTable `rowFilters`). The first option is the "all" one, which means off.
  */
-export interface RowFilter<T> {
+export interface RowFilter<T> extends FilterRule<T> {
+  value: string;
+  onChange: (value: string) => void;
+}
+
+/** A filter's choices and its check on rows, without a page dropdown's state (e.g. one made from a table column). */
+export interface FilterRule<T> {
   id: string;
   label: string;
   options: { value: string; label: string }[];
   test: (row: T, value: string) => boolean;
-  value: string;
-  onChange: (value: string) => void;
 }
 
 const isOff = (value: string | undefined) => !value || value.toLowerCase() === "all";
 
 /** Whether a row passes the filters, at their own values or at `values` (by filter id) when given. */
-export const passesFilters = <T,>(row: T, filters: RowFilter<T>[], values?: Record<string, string>) =>
+export const passesFilters = <T,>(row: T, filters: (FilterRule<T> & { value?: string })[], values?: Record<string, string>) =>
   filters.every((filter) => {
     const value = values ? values[filter.id] : filter.value;
-    return isOff(value) || filter.test(row, value);
+    return value === undefined || isOff(value) || filter.test(row, value);
   });
+
+/** A Brand filter for products: every brand in `products`, plus "No brand". */
+export function brandFilter<T extends { brand?: string }>(products: T[], value: string, onChange: (value: string) => void): RowFilter<T> {
+  const brands = [...new Set(products.map((p) => p.brand?.trim() ?? "").filter(Boolean))].sort((a, b) => a.localeCompare(b));
+  return {
+    id: "brand",
+    label: "Brand",
+    value,
+    onChange,
+    options: [{ value: "all", label: "All brands" }, { value: "none", label: "No brand" }, ...brands.map((b) => ({ value: b, label: b }))],
+    test: (p, v) => (p.brand?.trim() ?? "") === (v === "none" ? "" : v),
+  };
+}
 
 /** The page's dropdowns for its filters. */
 export function FilterSelects<T>({ filters }: { filters: RowFilter<T>[] }) {

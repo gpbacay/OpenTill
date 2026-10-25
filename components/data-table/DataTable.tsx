@@ -15,7 +15,7 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { passesFilters, useFilter, type RowFilter } from "./controls";
+import { passesFilters, useFilter, type FilterRule, type RowFilter } from "./controls";
 
 export interface Column<T> {
   id: string;
@@ -59,7 +59,7 @@ interface DataTableProps<T> {
   groupBy?: string;
   /** Remembers each group's own search and filters on this device under this key. Defaults to `columnOrderKey`. */
   stateKey?: string;
-  /** The page's filters, offered again inside each group with only the choices that group has. */
+  /** The page's filters, offered again inside each group (with every other column) with only the choices that group has. */
   rowFilters?: RowFilter<T>[];
   /** Row photo: a cover on cards and a thumbnail in the table. Return "" or undefined for a placeholder. */
   image?: (row: T) => string | undefined;
@@ -125,14 +125,33 @@ function groupRows<T>(rows: T[], column?: Column<T>): Group<T>[] {
 /** One group's own search, and its own value for each of the page's filters (by filter id; missing means "all"). */
 type GroupFilter = { query: string; filters: Record<string, string> };
 
-function passes<T>(row: T, columns: Column<T>[], rowFilters: RowFilter<T>[], { query, filters }: GroupFilter) {
+const cellText = <T,>(column: Column<T>, row: T) => textOf(column.cell(row)).trim() || "—";
+
+/** A filter for each column the page's own filters don't already cover: one choice per value the column shows. */
+function columnFilters<T>(rows: T[], columns: Column<T>[], covered: FilterRule<T>[]): FilterRule<T>[] {
+  return columns
+    .filter((column) => !covered.some((filter) => filter.id === column.id))
+    .map((column) => ({
+      id: `column-${column.id}`,
+      label: column.header,
+      options: [
+        { value: "all", label: `All ${column.header.toLowerCase()}` },
+        ...[...new Set(rows.map((row) => cellText(column, row)))]
+          .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
+          .map((value) => ({ value, label: value })),
+      ],
+      test: (row: T, value: string) => cellText(column, row) === value,
+    }));
+}
+
+function passes<T>(row: T, columns: Column<T>[], rowFilters: FilterRule<T>[], { query, filters }: GroupFilter) {
   if (!passesFilters(row, rowFilters, filters)) return false;
   const q = query.trim().toLowerCase();
   return !q || columns.some((column) => textOf(column.cell(row)).toLowerCase().includes(q));
 }
 
 /** A page filter as offered inside one group: its "all" option plus only the choices some row of the group has. */
-function groupChoices<T>(rows: T[], filter: RowFilter<T>, chosen?: string) {
+function groupChoices<T>(rows: T[], filter: FilterRule<T>, chosen?: string) {
   const [all, ...rest] = filter.options;
   return [all, ...rest.filter((option) => option.value === chosen || rows.some((row) => filter.test(row, option.value)))];
 }
@@ -215,9 +234,11 @@ export function DataTable<T>({
   const resetGroup = (key: string) => setGroupFilter(key, { query: "", filters: {} });
   const allGroups = groupRows(rows, groupColumn);
   const totals = new Map(allGroups.map((group) => [group.key, group.rows]));
-  // Each group narrows its own rows with its search and filter; the page's filters already ran.
+  // Inside a group: the page's filters first, then one per remaining column (the grouped one is already the group).
+  const groupRules: FilterRule<T>[] = groupColumn ? [...rowFilters, ...columnFilters(rows, columns, rowFilters)] : [];
+  // Each group narrows its own rows with its search and filters; the page's filters already ran.
   const groups = allGroups.map((group) =>
-    group.key !== null && groupFilters[group.key] ? { ...group, rows: group.rows.filter((row) => passes(row, columns, rowFilters, filterOf(group.key!))) } : group
+    group.key !== null && groupFilters[group.key] ? { ...group, rows: group.rows.filter((row) => passes(row, columns, groupRules, filterOf(group.key!))) } : group
   );
   const listed = groups.flatMap((group) => group.rows);
   // Grouped rows show all at once: closed groups already keep the list short.
@@ -247,11 +268,14 @@ export function DataTable<T>({
     const open = opened.has(key);
     const all = totals.get(key) ?? [];
     const own = filterOf(key);
-    // A filter with one real choice left (or none) can't narrow this group, unless it is already set here.
+    // The page's filters always show while the group has a choice for them (not the one the table is grouped by); a
+    // column's own filter only when it has two or more, since one value can't narrow anything. A set filter stays.
     const menus = open
-      ? rowFilters
+      ? groupRules
           .map((filter) => ({ filter, choices: groupChoices(all, filter, own.filters[filter.id]) }))
-          .filter(({ filter, choices }) => choices.length > 2 || own.filters[filter.id])
+          .filter(({ filter, choices }) =>
+            own.filters[filter.id] || (rowFilters.includes(filter as RowFilter<T>) ? filter.id !== groupBy && choices.length > 1 : choices.length > 2)
+          )
       : [];
     const setHere = menus.filter(({ filter }) => own.filters[filter.id]);
     const filterLabel = setHere.length
@@ -307,7 +331,7 @@ export function DataTable<T>({
                   </button>
                 </DropdownMenuTrigger>
                 {/* One short line per filter; its choices open beside it, so a long list never fills the screen. */}
-                <DropdownMenuContent align="start" className="w-auto min-w-44">
+                <DropdownMenuContent align="start" collisionPadding={8} className="w-auto max-w-(--radix-dropdown-menu-content-available-width) min-w-44">
                   <DropdownMenuLabel>Filter {key}</DropdownMenuLabel>
                   {menus.map(({ filter, choices }) => (
                     <DropdownMenuSub key={filter.id}>
@@ -319,14 +343,18 @@ export function DataTable<T>({
                           </span>
                         ) : null}
                       </DropdownMenuSubTrigger>
-                      <DropdownMenuSubContent className="max-h-72 overflow-y-auto">
+                      {/* Never wider than the room beside the menu, so long values truncate instead of running off screen. */}
+                      <DropdownMenuSubContent
+                        collisionPadding={8}
+                        className="max-h-72 w-max max-w-[min(18rem,var(--radix-dropdown-menu-content-available-width))] overflow-y-auto"
+                      >
                         <DropdownMenuRadioGroup
                           value={own.filters[filter.id] ?? choices[0].value}
                           onValueChange={(value) => setGroupFilter(key, { filters: { ...own.filters, [filter.id]: value } })}
                         >
                           {choices.map((choice) => (
-                            <DropdownMenuRadioItem key={choice.value} value={choice.value}>
-                              {choice.label}
+                            <DropdownMenuRadioItem key={choice.value} value={choice.value} title={choice.label}>
+                              <span className="min-w-0 truncate">{choice.label}</span>
                             </DropdownMenuRadioItem>
                           ))}
                         </DropdownMenuRadioGroup>

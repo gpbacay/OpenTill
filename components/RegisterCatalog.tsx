@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { DataTable, type Column } from "@/components/data-table/DataTable";
 import { customColumnDefs } from "@/components/data-table/custom-columns";
 import { useOps } from "@/contexts/ops-context";
-import { FilterBar, FilterSelects, passesFilters, type RowFilter, ResetFiltersButton, ViewBySelect, GroupBySelect, useGroupBy, useFilter, useViewMode } from "@/components/data-table/controls";
+import { FilterBar, FilterSelects, brandFilter, passesFilters, type RowFilter, ResetFiltersButton, ViewBySelect, GroupBySelect, useGroupBy, useFilter, useViewMode } from "@/components/data-table/controls";
 
 interface RegisterCatalogProps {
   products: Product[];
@@ -20,10 +20,11 @@ interface RegisterCatalogProps {
 export function RegisterCatalog({ products, activeTenant, onAddToSale }: RegisterCatalogProps) {
   const [search, setSearch] = useFilter("register_query", "");
   const [selectedCategory, setSelectedCategory] = useFilter("register_category", "all");
-  // Saved before "all" was lowercase here.
-  const categoryOn = selectedCategory.toLowerCase() !== "all";
   const [view, setView] = useViewMode("register", "cards");
   const [groupBy, setGroupBy] = useGroupBy("register");
+  const [brand, setBrand] = useFilter("register_brand", "all");
+  // toLowerCase: the category was saved as "All" before.
+  const filtersOn = selectedCategory.toLowerCase() !== "all" || brand !== "all";
   const [message, setMessage] = useState("");
   const { columnsFor } = useOps();
 
@@ -49,6 +50,10 @@ export function RegisterCatalog({ products, activeTenant, onAddToSale }: Registe
       options: [{ value: "all", label: "All categories" }, ...categories.map((category) => ({ value: category, label: category }))],
       test: (product, value) => product.category === value,
     },
+    brandFilter(tenantProducts, brand, (value) => {
+      setBrand(value);
+      setMessage("");
+    }),
   ];
 
   const filteredProducts = useMemo(() => {
@@ -64,7 +69,7 @@ export function RegisterCatalog({ products, activeTenant, onAddToSale }: Registe
       const matchesCategory = passesFilters(product, filters);
       return matchesQuery && matchesCategory;
     });
-  }, [tenantProducts, search, selectedCategory]);
+  }, [tenantProducts, search, selectedCategory, brand]);
 
   const query = search.trim().toLowerCase();
   const match = useMemo(() => {
@@ -132,10 +137,11 @@ export function RegisterCatalog({ products, activeTenant, onAddToSale }: Registe
     );
   };
 
-  const filtersActive = search.trim() !== "" || categoryOn;
+  const filtersActive = search.trim() !== "" || filtersOn;
   const resetFilters = () => {
     setSearch("");
     setSelectedCategory("all");
+    setBrand("all");
     setMessage("");
   };
 
@@ -143,7 +149,7 @@ export function RegisterCatalog({ products, activeTenant, onAddToSale }: Registe
     <div className="flex h-full flex-col gap-3">
       <FilterBar
         label="Filters"
-        active={categoryOn}
+        active={filtersOn}
         leading={
           <form onSubmit={addMatch} className="min-w-0 flex-1">
             <Input
@@ -182,7 +188,7 @@ export function RegisterCatalog({ products, activeTenant, onAddToSale }: Registe
         columnOrderKey="register"
         image={(product) => product.image}
         isRowDisabled={(product) => product.stock <= 0}
-        resetKey={`${activeTenant.id}|${search}|${selectedCategory}`}
+        resetKey={`${activeTenant.id}|${search}|${selectedCategory}|${brand}`}
         bulkActions={(selected, clear) => (
           <Button size="sm" onClick={() => addSelected(selected, clear)}>
             Add {selected.length} to sale

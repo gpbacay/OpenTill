@@ -365,9 +365,11 @@ export function PosProvider({
                 return p;
               });
             const ids = new Set(server.map((p: Product) => p.id));
+            // Keep a product the server doesn't have only while it waits to be uploaded. Anything else is gone from
+            // the server (e.g. sample data re-seeded under new ids) and would otherwise linger as a duplicate.
             return [
               ...merged,
-              ...local.filter((p) => !ids.has(p.id) && !deleted.has(p.id)),
+              ...local.filter((p) => !ids.has(p.id) && !deleted.has(p.id) && dirty.has(p.id)),
             ];
           });
         }
