@@ -30,7 +30,7 @@ export interface AuthedRequest {
 type Route = [method: string, path: RegExp];
 
 const CASHIER_ROUTES: Route[] = [
-  ["GET", /^\/api\/(auth\/me|tenants|products|events|changes|orders)$/],
+  ["GET", /^\/api\/(auth\/me|tenants|products|events|changes|orders|columns)$/],
   ["PATCH", /^\/api\/auth\/account$/],
   ["POST", /^\/api\/orders\/sync$/],
 ];
@@ -40,13 +40,13 @@ const PAGE_ROUTES: Record<string, Route[]> = {
     ["POST", /^\/api\/products$/],
     ["PUT", /^\/api\/(products|stock-movements)\/[^/]+$/],
     ["DELETE", /^\/api\/products\/[^/]+$/],
-    // Read-only: suppliers, categories and custom columns are managed on admin pages.
-    ["GET", /^\/api\/(stock-movements|suppliers|categories|columns)$/],
+    // Read-only: suppliers and categories are managed on admin pages.
+    ["GET", /^\/api\/(stock-movements|suppliers|categories)$/],
   ],
   "/expenses": [
     ["PUT", /^\/api\/expenses\/[^/]+$/],
     ["DELETE", /^\/api\/expenses\/[^/]+$/],
-    ["GET", /^\/api\/(expenses|suppliers|columns)$/],
+    ["GET", /^\/api\/(expenses|suppliers)$/],
   ],
 };
 

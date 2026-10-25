@@ -7,6 +7,8 @@ import { money } from "@/lib/money";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { DataTable, type Column } from "@/components/data-table/DataTable";
+import { customColumnDefs } from "@/components/data-table/custom-columns";
+import { useOps } from "@/contexts/ops-context";
 import { FilterBar, FilterSelect, ResetFiltersButton, ViewBySelect, GroupBySelect, useGroupBy, useViewMode } from "@/components/data-table/controls";
 
 interface RegisterCatalogProps {
@@ -21,6 +23,7 @@ export function RegisterCatalog({ products, activeTenant, onAddToSale }: Registe
   const [view, setView] = useViewMode("register", "cards");
   const [groupBy, setGroupBy] = useGroupBy();
   const [message, setMessage] = useState("");
+  const { columnsFor } = useOps();
 
   const tenantProducts = useMemo(
     () => products.filter((product) => product.tenantId === activeTenant.id),
@@ -99,6 +102,7 @@ export function RegisterCatalog({ products, activeTenant, onAddToSale }: Registe
       align: "right",
       cell: (product) => money(activeTenant.currency, product.price),
     },
+    ...customColumnDefs<Product>(columnsFor("products")),
   ];
 
   const addSelected = (selected: Product[], clear: () => void) => {

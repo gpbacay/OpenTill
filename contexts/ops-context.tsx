@@ -47,7 +47,8 @@ export function OpsProvider({ userId, children }: { userId: string; children: Re
   const suppliers = useCollection<Supplier>(userId, "suppliers", "suppliers", "suppliers", inventory || spending);
   const expenses = useCollection<Expense>(userId, "expenses", "expenses", "expenses", spending);
   const movements = useCollection<StockMovement>(userId, "movements", "stock-movements", "stock", inventory);
-  const columns = useCollection<CustomColumn>(userId, "columns", "columns", "columns", inventory || spending);
+  // Every page that lists products or sales shows the custom columns, so everyone loads them.
+  const columns = useCollection<CustomColumn>(userId, "columns", "columns", "columns");
   const categories = useCollection<Category>(userId, "categories", "categories", "categories", inventory || admin);
 
   const tenantId = activeTenant?.id;

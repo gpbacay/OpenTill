@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { usePos } from "@/contexts/pos-context";
+import { useOps } from "@/contexts/ops-context";
 import { money } from "@/lib/money";
 import { inRange, presetRange, rangeFromParams } from "@/lib/periods";
 import { useSearchParams } from "next/navigation";
@@ -31,7 +32,8 @@ const PAYMENT = [
 const PAY_LABEL: Record<string, string> = { CASH: "Cash", CARD: "Card", MOBILE_WALLET: "Wallet" };
 
 export function SalesView() {
-  const { activeTenant, tenantSyncedOrders } = usePos();
+  const { activeTenant, tenantSyncedOrders, products } = usePos();
+  const productColumns = useOps().columnsFor("products");
   const params = useSearchParams();
   const [tab, setTab] = useState<"sales" | "reports">("sales");
   const [query, setQuery] = useState("");
@@ -49,6 +51,13 @@ export function SalesView() {
     [tenantSyncedOrders]
   );
 
+  /** A sale's values for one product column: each distinct value across its items, from the products as they are now. */
+  const productValues = useMemo(() => {
+    const byId = new Map(products.map((p) => [p.id, p]));
+    return (o: Order, columnId: string) =>
+      [...new Set((o.items ?? []).map((i) => byId.get(i.productId)?.custom?.[columnId]).filter(Boolean))].join(", ");
+  }, [products]);
+
   const rows = useMemo(
     () =>
       tenantSyncedOrders
@@ -58,10 +67,10 @@ export function SalesView() {
             (status === "all" || o.status === status) &&
             (payment === "all" || o.paymentMethod === payment) &&
             (cashier === "all" || o.cashierName === cashier) &&
-            matches(query, o.id, o.customerName, o.cashierName, ...(o.items ?? []).map((i) => i.name))
+            matches(query, o.id, o.customerName, o.cashierName, ...(o.items ?? []).map((i) => i.name), ...productColumns.map((c) => productValues(o, c.id)))
         )
         .sort((a, b) => b.date.localeCompare(a.date)),
-    [tenantSyncedOrders, range, status, payment, cashier, query]
+    [tenantSyncedOrders, range, status, payment, cashier, query, productColumns, productValues]
   );
 
   const totals = useMemo(() => {
@@ -95,6 +104,11 @@ export function SalesView() {
       cell: (o) =>
         o.status === "PENDING_SYNC" ? <Badge variant="secondary">Queued</Badge> : o.status === "FAILED" ? <Badge variant="destructive">Failed</Badge> : <Badge variant="outline">Saved</Badge>,
     },
+    ...productColumns.map((c): Column<Order> => ({
+      id: `custom-${c.id}`,
+      header: c.label,
+      cell: (o) => productValues(o, c.id) || <span className="text-muted-foreground">—</span>,
+    })),
   ];
 
   if (!activeTenant) return null;
@@ -179,8 +193,8 @@ export function SalesView() {
                 <span className="text-muted-foreground">Total {money(currency, chosen.filter((o) => o.status !== "FAILED").reduce((sum, o) => sum + o.total, 0))}</span>
                 <ExportButton
                   filename="sales.csv"
-                  headers={["Date", "ID", "Customer", "Cashier", "Payment", "Discount", "Total", "Status"]}
-                  rows={chosen.map((o) => [new Date(o.date).toLocaleString(), o.id, o.customerName ?? "Walk-in", o.cashierName ?? "", PAY_LABEL[o.paymentMethod] ?? o.paymentMethod, o.discountAmount ?? 0, o.total, o.status])}
+                  headers={["Date", "ID", "Customer", "Cashier", "Payment", "Discount", "Total", "Status", ...productColumns.map((c) => c.label)]}
+                  rows={chosen.map((o) => [new Date(o.date).toLocaleString(), o.id, o.customerName ?? "Walk-in", o.cashierName ?? "", PAY_LABEL[o.paymentMethod] ?? o.paymentMethod, o.discountAmount ?? 0, o.total, o.status, ...productColumns.map((c) => productValues(o, c.id))])}
                 />
               </>
             )}

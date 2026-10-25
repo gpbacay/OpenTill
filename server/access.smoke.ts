@@ -165,10 +165,12 @@ async function main() {
   r = await call(admin, "PATCH", "/api/cashiers/" + cid, { pages: ["/", "/records"] });
   r = await call(cashier, "GET", "/api/orders");
   assert(r.status === 200, "turning a sales page back on restores it");
-  for (const [m, p] of [["GET", "/api/suppliers"], ["GET", "/api/expenses"], ["GET", "/api/stock-movements"], ["GET", "/api/columns"], ["GET", "/api/cashiers"], ["POST", "/api/cashiers"], ["PUT", "/api/tenants/t1"], ["DELETE", "/api/tenants/t1"], ["PUT", "/api/products/p1"], ["DELETE", "/api/products/p1"], ["PUT", "/api/expenses/e1"], ["PUT", "/api/suppliers/s1"], ["PUT", "/api/stock-movements/m1"], ["PUT", "/api/columns/x1"]] as const) {
+  for (const [m, p] of [["GET", "/api/suppliers"], ["GET", "/api/expenses"], ["GET", "/api/stock-movements"], ["GET", "/api/cashiers"], ["POST", "/api/cashiers"], ["PUT", "/api/tenants/t1"], ["DELETE", "/api/tenants/t1"], ["PUT", "/api/products/p1"], ["DELETE", "/api/products/p1"], ["PUT", "/api/expenses/e1"], ["PUT", "/api/suppliers/s1"], ["PUT", "/api/stock-movements/m1"], ["PUT", "/api/columns/x1"]] as const) {
     r = await call(cashier, m, p, {});
     assert(r.status === 403, `cashier blocked: ${m} ${p}`);
   }
+  r = await call(cashier, "GET", "/api/columns");
+  assert(r.status === 200, "every cashier reads custom columns, so the Register and Sales show them");
 
   // Inventory and Expenses open their own endpoints, scoped to the cashier's store
   r = await call(admin, "PATCH", "/api/cashiers/" + cid, { pages: ["/", "/records", "/inventory"] });
