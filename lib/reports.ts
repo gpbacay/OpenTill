@@ -155,7 +155,7 @@ export function buildReport(type: ReportType, period: string, data: ReportData, 
           { label: "Units sold", value: total(rows, (r) => r[1]), kind: "number" },
           { label: "Products sold", value: rows.length, kind: "number" },
         ],
-        columns: [{ label: "Product" }, { label: "Units", kind: "number" }, { label: "Item sales", kind: "money" }],
+        columns: [{ label: "Name" }, { label: "Units", kind: "number" }, { label: "Item sales", kind: "money" }],
         rows,
         note: missing
           ? `Item sales are before discounts and tax. ${missing} ${missing === 1 ? "sale has" : "sales have"} no item details on this device and ${missing === 1 ? "is" : "are"} left out.`

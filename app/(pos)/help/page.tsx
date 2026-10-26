@@ -27,7 +27,7 @@ const TOPICS: { title: string; articles: Article[] }[] = [
   {
     title: "Register and sales",
     articles: [
-      { q: "How do I ring up a sale?", a: "Open the Register, search or scan a SKU (or tap products), then take payment. Leave “Cash received” empty for an exact cash payment.", href: "/orders" },
+      { q: "How do I ring up a sale?", a: "Open the Register, search or scan a product QR (or tap products), then take payment. Leave “Cash received” empty for an exact cash payment.", href: "/orders" },
       { q: "Can I put a sale on hold?", a: "Yes. Hold the current sale from the cart and resume it later from the held sales list." },
       { q: "How do I print or find a receipt?", a: "Open Sales and select the sale. The receipt shows in the details panel with a print button.", href: "/records" },
       { q: "Why is a sale marked Queued?", a: "It was made while offline. It's saved on this device and is sent automatically when you're back online. You can also press Save in the header." },

@@ -2,10 +2,14 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { QrCodeScanIcon } from "@hugeicons/core-free-icons";
 import { Product, Tenant, reorderLevel } from "@/lib/types";
 import { money } from "@/lib/money";
+import { productIdFromScan } from "@/lib/scan";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { QrScanDialog } from "@/components/QrScanDialog";
 import { DataTable, type Column } from "@/components/data-table/DataTable";
 import { customColumnDefs } from "@/components/data-table/custom-columns";
 import { useOps } from "@/contexts/ops-context";
@@ -26,6 +30,7 @@ export function RegisterCatalog({ products, activeTenant, onAddToSale }: Registe
   // toLowerCase: the category was saved as "All" before.
   const filtersOn = selectedCategory.toLowerCase() !== "all" || brand !== "all";
   const [message, setMessage] = useState("");
+  const [scanning, setScanning] = useState(false);
   const { columnsFor } = useOps();
 
   const tenantProducts = useMemo(
@@ -77,30 +82,58 @@ export function RegisterCatalog({ products, activeTenant, onAddToSale }: Registe
     return tenantProducts.find((product) => product.sku.toLowerCase() === query) ?? (filteredProducts.length === 1 ? filteredProducts[0] : null);
   }, [filteredProducts, query, tenantProducts]);
 
+  const addProduct = (product: Product | undefined, missing: string) => {
+    if (!product) {
+      setMessage(missing);
+      return missing;
+    }
+    if (product.stock <= 0) {
+      const out = `${product.name} is out of stock.`;
+      setMessage(out);
+      return out;
+    }
+    onAddToSale(product);
+    setSearch("");
+    const added = `Added ${product.name} to the sale.`;
+    setMessage(added);
+    return added;
+  };
+
+  const addFromScan = (raw: string) => {
+    const id = productIdFromScan(raw);
+    if (!id) {
+      const bad = "That code isn't a product QR.";
+      setMessage(bad);
+      return bad;
+    }
+    return addProduct(
+      tenantProducts.find((product) => product.id === id),
+      "No product matches that code."
+    );
+  };
+
   const addMatch = (event: React.FormEvent) => {
     event.preventDefault();
+    if (productIdFromScan(search)) {
+      addFromScan(search);
+      return;
+    }
     if (!query) {
-      setMessage("Type a product name or scan a SKU.");
+      setMessage("Type a product name or scan a product QR.");
       return;
     }
     if (!match) {
       setMessage(filteredProducts.length > 1 ? "More than one product matches. Choose one from the list." : "No product matches.");
       return;
     }
-    if (match.stock <= 0) {
-      setMessage(`${match.name} is out of stock.`);
-      return;
-    }
-    onAddToSale(match);
-    setSearch("");
-    setMessage(`Added ${match.name} to the sale.`);
+    addProduct(match, "No product matches.");
   };
 
   const columns: Column<Product>[] = [
     { id: "category", header: "Category", cell: (product) => product.category || "—" },
     {
       id: "name",
-      header: "Product",
+      header: "Name",
       groupable: false,
       cell: (product) => <span className="font-medium">{product.name}</span>,
     },
@@ -151,17 +184,21 @@ export function RegisterCatalog({ products, activeTenant, onAddToSale }: Registe
         label="Filters"
         active={filtersOn}
         leading={
-          <form onSubmit={addMatch} className="min-w-0 flex-1">
+          <form onSubmit={addMatch} className="flex min-w-0 flex-1 gap-2">
             <Input
               data-register-action="product-search"
+              className="min-w-0 flex-1"
               value={search}
               onChange={(event) => {
                 setSearch(event.target.value);
                 setMessage("");
               }}
-              placeholder="Search or scan a SKU"
-              aria-label="Search or scan a SKU"
+              placeholder="Search or scan a product QR"
+              aria-label="Search or scan a product QR"
             />
+            <Button type="button" variant="outline" size="icon" aria-label="Scan product QR" title="Scan product QR" onClick={() => setScanning(true)}>
+              <HugeiconsIcon icon={QrCodeScanIcon} size={16} />
+            </Button>
           </form>
         }
       >
@@ -211,6 +248,7 @@ export function RegisterCatalog({ products, activeTenant, onAddToSale }: Registe
       <p className="hidden text-xs text-muted-foreground lg:block">
         F2 search, F4 hold, F8 charge, Esc clear
       </p>
+      {scanning ? <QrScanDialog onClose={() => setScanning(false)} onCode={addFromScan} /> : null}
     </div>
   );
 }

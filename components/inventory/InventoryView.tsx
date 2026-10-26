@@ -123,7 +123,7 @@ export function InventoryView() {
     { id: "category", header: "Category", cell: (p) => p.category },
     {
       id: "name",
-      header: "Product",
+      header: "Name",
       groupable: false,
       cell: (p) => (
         <div className="min-w-40">
@@ -155,7 +155,7 @@ export function InventoryView() {
 
   const historyColumns: Column<StockMovement>[] = [
     { id: "date", header: "Date", cell: (m) => <span className="whitespace-nowrap">{new Date(m.date).toLocaleString()}</span>, group: (m) => new Date(m.date).toLocaleDateString() },
-    { id: "product", header: "Product", cell: (m) => m.productName },
+    { id: "product", header: "Name", cell: (m) => m.productName },
     { id: "type", header: "Type", cell: (m) => <Badge variant="secondary">{TYPE_LABEL[m.type] ?? m.type}</Badge> },
     {
       id: "qty",
@@ -353,7 +353,7 @@ export function InventoryView() {
           bulkActions={(chosen) => (
             <ExportButton
               filename="stock-history.csv"
-              headers={["ID", "Date", "Product", "Type", "Change", "Cost each", "Supplier", "Note"]}
+              headers={["ID", "Date", "Name", "Type", "Change", "Cost each", "Supplier", "Note"]}
               rows={chosen.map((m) => [m.id, new Date(m.date).toLocaleString(), m.productName, TYPE_LABEL[m.type] ?? m.type, m.quantity, m.unitCost, supplierName(m.supplierId), m.note])}
             />
           )}
