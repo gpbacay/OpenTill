@@ -7,6 +7,30 @@ type Layer = { id: number; close: () => void };
 const layers: Layer[] = [];
 let nextId = 1;
 let ignorePop = false;
+// A phone's file picker pauses the page and pops the dialog's history entry, which would close Add product
+// before the picture comes back. Hold the dialog until the picker is done.
+let filePicker = false;
+let fileTimer = 0;
+
+function pickingFile(target: EventTarget | null) {
+  return target instanceof HTMLInputElement && target.type === "file";
+}
+
+function armFilePicker() {
+  filePicker = true;
+  window.clearTimeout(fileTimer);
+  fileTimer = window.setTimeout(() => {
+    if (document.hasFocus()) filePicker = false;
+  }, 700);
+}
+
+function releaseFilePicker() {
+  if (!filePicker) return;
+  window.clearTimeout(fileTimer);
+  fileTimer = window.setTimeout(() => {
+    filePicker = false;
+  }, 400);
+}
 
 function layerId(state: unknown) {
   if (!state || typeof state !== "object" || !("opentillLayer" in state)) return undefined;
@@ -18,6 +42,12 @@ function onPop(event: PopStateEvent) {
   if (ignorePop) {
     ignorePop = false;
     event.stopImmediatePropagation();
+    return;
+  }
+  if (filePicker && layers.length > 0) {
+    event.stopImmediatePropagation();
+    const top = layers[layers.length - 1];
+    if (layerId(history.state) !== top.id) history.pushState({ opentillLayer: top.id }, "");
     return;
   }
   if (layers.length === 0) return;
@@ -36,6 +66,21 @@ function onPop(event: PopStateEvent) {
 if (typeof window !== "undefined" && !(window as Window & { __opentillHistoryLayer?: boolean }).__opentillHistoryLayer) {
   (window as Window & { __opentillHistoryLayer?: boolean }).__opentillHistoryLayer = true;
   window.addEventListener("popstate", onPop, true);
+  document.addEventListener(
+    "click",
+    (event) => {
+      if (pickingFile(event.target)) armFilePicker();
+    },
+    true
+  );
+  document.addEventListener(
+    "change",
+    (event) => {
+      if (pickingFile(event.target)) releaseFilePicker();
+    },
+    true
+  );
+  window.addEventListener("focus", releaseFilePicker);
 }
 
 /** Browser back closes this instead of leaving the page. Closing it any other way removes that back step. */

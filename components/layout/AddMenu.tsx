@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/auth-context";
-import { isCashier } from "@/lib/local-auth";
 import { canOpen } from "@/components/layout/Sidebar";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { PlusSignIcon } from "@hugeicons/core-free-icons";
@@ -31,7 +30,6 @@ export function AddMenu({
 }) {
   const router = useRouter();
   const { user } = useAuth();
-  const cashier = isCashier(user);
   const [addingProduct, setAddingProduct] = useState(false);
   const [generating, setGenerating] = useState(false);
 
@@ -44,13 +42,13 @@ export function AddMenu({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent side={side} align={align} className="min-w-40">
-          <DropdownMenuItem onSelect={() => router.push("/orders")}>New sale</DropdownMenuItem>
-          {cashier ? null : (
-            <>
-              <DropdownMenuItem onSelect={() => router.push("/expenses")}>Add expense</DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => setAddingProduct(true)}>Add product</DropdownMenuItem>
-            </>
-          )}
+          {canOpen(user, "/orders") ? <DropdownMenuItem onSelect={() => router.push("/orders")}>New sale</DropdownMenuItem> : null}
+          {canOpen(user, "/expenses") ? (
+            <DropdownMenuItem onSelect={() => router.push("/expenses")}>Add expense</DropdownMenuItem>
+          ) : null}
+          {canOpen(user, "/inventory") ? (
+            <DropdownMenuItem onSelect={() => setAddingProduct(true)}>Add product</DropdownMenuItem>
+          ) : null}
           {canOpen(user, "/reports") ? (
             <DropdownMenuItem onSelect={() => setGenerating(true)}>Generate report</DropdownMenuItem>
           ) : null}

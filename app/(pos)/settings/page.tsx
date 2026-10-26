@@ -92,7 +92,7 @@ export default function SettingsPage() {
       id: "cashiers",
       section: "Stores",
       title: "Cashier accounts",
-      description: "Give staff their own login that can only use the Register of one store.",
+      description: "Give staff a login for one store and choose which pages they can open, including the Register.",
       keywords: "cashier staff employee team user login role permission access",
       control: <LinkRow href="/cashiers" label="Manage cashiers" />,
     },

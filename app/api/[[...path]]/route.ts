@@ -3,7 +3,7 @@
 import "reflect-metadata";
 import { NestFactory } from "@nestjs/core";
 import inject from "light-my-request";
-import { AppModule } from "../../../server/app.module";
+import { acceptPhotos, AppModule } from "../../../server/app.module";
 import { RealtimeService } from "../../../server/realtime/realtime.service";
 
 export const runtime = "nodejs";
@@ -16,6 +16,7 @@ let ready: Promise<{ dispatch: Dispatch; realtime: RealtimeService }> | undefine
 // Built once per warm instance.
 function boot() {
   ready ??= NestFactory.create(AppModule, { logger: ["error", "warn"] }).then(async (app) => {
+    acceptPhotos(app); // before init, so this parser is the one Nest keeps (it skips a second json parser)
     await app.init();
     return { dispatch: app.getHttpAdapter().getInstance() as Dispatch, realtime: app.get(RealtimeService) };
   });

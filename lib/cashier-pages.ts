@@ -1,19 +1,20 @@
 // Shared by the app and the API (server/), so keep it free of browser or Node-only imports.
 
 /**
- * Pages an admin can turn on or off for each cashier. `optIn` pages show costs, suppliers or spending, so they
- * start off. The Register, Account, Help center and About are always on.
+ * Pages an admin can turn on or off for each cashier. `optIn` pages start off.
+ * Inventory starts on. Account, Help center and About are always on.
  */
 export const CASHIER_PAGES = [
+  { href: "/orders", label: "Register" },
   { href: "/", label: "Dashboard" },
   { href: "/records", label: "Sales" },
   { href: "/reports", label: "Reports" },
   { href: "/activity", label: "Recent activity" },
-  { href: "/inventory", label: "Inventory", optIn: true },
+  { href: "/inventory", label: "Inventory" },
   { href: "/expenses", label: "Expenses", optIn: true },
 ] as const;
 
-export const ALWAYS_OPEN = ["/orders", "/account", "/help", "/about"];
+export const ALWAYS_OPEN = ["/account", "/help", "/about"];
 
 /** Pages that show the store's sales, so they need the cashier to be able to read orders. */
 export const SALES_PAGES = ["/", "/records", "/reports", "/activity"];

@@ -47,7 +47,8 @@ export function DetailPanel({
   closeRef.current = onClose;
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") closeRef.current();
+      // A dialog (void sale) already consumed Escape. Don't close the panel under it.
+      if (event.key === "Escape" && !event.defaultPrevented) closeRef.current();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);

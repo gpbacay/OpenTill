@@ -22,21 +22,21 @@ export interface AuthedRequest {
   user?: AuthUser;
 }
 
-// Cashiers ring up sales and can read their store, its products (without costs, see ProductsController) and their
-// own sales (see OrdersService), the latter only when their admin gave them a page that shows sales.
-// The Inventory and Expenses pages each open up their own endpoints (PAGE_ROUTES), and only when the admin turned
-// that page on. Writes stay scoped to the cashier's store by the services' ownership checks. Settings and suppliers
-// stay with the admin. Everything not listed here is admin-only, so new endpoints are closed to cashiers by default.
+// Cashiers can read their store, its products (without costs, see ProductsController) and their own sales (see
+// OrdersService), the latter only when their admin gave them a page that shows sales. Ringing a sale needs the
+// Register page. Inventory and Expenses each open their own endpoints (PAGE_ROUTES) only when that page is on.
+// Writes stay scoped to the cashier's store by the services' ownership checks. Settings and suppliers stay with
+// the admin. Everything not listed here is admin-only, so new endpoints are closed to cashiers by default.
 type Route = [method: string, path: RegExp];
 
 const CASHIER_ROUTES: Route[] = [
   ["GET", /^\/api\/(auth\/me|tenants|products|events|changes|orders|columns)$/],
   ["PATCH", /^\/api\/auth\/account$/],
-  ["POST", /^\/api\/orders\/sync$/],
   ["POST", /^\/api\/orders\/[^/]+\/void$/],
 ];
 
 const PAGE_ROUTES: Record<string, Route[]> = {
+  "/orders": [["POST", /^\/api\/orders\/sync$/]],
   "/inventory": [
     ["POST", /^\/api\/products$/],
     ["PUT", /^\/api\/(products|stock-movements)\/[^/]+$/],

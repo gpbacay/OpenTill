@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { InformationCircleIcon } from "@hugeicons/core-free-icons";
 import { usePos } from "@/contexts/pos-context";
 import { Cashier } from "@/lib/types";
 import { Button } from "@/components/ui/button";
@@ -9,11 +11,34 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { CASHIER_PAGES, cashierPages } from "@/lib/cashier-pages";
 import { FieldError, check, clearError, invalid } from "@/components/FieldError";
 import { PasswordInput } from "@/components/PasswordInput";
 import { collect, numberError, numericInput, passwordError, required, usernameError, type FieldErrors } from "@/lib/validation";
 import type { CashierInput } from "./use-cashiers";
+
+function Hint({ label, children }: { label: string; children: React.ReactNode }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <Tooltip open={open} onOpenChange={setOpen}>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          aria-label={label}
+          className="-m-1 rounded-full p-1 text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+          onClick={() => setOpen((current) => !current)}
+          onBlur={() => setOpen(false)}
+        >
+          <HugeiconsIcon icon={InformationCircleIcon} size={14} />
+        </button>
+      </TooltipTrigger>
+      <TooltipContent side="top" className="z-[60] block text-left">
+        {children}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
 
 export function CashierDialog({
   target,
@@ -82,11 +107,13 @@ export function CashierDialog({
     <Dialog open={target !== null} onOpenChange={(open) => !open && onClose()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{editing ? "Edit cashier" : "Add cashier"}</DialogTitle>
+          <DialogTitle className="flex items-center gap-1.5">
+            {editing ? "Edit cashier" : "Add cashier"}
+            <Hint label="About cashier accounts">
+              Cashiers sign in to one store. You set their password; they can't change it. Account, Help center and About stay on. Settings, suppliers and profit stay with you.
+            </Hint>
+          </DialogTitle>
         </DialogHeader>
-        <p className="text-sm text-muted-foreground">
-          Cashiers use the Register of their store and only see the sales they ring up. You set their password; they can't change it.
-        </p>
         <form onSubmit={submit} noValidate className="space-y-3">
           <div className="space-y-1">
             <Label htmlFor="cashier-username" required>Username</Label>
@@ -160,7 +187,12 @@ export function CashierDialog({
             <FieldError errors={errors} id="cashier-store" />
           </div>
           <div className="space-y-1">
-            <Label htmlFor="cashier-uses" required>Devices the sign-in link works on</Label>
+            <div className="flex items-center gap-1.5">
+              <Label htmlFor="cashier-uses" required>Devices the sign-in link works on</Label>
+              <Hint label="How device limits work">
+                1 means one phone or computer: the first one to open the link. It can use it again, but other devices can't.
+              </Hint>
+            </div>
             <Input
               id="cashier-uses"
               {...invalid(errors, "cashier-uses")}
@@ -172,16 +204,14 @@ export function CashierDialog({
               }}
             />
             <FieldError errors={errors} id="cashier-uses" />
-            <p className="text-xs text-muted-foreground">
-              1 means one phone or computer: the first one to open the link. It can use it again, but other devices can't.
-            </p>
           </div>
           <fieldset className="space-y-2">
-            <legend className="text-sm font-medium">Pages</legend>
-            <p className="text-xs text-muted-foreground">
-              The Register, Account, Help center and About are always on. Inventory shows costs and suppliers and Expenses shows
-              spending, so both start off. Settings, suppliers and profit are never shown to cashiers.
-            </p>
+            <legend className="flex items-center gap-1.5 text-sm font-medium">
+              Pages
+              <Hint label="Which pages a cashier can open">
+                Turn the Register off to stop them ringing up sales. Inventory shows costs, stock and suppliers and starts on. Expenses shows spending and starts off. Account, Help center and About stay on. Settings, suppliers and profit are never shown.
+              </Hint>
+            </legend>
             <div className="divide-y divide-border rounded-lg border border-border">
               {CASHIER_PAGES.map((page) => (
                 <label key={page.href} htmlFor={`cashier-page-${page.href}`} className="flex cursor-pointer items-center justify-between gap-3 px-3 py-2 text-sm">

@@ -14,6 +14,7 @@ import { AnalyticsPanel } from "@/components/AnalyticsPanel";
 import { PrintReceipt } from "@/components/PrintReceipt";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -46,6 +47,9 @@ function statusText(status: Order["status"]) {
 
 function VoidSaleForm({ order, onVoid }: { order: Order; onVoid: (orderId: string, reason: string) => Promise<string | null> }) {
   const { user } = useAuth();
+  const { activeTenant } = usePos();
+  const [open, setOpen] = useState(false);
+  const [step, setStep] = useState<"reason" | "confirm">("reason");
   const [reason, setReason] = useState("");
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
@@ -58,35 +62,93 @@ function VoidSaleForm({ order, onVoid }: { order: Order; onVoid: (orderId: strin
   if (!order.items?.length) {
     return <p className="text-sm text-muted-foreground">Item details aren&apos;t on this device yet, so this sale can&apos;t be voided from here.</p>;
   }
+
+  const close = () => {
+    if (pending) return;
+    setOpen(false);
+    setStep("reason");
+    setReason("");
+    setError("");
+  };
+
   return (
-    <form
-      className="space-y-2"
-      onSubmit={(event) => {
-        event.preventDefault();
-        setPending(true);
-        setError("");
-        void onVoid(order.id, reason).then((message) => {
-          setPending(false);
-          if (message) setError(message);
-        });
-      }}
-    >
-      <Label htmlFor={`void-${order.id}`} required>
-        Reason
-      </Label>
-      <Textarea
-        id={`void-${order.id}`}
-        value={reason}
-        maxLength={200}
-        placeholder="What was wrong with this sale?"
-        onChange={(event) => setReason(event.target.value)}
-        required
-      />
-      {error ? <p className="text-sm text-destructive">{error}</p> : null}
-      <Button type="submit" variant="destructive" disabled={pending || !reason.trim()}>
+    <>
+      <Button type="button" variant="destructive" className="w-full" onClick={() => setOpen(true)}>
         Void sale
       </Button>
-    </form>
+      <Dialog open={open} onOpenChange={(next) => (next ? setOpen(true) : close())}>
+        <DialogContent>
+          {step === "reason" ? (
+            <form
+              className="grid gap-4"
+              onSubmit={(event) => {
+                event.preventDefault();
+                if (!reason.trim()) return;
+                setError("");
+                setStep("confirm");
+              }}
+            >
+              <DialogHeader>
+                <DialogTitle>Void sale</DialogTitle>
+                <DialogDescription>Say what was wrong with this sale.</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-2">
+                <Label htmlFor={`void-${order.id}`} required>
+                  Reason
+                </Label>
+                <Textarea
+                  id={`void-${order.id}`}
+                  value={reason}
+                  maxLength={200}
+                  autoFocus
+                  placeholder="What was wrong with this sale?"
+                  onChange={(event) => setReason(event.target.value)}
+                  required
+                />
+              </div>
+              <DialogFooter>
+                <Button type="button" variant="ghost" onClick={close}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={!reason.trim()}>
+                  Continue
+                </Button>
+              </DialogFooter>
+            </form>
+          ) : (
+            <form
+              className="grid gap-4"
+              onSubmit={(event) => {
+                event.preventDefault();
+                setPending(true);
+                setError("");
+                void onVoid(order.id, reason).then((message) => {
+                  setPending(false);
+                  if (message) setError(message);
+                });
+              }}
+            >
+              <DialogHeader>
+                <DialogTitle>Void this sale?</DialogTitle>
+                <DialogDescription>
+                  {money(activeTenant?.currency ?? "PHP", order.total)} comes out of your totals and the items go back in stock. This can&apos;t be undone.
+                </DialogDescription>
+              </DialogHeader>
+              <p className="rounded-lg bg-muted px-3 py-2 text-sm">{reason.trim()}</p>
+              {error ? <p className="text-sm text-destructive">{error}</p> : null}
+              <DialogFooter>
+                <Button type="button" variant="ghost" disabled={pending} onClick={() => setStep("reason")}>
+                  Back
+                </Button>
+                <Button type="submit" variant="destructive" disabled={pending}>
+                  {pending ? "Voiding" : "Void sale"}
+                </Button>
+              </DialogFooter>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 const PAYMENT = [
@@ -208,7 +270,7 @@ export function SalesView() {
               : []),
           ]}
         />
-        <VoidSaleForm order={selected} onVoid={handleVoidSale} />
+        <VoidSaleForm key={selected.id} order={selected} onVoid={handleVoidSale} />
         {selected.items?.length ? (
           <PrintReceipt order={selected} items={selected.items} tenant={activeTenant} />
         ) : (

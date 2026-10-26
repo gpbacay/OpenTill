@@ -1,8 +1,7 @@
 import "reflect-metadata";
 import { NestFactory } from "@nestjs/core";
-import express from "express";
 import dotenv from "dotenv";
-import { AppModule } from "./server/app.module";
+import { acceptPhotos, AppModule } from "./server/app.module";
 
 // Load .env.local first, then .env (DATABASE_URL in .env wins)
 dotenv.config({ path: ".env.local" });
@@ -13,8 +12,7 @@ async function bootstrap() {
 
   app.enableCors();
 
-  const expressApp = app.getHttpAdapter().getInstance();
-  expressApp.use(express.json());
+  acceptPhotos(app);
 
   const PORT = 3001;
   await app.listen(PORT, "0.0.0.0");

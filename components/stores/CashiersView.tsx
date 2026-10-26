@@ -150,7 +150,7 @@ export function CashiersView() {
         rows={[
           ["Status", <Activity key="status" lastSeenAt={selected.lastSeenAt} now={now} />],
           ["Store", storeName(selected.tenantId)],
-          ["Pages", ["Register", ...CASHIER_PAGES.filter((page) => selected.pages.includes(page.href)).map((page) => page.label)].join(", ")],
+          ["Pages", CASHIER_PAGES.filter((page) => selected.pages.includes(page.href)).map((page) => page.label).join(", ") || "Account only"],
           ["Sign-in link", selected.hasLink ? `${selected.linkUses} of ${selected.linkMaxUses} device${selected.linkMaxUses === 1 ? "" : "s"} used` : "None"],
           ["Added", new Date(selected.createdAt).toLocaleDateString()],
         ]}

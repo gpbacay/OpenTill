@@ -2,7 +2,7 @@
 //   DATABASE_URL=file:/tmp/smoke.db npx prisma migrate deploy && DATABASE_URL=file:/tmp/smoke.db npx tsx server/access.smoke.ts
 import "reflect-metadata";
 import { NestFactory } from "@nestjs/core";
-import express from "express";
+import { acceptPhotos } from "./app.module";
 
 const assert = (cond: unknown, msg: string) => {
   if (!cond) throw new Error("FAIL: " + msg);
@@ -12,7 +12,7 @@ const assert = (cond: unknown, msg: string) => {
 async function main() {
   const { AppModule } = await import("./app.module");
   const app = await NestFactory.create(AppModule, { logger: ["error"] });
-  app.getHttpAdapter().getInstance().use(express.json());
+  acceptPhotos(app);
   await app.listen(3999);
   const base = "http://localhost:3999";
 
@@ -76,7 +76,7 @@ async function main() {
   assert(r.json.length === 1 && r.json[0].id === "t1", "cashier sees only their store");
   r = await call(cashier, "GET", "/api/products");
   assert(r.status === 200 && r.json.length === 1, "cashier reads products");
-  assert(!("costPrice" in r.json[0]) && !("supplierId" in r.json[0]), "cashier doesn't see cost price or supplier");
+  assert("costPrice" in r.json[0] && "supplierId" in r.json[0], "inventory starts on, so a new cashier sees cost and supplier");
 
   // categories: per store, renaming one renames it on the store's products
   r = await call(admin, "PUT", "/api/categories/c1", { tenantId: "t1", name: "  Drinks  " });
@@ -86,7 +86,7 @@ async function main() {
   r = await call(other, "GET", "/api/categories");
   assert(r.json.length === 0, "other admin doesn't see my categories");
   r = await call(cashier, "GET", "/api/categories");
-  assert(r.status === 403, "cashier can't use the categories API");
+  assert(r.status === 200, "inventory starts on, so a new cashier can read categories");
   r = await call(admin, "PUT", "/api/categories/c1", { tenantId: "t1", name: "Beverages" });
   assert(r.status === 200 && r.json.name === "Beverages", "admin renames the category");
   r = await call(admin, "GET", "/api/products");
@@ -192,8 +192,8 @@ async function main() {
   );
   r = await call(admin, "GET", "/api/cashiers");
   assert(
-    r.json[0].pages.join() === "/,/records,/reports,/activity",
-    "cashier starts with the sales pages; Inventory and Expenses start off"
+    r.json[0].pages.join() === "/orders,/,/records,/reports,/activity,/inventory",
+    "cashier starts with the register, sales pages and inventory; expenses start off"
   );
   assert(r.json[0].lastSeenAt !== null, "the cashier's requests mark them as recently active");
   assert(((await versionsOf(admin))["t1:cashiers"] ?? 0) >= 1, "cashier activity reaches the admin's change counter");
@@ -207,11 +207,17 @@ async function main() {
   assert(r.json.pages.length === 0, "the cashier's session carries their pages");
   r = await call(cashier, "GET", "/api/orders");
   assert(r.status === 403, "no sales pages, no sales data");
+  r = await call(cashier, "POST", "/api/orders/sync", { orders: [order], items: [] });
+  assert(r.status === 403, "no register, no sale");
   r = await call(cashier, "POST", "/api/orders/o-old/void", { reason: "wrong item" });
   assert(r.status === 403, "no sales pages, no void");
   r = await call(admin, "PATCH", "/api/cashiers/" + cid, { pages: ["/", "/records"] });
   r = await call(cashier, "GET", "/api/orders");
   assert(r.status === 200, "turning a sales page back on restores it");
+  r = await call(cashier, "GET", "/api/products");
+  assert(!("costPrice" in r.json[0]) && !("supplierId" in r.json[0]), "turning Inventory off hides cost and supplier again");
+  r = await call(cashier, "POST", "/api/orders/sync", { orders: [{ ...order, id: "o-noreg" }], items: [] });
+  assert(r.status === 403, "sales pages without the register can't ring a sale");
   for (const [m, p] of [["GET", "/api/suppliers"], ["GET", "/api/expenses"], ["GET", "/api/stock-movements"], ["GET", "/api/cashiers"], ["POST", "/api/cashiers"], ["PUT", "/api/tenants/t1"], ["DELETE", "/api/tenants/t1"], ["PUT", "/api/products/p1"], ["DELETE", "/api/products/p1"], ["PUT", "/api/expenses/e1"], ["PUT", "/api/suppliers/s1"], ["PUT", "/api/stock-movements/m1"], ["PUT", "/api/columns/x1"]] as const) {
     r = await call(cashier, m, p, {});
     assert(r.status === 403, `cashier blocked: ${m} ${p}`);
@@ -226,6 +232,10 @@ async function main() {
   assert("costPrice" in r.json[0], "with Inventory the cashier sees cost prices");
   r = await call(cashier, "PUT", "/api/products/p1", { id: "p1", tenantId: "t1", name: "Cola", category: "Drinks", sku: "C1", price: 13, description: "" });
   assert(r.status === 200 && r.json.price === 13, "with Inventory the cashier edits a product");
+  const photo = "data:image/jpeg;base64," + "A".repeat(120_000);
+  r = await call(cashier, "POST", "/api/products", { id: "p-photo", tenantId: "t1", name: "Photo", category: "Drinks", sku: "PIC", price: 1, description: "", image: photo });
+  assert(r.status === 201 || r.status === 200, "with Inventory the cashier uploads a product photo");
+  assert(r.json?.image === photo, "the product photo is stored");
   r = await call(cashier, "PUT", "/api/stock-movements/m-cashier", { tenantId: "t1", productId: "p1", type: "ADJUSTMENT", quantity: 2, date: new Date().toISOString() });
   assert(r.status === 200, "with Inventory the cashier adjusts stock");
   for (const p of ["/api/stock-movements", "/api/suppliers", "/api/categories", "/api/columns"]) {
@@ -249,7 +259,7 @@ async function main() {
   assert(r.status === 200, "with Expenses the cashier deletes an expense");
   r = await call(cashier, "PUT", "/api/products/p1", { id: "p1", tenantId: "t1", name: "Cola", price: 12 });
   assert(r.status === 403, "turning Inventory off closes product edits again");
-  r = await call(admin, "PATCH", "/api/cashiers/" + cid, { pages: ["/", "/records"] });
+  r = await call(admin, "PATCH", "/api/cashiers/" + cid, { pages: ["/", "/orders", "/records"] });
 
   r = await call(cashier, "GET", "/api/tenants?x=1");
   assert(r.status === 200, "query string doesn't break allowlist");

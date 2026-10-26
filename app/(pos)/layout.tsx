@@ -21,8 +21,6 @@ import { AppShellSkeleton } from "@/components/loading/PageSkeletons";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 const TABS = ["home", "orders", "inventory", "records"].map((id) => MENU_ITEMS.find((item) => item.id === id)!);
-// Cashiers can't open Suppliers or Inventory, so their bar holds the pages they use instead.
-const CASHIER_TABS = ["home", "orders", "records", "reports", "activity"].map((id) => MENU_ITEMS.find((item) => item.id === id)!);
 
 // Leave sideways gestures to fields, charts and anything that scrolls sideways (tables).
 function usesSideways(el: HTMLElement | null, root: HTMLElement) {
@@ -50,14 +48,18 @@ function PosShell({ children }: { children: React.ReactNode }) {
   const isMobile = useIsMobile();
   const swipeStart = useRef<{ x: number; y: number } | null>(null);
   const cashier = isCashier(user);
-  const tabs = cashier ? CASHIER_TABS.filter((item) => canOpen(user, item.href)) : TABS;
+  const tabs = TABS.filter((item) => canOpen(user, item.href));
   const bottomBar = tabs.length > 0;
   const tabIndex = tabs.findIndex((item) => item.href === pathname);
-  // Cashiers can't open back-office pages (the API refuses their writes too); send them to the register.
+  // Cashiers can't open pages their admin turned off (the API refuses those writes too).
   const blocked = !canOpen(user, pathname);
   useEffect(() => {
-    if (blocked) router.replace("/orders");
-  }, [blocked, router]);
+    if (!blocked) return;
+    const landing = ["/", "/orders", "/inventory", "/records", "/reports", "/activity", "/expenses", "/account"].find((href) =>
+      canOpen(user, href)
+    );
+    router.replace(landing ?? "/account");
+  }, [blocked, router, user]);
 
   // Auto-hide: the bottom bar slides away after a few idle seconds and comes back on any touch or scroll.
   const [navHidden, setNavHidden] = useState(false);
@@ -197,7 +199,7 @@ function PosShell({ children }: { children: React.ReactNode }) {
                   }`}
                 >
                   <HugeiconsIcon icon={item.icon} size={20} />
-                  <span className="max-w-full truncate">{item.id === "activity" ? "Activity" : item.label}</span>
+                  <span className="max-w-full truncate">{item.label}</span>
                 </Link>
               );
             })}
