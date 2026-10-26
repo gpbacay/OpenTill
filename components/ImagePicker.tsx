@@ -3,7 +3,7 @@
 import { useId, useState, type ReactNode } from "react";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { ImageAdd01Icon } from "@hugeicons/core-free-icons";
-import { resizeImage } from "@/lib/image";
+import { PHOTO_ACCEPT, resizeImage } from "@/lib/image";
 import { Button } from "@/components/ui/button";
 
 /** Optional picture with a preview, Add/Change and Remove. Photos are shrunk to `max` pixels before `onChange`. */
@@ -67,7 +67,7 @@ export function ImagePicker({
       <input
         id={inputId}
         type="file"
-        accept="image/*"
+        accept={PHOTO_ACCEPT}
         disabled={disabled}
         className="absolute h-px w-px opacity-0"
         onChange={(event) => {
