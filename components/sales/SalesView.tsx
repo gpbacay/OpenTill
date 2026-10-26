@@ -1,16 +1,21 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
+import { useAuth } from "@/contexts/auth-context";
 import { usePos } from "@/contexts/pos-context";
 import { useOps } from "@/contexts/ops-context";
 import { money } from "@/lib/money";
 import { inRange, presetRange } from "@/lib/periods";
 import { useSearchParams } from "next/navigation";
 import { Order, Product } from "@/lib/types";
+import { countsTowardSales, voidDenial } from "@/lib/void-sale";
 import { DetailPanel, Fields, SplitView } from "@/components/data-table/DetailPanel";
 import { AnalyticsPanel } from "@/components/AnalyticsPanel";
 import { PrintReceipt } from "@/components/PrintReceipt";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DeleteButton, ExportButton } from "@/components/data-table/bulk";
 import { DataTable, type Column } from "@/components/data-table/DataTable";
@@ -20,9 +25,70 @@ import { FilterSelects, passesFilters, type RowFilter, ResetFiltersButton, Searc
 const STATUS = [
   { value: "all", label: "All sales" },
   { value: "COMPLETED", label: "Saved" },
+  { value: "VOIDED", label: "Voided" },
   { value: "PENDING_SYNC", label: "Queued" },
   { value: "FAILED", label: "Failed" },
 ];
+
+function statusBadge(status: Order["status"]) {
+  if (status === "PENDING_SYNC") return <Badge variant="secondary">Queued</Badge>;
+  if (status === "FAILED") return <Badge variant="destructive">Failed</Badge>;
+  if (status === "VOIDED") return <Badge variant="destructive">Voided</Badge>;
+  return <Badge variant="outline">Saved</Badge>;
+}
+
+function statusText(status: Order["status"]) {
+  if (status === "PENDING_SYNC") return "Queued, not saved yet";
+  if (status === "FAILED") return "Failed";
+  if (status === "VOIDED") return "Voided";
+  return "Saved";
+}
+
+function VoidSaleForm({ order, onVoid }: { order: Order; onVoid: (orderId: string, reason: string) => Promise<string | null> }) {
+  const { user } = useAuth();
+  const [reason, setReason] = useState("");
+  const [error, setError] = useState("");
+  const [pending, setPending] = useState(false);
+  if (!user || order.status === "VOIDED") return null;
+  const denial = voidDenial(user, order);
+  if (denial?.status === 403 && order.cashierId === user.id) {
+    return <p className="text-sm text-muted-foreground">You can only void a sale from today. Ask an admin after that.</p>;
+  }
+  if (denial) return null;
+  if (!order.items?.length) {
+    return <p className="text-sm text-muted-foreground">Item details aren&apos;t on this device yet, so this sale can&apos;t be voided from here.</p>;
+  }
+  return (
+    <form
+      className="space-y-2"
+      onSubmit={(event) => {
+        event.preventDefault();
+        setPending(true);
+        setError("");
+        void onVoid(order.id, reason).then((message) => {
+          setPending(false);
+          if (message) setError(message);
+        });
+      }}
+    >
+      <Label htmlFor={`void-${order.id}`} required>
+        Reason
+      </Label>
+      <Textarea
+        id={`void-${order.id}`}
+        value={reason}
+        maxLength={200}
+        placeholder="What was wrong with this sale?"
+        onChange={(event) => setReason(event.target.value)}
+        required
+      />
+      {error ? <p className="text-sm text-destructive">{error}</p> : null}
+      <Button type="submit" variant="destructive" disabled={pending || !reason.trim()}>
+        Void sale
+      </Button>
+    </form>
+  );
+}
 const PAYMENT = [
   { value: "all", label: "Any payment" },
   { value: "CASH", label: "Cash" },
@@ -32,7 +98,7 @@ const PAYMENT = [
 const PAY_LABEL: Record<string, string> = { CASH: "Cash", CARD: "Card", MOBILE_WALLET: "Wallet" };
 
 export function SalesView() {
-  const { activeTenant, tenantSyncedOrders, products } = usePos();
+  const { activeTenant, tenantSyncedOrders, products, handleVoidSale } = usePos();
   const productColumns = useOps().columnsFor("products");
   const params = useSearchParams();
   const [tab, setTab] = useFilter<"sales" | "reports">("sales_tab", "sales");
@@ -79,7 +145,7 @@ export function SalesView() {
   );
 
   const totals = useMemo(() => {
-    const counted = rows.filter((o) => o.status !== "FAILED");
+    const counted = rows.filter(countsTowardSales);
     const sum = counted.reduce((s, o) => s + o.total, 0);
     return { sum, count: counted.length, avg: counted.length ? sum / counted.length : 0 };
   }, [rows]);
@@ -107,8 +173,7 @@ export function SalesView() {
     {
       id: "status",
       header: "Status",
-      cell: (o) =>
-        o.status === "PENDING_SYNC" ? <Badge variant="secondary">Queued</Badge> : o.status === "FAILED" ? <Badge variant="destructive">Failed</Badge> : <Badge variant="outline">Saved</Badge>,
+      cell: (o) => statusBadge(o.status),
     },
     ...productColumns.map((c): Column<Order> => ({
       id: `custom-${c.id}`,
@@ -133,9 +198,17 @@ export function SalesView() {
             ["Customer", selected.customerName || "Walk-in"],
             ["Cashier", selected.cashierName || "—"],
             ["Payment", PAY_LABEL[selected.paymentMethod] ?? selected.paymentMethod],
-            ["Status", selected.status === "PENDING_SYNC" ? "Queued, not saved yet" : selected.status === "FAILED" ? "Failed" : "Saved"],
+            ["Status", statusText(selected.status)],
+            ...(selected.status === "VOIDED"
+              ? ([
+                  ["Voided", selected.voidedAt ? new Date(selected.voidedAt).toLocaleString() : "Yes"],
+                  ["Voided by", selected.voidedByName || "—"],
+                  ["Reason", selected.voidReason || "—"],
+                ] as [string, ReactNode][])
+              : []),
           ]}
         />
+        <VoidSaleForm order={selected} onVoid={handleVoidSale} />
         {selected.items?.length ? (
           <PrintReceipt order={selected} items={selected.items} tenant={activeTenant} />
         ) : (
@@ -200,7 +273,7 @@ export function SalesView() {
             selectedKey={selectedId}
             bulkActions={(chosen) => (
               <>
-                <span className="text-muted-foreground">Total {money(currency, chosen.filter((o) => o.status !== "FAILED").reduce((sum, o) => sum + o.total, 0))}</span>
+                <span className="text-muted-foreground">Total {money(currency, chosen.filter(countsTowardSales).reduce((sum, o) => sum + o.total, 0))}</span>
                 <ExportButton
                   filename="sales.csv"
                   headers={["Date", "ID", "Customer", "Cashier", "Payment", "Discount", "Total", "Status", "Brand", ...productColumns.map((c) => c.label)]}

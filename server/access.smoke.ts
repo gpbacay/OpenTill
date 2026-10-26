@@ -145,6 +145,51 @@ async function main() {
   assert(r.status === 200 && r.json.length === 1 && r.json[0].id === "o1", "cashier sees only the sales they rang up");
   r = await call(admin, "GET", "/api/orders");
   assert(r.json.length === 2, "admin sees every sale");
+
+  // Void: the sale stays, stock comes back, and a cashier can only undo their own sale from today.
+  r = await call(admin, "POST", "/api/products", { id: "p-void", tenantId: "t1", name: "Void me", category: "Drinks", sku: "V1", price: 10, description: "" });
+  assert(r.status === 201 || r.status === 200, "product for the void checks");
+  r = await call(admin, "PUT", "/api/stock-movements/m-void-open", { tenantId: "t1", productId: "p-void", type: "RESTOCK", quantity: 5, date: new Date().toISOString() });
+  assert(r.status === 200 && r.json.quantity === 5, "stock for the void checks");
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  yesterday.setHours(12, 0, 0, 0);
+  const voidItem = (orderId: string, itemId: string) => ({ id: itemId, orderId, productId: "p-void", name: "Void me", price: 10, quantity: 1 });
+  r = await call(cashier, "POST", "/api/orders/sync", {
+    orders: [{ ...order, id: "o-today", date: new Date().toISOString() }],
+    items: [voidItem("o-today", "i-today")],
+  });
+  assert(r.status === 201 || r.status === 200, "cashier rings a sale to void");
+  r = await call(cashier, "POST", "/api/orders/sync", {
+    orders: [{ ...order, id: "o-old", date: yesterday.toISOString() }],
+    items: [voidItem("o-old", "i-old")],
+  });
+  assert(r.status === 201 || r.status === 200, "cashier rings yesterday's sale");
+  const stockOf = async () => ((await call(admin, "GET", "/api/products")).json as { id: string; stock: number }[]).find((p) => p.id === "p-void")?.stock;
+  assert((await stockOf()) === 3, "both sales took stock");
+  r = await call(cashier, "POST", "/api/orders/o-today/void", { reason: "   " });
+  assert(r.status === 400, "a void needs a reason");
+  r = await call(cashier, "POST", "/api/orders/o-admin/void", { reason: "wrong item" });
+  assert(r.status === 403, "a cashier can't void someone else's sale");
+  r = await call(cashier, "POST", "/api/orders/o-old/void", { reason: "wrong item" });
+  assert(r.status === 403, "a cashier can't void yesterday's sale");
+  r = await call(other, "POST", "/api/orders/o-today/void", { reason: "wrong item" });
+  assert(r.status === 403, "another store's admin can't void the sale");
+  r = await call(cashier, "POST", "/api/orders/o-today/void", { reason: "rang the wrong item" });
+  assert((r.status === 200 || r.status === 201) && r.json.status === "VOIDED" && r.json.voidReason === "rang the wrong item", "cashier voids their sale from today");
+  assert((await stockOf()) === 4, "void puts that sale's stock back");
+  r = await call(cashier, "POST", "/api/orders/o-today/void", { reason: "again" });
+  assert(r.status === 400, "a voided sale stays voided");
+  r = await call(cashier, "GET", "/api/orders");
+  assert(r.json.some((sale: { id: string; status: string }) => sale.id === "o-today" && sale.status === "VOIDED"), "the voided sale stays on the cashier's list");
+  r = await call(admin, "POST", "/api/orders/o-old/void", { reason: "wrong sale" });
+  assert((r.status === 200 || r.status === 201) && r.json.status === "VOIDED", "admin voids an older sale");
+  assert((await stockOf()) === 5, "admin void puts the rest of the stock back");
+  r = await call(admin, "GET", "/api/stock-movements");
+  assert(
+    r.json.some((m: { id: string; type: string; quantity: number }) => m.id === "mov-void-i-today" && m.type === "VOID" && m.quantity === 1),
+    "the void is a stock movement, so the count still adds up"
+  );
   r = await call(admin, "GET", "/api/cashiers");
   assert(
     r.json[0].pages.join() === "/,/records,/reports,/activity",
@@ -162,6 +207,8 @@ async function main() {
   assert(r.json.pages.length === 0, "the cashier's session carries their pages");
   r = await call(cashier, "GET", "/api/orders");
   assert(r.status === 403, "no sales pages, no sales data");
+  r = await call(cashier, "POST", "/api/orders/o-old/void", { reason: "wrong item" });
+  assert(r.status === 403, "no sales pages, no void");
   r = await call(admin, "PATCH", "/api/cashiers/" + cid, { pages: ["/", "/records"] });
   r = await call(cashier, "GET", "/api/orders");
   assert(r.status === 200, "turning a sales page back on restores it");
@@ -211,7 +258,7 @@ async function main() {
   r = await call(cashier, "POST", "/api/orders/sync", { orders: [{ ...order, id: "o2", tenantId: "t2" }], items: [] });
   assert(r.status === 403, "cashier can't sell into another store");
 
-  // sign-in links: the admin sets the password; a link signs in up to N devices (no expiry)
+  // sign-in links: the admin sets the password; the link still asks for it, and works on up to N devices (no expiry)
   const cookiesOf = (res: Response) => (res.headers.getSetCookie?.() ?? []).map((c) => c.split(";")[0]).join("; ");
   const deviceOf = (res: Response) => cookiesOf(res).split("; ").find((c) => c.startsWith("opentill_device=")) ?? "";
   const list = async () => (await call(admin, "GET", "/api/cashiers")).json as any[];
@@ -232,6 +279,11 @@ async function main() {
   assert(r.status === 404, "unknown link token is 404");
 
   r = await call("", "POST", "/api/auth/join", { token: ivy.inviteToken });
+  assert(r.status === 401, "link without the password is refused");
+  r = await call("", "POST", "/api/auth/join", { token: ivy.inviteToken, password: "nope" });
+  assert(r.status === 401 && /password/i.test(r.json.message), "wrong password is refused");
+  assert((await list()).find((c) => c.id === ivy.id).linkUses === 0, "a wrong password doesn't use up a device");
+  r = await call("", "POST", "/api/auth/join", { token: ivy.inviteToken, password: "ivypass123" });
   const phoneA = deviceOf(r.res);
   const ivyCookie = (r.res.headers.get("set-cookie") ?? "").split(";")[0];
   assert(r.status === 200 && r.json.role === "CASHIER" && r.json.tenantId === "t1" && phoneA && ivyCookie.includes("opentill_session"), "device A: link signs in and records the device");
@@ -240,17 +292,17 @@ async function main() {
   r = await call(ivyCookie, "GET", "/api/cashiers");
   assert(r.status === 403, "linked cashier is still limited");
   assert((await list()).find((c) => c.id === ivy.id).linkUses === 1, "usage shows 1 of 2");
-  r = await call(phoneA, "POST", "/api/auth/join", { token: ivy.inviteToken });
+  r = await call(phoneA, "POST", "/api/auth/join", { token: ivy.inviteToken, password: "ivypass123" });
   assert(r.status === 200, "device A can use the link again after logging out");
   assert((await list()).find((c) => c.id === ivy.id).linkUses === 1, "re-using on the same device doesn't count again");
-  r = await call("", "POST", "/api/auth/join", { token: ivy.inviteToken });
+  r = await call("", "POST", "/api/auth/join", { token: ivy.inviteToken, password: "ivypass123" });
   const phoneB = deviceOf(r.res);
   assert(r.status === 200 && phoneB && phoneB !== phoneA, "device B: second device is allowed");
-  r = await call("", "POST", "/api/auth/join", { token: ivy.inviteToken });
+  r = await call("", "POST", "/api/auth/join", { token: ivy.inviteToken, password: "ivypass123" });
   assert(r.status === 403 && /already used/.test(r.json.message), "device C: refused, the 2 allowed devices are taken");
   r = await call("", "GET", "/api/auth/invite/" + ivy.inviteToken);
   assert(r.status === 403, "device C: link page says it's used up");
-  r = await call(phoneB, "POST", "/api/auth/join", { token: ivy.inviteToken });
+  r = await call(phoneB, "POST", "/api/auth/join", { token: ivy.inviteToken, password: "ivypass123" });
   assert(r.status === 200, "a recorded device still works when the link is full");
   r = await call("", "POST", "/api/auth/login", { username: "ivy", password: "ivypass123" });
   assert(r.status === 200, "the admin's password works from any device (not device-locked)");
@@ -265,32 +317,32 @@ async function main() {
   assert(r.json.linkUses === 0 && r.json.hasLink && !("inviteToken" in r.json), "usage back to 0, same link, no token re-shown");
   r = await call(ivyCookie, "GET", "/api/auth/me");
   assert(r.status === 401, "reset signs the cashier out everywhere");
-  r = await call("", "POST", "/api/auth/join", { token: ivy.inviteToken });
+  r = await call("", "POST", "/api/auth/join", { token: ivy.inviteToken, password: "ivypass123" });
   assert(r.status === 200, "the same link works again after the reset (device C gets in)");
 
   // someone used the link before the real cashier -> reset -> cashier gets in, intruder is locked out
   r = await call(admin, "POST", "/api/cashiers", { username: "jo", password: "jopass1234", tenantId: "t1" });
   const jo = r.json;
   assert(jo.linkMaxUses === 1, "device limit defaults to 1");
-  r = await call("", "POST", "/api/auth/join", { token: jo.inviteToken });
+  r = await call("", "POST", "/api/auth/join", { token: jo.inviteToken, password: "jopass1234" });
   const intruder = deviceOf(r.res);
   const intruderSession = (r.res.headers.get("set-cookie") ?? "").split(";")[0];
   assert(r.status === 200, "intruder opens jo's link first");
-  r = await call("", "POST", "/api/auth/join", { token: jo.inviteToken });
+  r = await call("", "POST", "/api/auth/join", { token: jo.inviteToken, password: "jopass1234" });
   assert(r.status === 403, "the real cashier is now locked out");
   await call(admin, "POST", `/api/cashiers/${jo.id}/reset-link`);
   r = await call(intruderSession, "GET", "/api/auth/me");
   assert(r.status === 401, "the intruder's session is gone after the reset");
-  r = await call("", "POST", "/api/auth/join", { token: jo.inviteToken });
+  r = await call("", "POST", "/api/auth/join", { token: jo.inviteToken, password: "jopass1234" });
   assert(r.status === 200, "the real cashier takes the single slot");
-  r = await call(intruder, "POST", "/api/auth/join", { token: jo.inviteToken });
+  r = await call(intruder, "POST", "/api/auth/join", { token: jo.inviteToken, password: "jopass1234" });
   assert(r.status === 403, "the intruder can't get back in with the link");
 
   // admin: new link and limit changes
   r = await call(admin, "POST", `/api/cashiers/${jo.id}/invite`);
   const joNew = r.json;
   assert(joNew.inviteToken && joNew.inviteToken !== jo.inviteToken && joNew.linkUses === 0, "admin makes a brand-new link, usage zero");
-  r = await call("", "POST", "/api/auth/join", { token: jo.inviteToken });
+  r = await call("", "POST", "/api/auth/join", { token: jo.inviteToken, password: "jopass1234" });
   assert(r.status === 404, "the old link is dead");
   r = await call(admin, "PATCH", "/api/cashiers/" + jo.id, { maxUses: 3 });
   assert(r.status === 200 && r.json.linkMaxUses === 3, "admin raises the device limit");
@@ -310,8 +362,10 @@ async function main() {
   assert(r.status === 401, "old password no longer works");
   r = await call("", "POST", "/api/auth/login", { username: "jo", password: "newjopass123" });
   assert(r.status === 200, "new admin-set password works");
-  r = await call("", "POST", "/api/auth/join", { token: joNew.inviteToken });
-  assert(r.status === 200, "the link is unaffected by a password change");
+  r = await call("", "POST", "/api/auth/join", { token: joNew.inviteToken, password: "jopass1234" });
+  assert(r.status === 401, "the link uses the new password");
+  r = await call("", "POST", "/api/auth/join", { token: joNew.inviteToken, password: "newjopass123" });
+  assert(r.status === 200, "the link still works after a password change, with the new password");
   r = await call(admin, "POST", "/api/cashiers", { username: "kim", password: "short", tenantId: "t1" });
   assert(r.status === 400, "a too-short admin password is rejected");
   assert(!JSON.stringify(await list()).includes("inviteToken") && !JSON.stringify(await list()).includes("inviteHash"), "list never exposes tokens");

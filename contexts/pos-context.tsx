@@ -13,6 +13,8 @@ import { useRouter } from "next/navigation";
 import { Tenant, Product, Order, OrderItem, HeldCart, StockMovement } from "@/lib/types";
 import { subscribe } from "@/lib/realtime";
 import { writeLocalSession } from "@/lib/local-auth";
+import { useAuth } from "@/contexts/auth-context";
+import { voidDenial, voidReason } from "@/lib/void-sale";
 import { isOnline as apiReachable, useOnline } from "@/lib/offline";
 import { load, save } from "@/lib/device-store";
 
@@ -53,6 +55,8 @@ interface PosContextValue {
   handleResumeHeldCart: (id: string) => void;
   handleDeleteHeldCart: (id: string) => void;
   handleCheckout: (order: Order, items: OrderItem[]) => Promise<void>;
+  /** Void a recorded sale. Resolves to an error message, or null when the sale is voided. */
+  handleVoidSale: (orderId: string, reason: string) => Promise<string | null>;
   handleAddProduct: (newProduct: Product) => Promise<void>;
   handleUpdateProduct: (updatedProduct: Product) => Promise<void>;
   handleDeleteProduct: (productId: string) => Promise<void>;
@@ -70,12 +74,15 @@ type Outbox = {
   productUpserts: string[];
   productDeletes: string[];
   tenantUpserts: string[];
+  /** Sales voided on this device that the server still has to void. */
+  voids: string[];
 };
 
 const EMPTY_OUTBOX: Outbox = {
   productUpserts: [],
   productDeletes: [],
   tenantUpserts: [],
+  voids: [],
 };
 
 function readStorage<T>(key: string, fallback: T): T {
@@ -114,6 +121,7 @@ export function PosProvider({
   children: ReactNode;
 }) {
   const router = useRouter();
+  const { user } = useAuth();
   const [scope, setScope] = useState<string | null>(null);
   const hydrated = scope === userId;
 
@@ -135,6 +143,8 @@ export function PosProvider({
   offlineQueueRef.current = offlineQueue;
   const productsRef = useRef(products);
   productsRef.current = products;
+  const ordersRef = useRef(syncedOrders);
+  ordersRef.current = syncedOrders;
   const tenantsRef = useRef(tenants);
   tenantsRef.current = tenants;
   const outboxRef = useRef<Outbox>(EMPTY_OUTBOX);
@@ -167,7 +177,7 @@ export function PosProvider({
       setIsDarkMode(readStorage("opentill_theme_dark", true));
       // New key: the old one saved "on" for every device whether or not anyone chose it, so the off default reaches them too.
       setAutoHideNav(readStorage("opentill_auto_hide_nav_v2", false));
-      outboxRef.current = outbox;
+      outboxRef.current = { ...EMPTY_OUTBOX, ...outbox, voids: outbox.voids ?? [] };
       setScope(userId);
     });
     return () => {
@@ -227,6 +237,15 @@ export function PosProvider({
     writeOutbox(userId, box);
   };
 
+  const shiftStock = (items: OrderItem[], sign: 1 | -1) => {
+    const next = productsRef.current.map((product) => {
+      const line = items.find((item) => item.productId === product.id);
+      return line ? { ...product, stock: product.stock + sign * line.quantity } : product;
+    });
+    productsRef.current = next;
+    setProducts(next);
+  };
+
   flushRef.current = async () => {
     if (!apiReachable() || syncingRef.current) return;
     const box = outboxRef.current;
@@ -234,7 +253,8 @@ export function PosProvider({
       offlineQueueRef.current.length > 0 ||
       box.productUpserts.length > 0 ||
       box.productDeletes.length > 0 ||
-      box.tenantUpserts.length > 0;
+      box.tenantUpserts.length > 0 ||
+      box.voids.length > 0;
     syncingRef.current = true;
     if (hasWork) {
       setIsSyncing(true);
@@ -302,15 +322,47 @@ export function PosProvider({
         if (!res.ok) throw new Error("local database sync failed");
         const ids = new Set(queue.map((item) => item.order.id));
         const syncedAt = new Date().toISOString();
-        setSyncedOrders((prev) =>
-          prev.map((order) =>
-            ids.has(order.id)
-              ? { ...order, status: "COMPLETED", isOffline: false, syncedAt }
+        setSyncedOrders((prev) => {
+          const next = prev.map((order) =>
+            ids.has(order.id) && order.status !== "VOIDED"
+              ? { ...order, status: "COMPLETED" as const, isOffline: false, syncedAt }
               : order
-          )
-        );
+          );
+          ordersRef.current = next;
+          return next;
+        });
+        // A void during this upload still has to reach the server, or the sale stays and the stock doesn't come back.
+        for (const item of queue) {
+          if (ordersRef.current.find((order) => order.id === item.order.id)?.status === "VOIDED") {
+            remember("voids", item.order.id, true);
+          }
+        }
         setOfflineQueue([]);
         offlineQueueRef.current = [];
+      }
+
+      for (const id of [...outboxRef.current.voids]) {
+        if (offlineQueueRef.current.some((entry) => entry.order.id === id)) {
+          remember("voids", id, false);
+          continue;
+        }
+        const order = ordersRef.current.find((existing) => existing.id === id);
+        const res = await api(`/api/orders/${id}/void`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ reason: order?.voidReason ?? "" }),
+        });
+        if (res.ok || res.status === 404 || res.status === 400) {
+          remember("voids", id, false);
+          continue;
+        }
+        if (res.status === 403 && order) {
+          const restored: Order = { ...order, status: "COMPLETED", voidedAt: undefined, voidReason: undefined, voidedByName: undefined };
+          ordersRef.current = ordersRef.current.map((existing) => (existing.id === id ? restored : existing));
+          setSyncedOrders(ordersRef.current);
+          shiftStock(order.items ?? [], -1);
+          remember("voids", id, false);
+        }
       }
 
       // Commit each collection as soon as its own request finishes. A slow orders request, for
@@ -347,11 +399,13 @@ export function PosProvider({
         if (Array.isArray(server) && server.length > 0) {
           const dirty = new Set(outboxRef.current.productUpserts);
           const deleted = new Set(outboxRef.current.productDeletes);
-          const queuedIds = new Set(
-            offlineQueueRef.current.flatMap((entry) =>
-              entry.items.map((item) => item.productId)
-            )
-          );
+          const voiding = new Set(outboxRef.current.voids);
+          const queuedIds = new Set([
+            ...offlineQueueRef.current.flatMap((entry) => entry.items.map((item) => item.productId)),
+            ...ordersRef.current
+              .filter((order) => voiding.has(order.id))
+              .flatMap((order) => (order.items ?? []).map((item) => item.productId)),
+          ]);
           setProducts((local) => {
             const byId = new Map(local.map((p) => [p.id, p]));
             const merged = server
@@ -380,6 +434,7 @@ export function PosProvider({
         if (!response.ok) return;
         const server = await response.json();
         if (Array.isArray(server)) {
+          const pendingVoids = new Set(outboxRef.current.voids);
           const mapped: Order[] = server.map((o: Order) => ({
             id: o.id,
             tenantId: o.tenantId,
@@ -392,16 +447,27 @@ export function PosProvider({
             date: o.date,
             syncedAt: o.syncedAt,
             cashierName: o.cashierName,
+            cashierId: o.cashierId,
             customerName: o.customerName,
             discountAmount: o.discountAmount,
             discountPercent: o.discountPercent,
             cashReceived: o.cashReceived,
             changeDue: o.changeDue,
+            voidedAt: o.voidedAt,
+            voidReason: o.voidReason,
+            voidedByName: o.voidedByName,
             items: o.items,
           }));
           setSyncedOrders((local) => {
-            const ids = new Set(mapped.map((o) => o.id));
-            return [...local.filter((o) => !ids.has(o.id)), ...mapped];
+            const kept = mapped.map((order) => {
+              if (!pendingVoids.has(order.id)) return order;
+              const pending = local.find((item) => item.id === order.id);
+              return pending?.status === "VOIDED" ? pending : order;
+            });
+            const ids = new Set(kept.map((o) => o.id));
+            const next = [...local.filter((o) => !ids.has(o.id)), ...kept];
+            ordersRef.current = next;
+            return next;
           });
         }
       };
@@ -632,6 +698,71 @@ export function PosProvider({
     }
   };
 
+  const handleVoidSale = async (orderId: string, reason: string): Promise<string | null> => {
+    const cleaned = voidReason(reason);
+    if (!cleaned) return "Enter a reason.";
+    if (!user) return "Sign in to void a sale.";
+    const order = ordersRef.current.find((existing) => existing.id === orderId);
+    if (!order) return "That sale isn't on this device.";
+    const denial = voidDenial(user, order);
+    if (denial) return denial.message;
+    if (!order.items?.length) return "Item details aren't on this device yet, so this sale can't be voided from here.";
+
+    const voided: Order = {
+      ...order,
+      status: "VOIDED",
+      voidedAt: new Date().toISOString(),
+      voidReason: cleaned,
+      voidedByName: user.name,
+    };
+    ordersRef.current = ordersRef.current.map((existing) => (existing.id === orderId ? voided : existing));
+    setSyncedOrders(ordersRef.current);
+    shiftStock(order.items, 1);
+
+    const queued = offlineQueueRef.current.some((entry) => entry.order.id === orderId);
+    if (queued) {
+      const next = offlineQueueRef.current.filter((entry) => entry.order.id !== orderId);
+      offlineQueueRef.current = next;
+      setOfflineQueue(next);
+      // The upload may already be in flight with this sale. Keep the void so the server can undo it.
+      if (syncingRef.current) remember("voids", orderId, true);
+      return null;
+    }
+
+    const send = async () => {
+      const res = await api(`/api/orders/${orderId}/void`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason: cleaned }),
+      });
+      return res;
+    };
+
+    if (!apiReachable()) {
+      remember("voids", orderId, true);
+      return null;
+    }
+
+    try {
+      const res = await send();
+      if (res.ok || res.status === 404 || res.status === 400) return null;
+      if (res.status === 403) {
+        ordersRef.current = ordersRef.current.map((existing) => (existing.id === orderId ? order : existing));
+        setSyncedOrders(ordersRef.current);
+        shiftStock(order.items, -1);
+        const body = await res.json().catch(() => null);
+        const message = body?.message;
+        return typeof message === "string" ? message : "This sale can't be voided.";
+      }
+      remember("voids", orderId, true);
+      return null;
+    } catch (err) {
+      console.warn("Void kept on this device until the sale can be updated.", err);
+      remember("voids", orderId, true);
+      return null;
+    }
+  };
+
   const handleAddProduct = async (newProduct: Product) => {
     setProducts((prev) => {
       const next = [newProduct, ...prev];
@@ -839,6 +970,7 @@ export function PosProvider({
     handleResumeHeldCart,
     handleDeleteHeldCart,
     handleCheckout,
+    handleVoidSale,
     handleAddProduct,
     handleUpdateProduct,
     handleDeleteProduct,

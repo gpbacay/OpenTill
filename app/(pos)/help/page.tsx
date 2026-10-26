@@ -30,6 +30,7 @@ const TOPICS: { title: string; articles: Article[] }[] = [
       { q: "How do I ring up a sale?", a: "Open the Register, search or scan a product QR (or tap products), then take payment. Leave “Cash received” empty for an exact cash payment.", href: "/orders" },
       { q: "Can I put a sale on hold?", a: "Yes. Hold the current sale from the cart and resume it later from the held sales list." },
       { q: "How do I print or find a receipt?", a: "Open Sales and select the sale. The receipt shows in the details panel with a print button.", href: "/records" },
+      { q: "Can I undo a sale?", a: "Open Sales, select the sale and void it with a reason. The sale stays on the list as Voided, its total drops out, and the items go back into stock. A cashier can void only a sale they rang up, and only on the same day. An admin can void any sale in the store.", href: "/records" },
       { q: "Why is a sale marked Queued?", a: "It was made while offline. It's saved on this device and is sent automatically when you're back online. You can also press Save in the header." },
     ],
   },
@@ -66,7 +67,7 @@ const TOPICS: { title: string; articles: Article[] }[] = [
       { q: "Does OpenTill work without internet?", a: "Yes. Everything is saved on this device first and synced when the connection returns. Settings shows the connection and anything still waiting to be sent.", href: "/settings" },
       { q: "I'm a cashier. Why don't I see Inventory, Expenses or Settings?", a: "Cashier accounts run the register and see the pages their admin turned on for them, such as the Dashboard, Sales, Reports and Recent activity, showing the sales they rang up. Product costs, stock changes, suppliers, expenses, profit and settings stay with your admin, so ask them if you need another page." },
       { q: "How do I change my name, photo or password?", a: "Open Account from the menu. Your photo is saved as soon as you pick it.", href: "/account" },
-      { q: "Can I swipe between pages on my phone?", a: "Yes. Swipe left or right to move between the pages in the bottom bar: Dashboard, Register, Inventory and Sales (for cashiers: Dashboard, Sales, Reports and Activity)." },
+      { q: "Can I swipe between pages on my phone?", a: "Yes. Swipe left or right to move between the pages in the bottom bar: Dashboard, Register, Inventory and Sales. Cashiers get Dashboard, Register, Sales, Reports and Activity." },
     ],
   },
 ];

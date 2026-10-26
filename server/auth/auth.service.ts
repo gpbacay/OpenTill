@@ -243,11 +243,16 @@ export class AuthService {
   }
 
   /**
-   * The cashier opens their sign-in link and is signed in without typing the admin's password.
+   * The cashier opens their sign-in link and enters the password their admin set.
    * The first browsers to use it (up to the limit the admin set) are remembered and can use it again; others can't.
+   * A wrong password does not use up a device.
    */
-  async join(body: { token?: string }, cookieHeader?: string) {
+  async join(body: { token?: string; password?: string }, cookieHeader?: string) {
     const { client, row, device } = await this.pendingInvite(body.token, cookieHeader);
+    const password = typeof body.password === "string" ? body.password : "";
+    if (!(await verifyPassword(password, row.passwordHash))) {
+      throw new UnauthorizedException("Password is incorrect.");
+    }
     let deviceToken = device;
     if (!deviceToken) {
       deviceToken = readCookie(cookieHeader, DEVICE_COOKIE) ?? randomBytes(24).toString("base64url");

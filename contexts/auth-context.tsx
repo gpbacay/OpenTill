@@ -43,7 +43,7 @@ interface AuthContextValue {
   login: (username: string, password: string, remember: boolean) => Promise<string | null>;
   register: (username: string, password: string) => Promise<string | null>;
   /** A cashier opens the sign-in link their admin shared. */
-  join: (token: string) => Promise<string | null>;
+  join: (token: string, password: string) => Promise<string | null>;
   logout: () => Promise<void>;
   updateAccount: (body: AccountUpdate) => Promise<string | null>;
 }
@@ -260,12 +260,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const join = async (token: string) => {
+  const join = async (token: string, password: string) => {
     try {
       const res = await fetch("/api/auth/join", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token }),
+        body: JSON.stringify({ token, password }),
       });
       if (apiMissing(res)) return "Couldn't reach the server. Connect to the internet and try again.";
       if (!res.ok) return errorMessage(res);

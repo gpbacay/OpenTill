@@ -9,7 +9,7 @@ import { Skeleton } from "@/components/motion/skeleton";
 import { usePos } from "@/contexts/pos-context";
 import type { CashierInvite } from "./use-cashiers";
 
-/** The one-time link (and QR code) a cashier opens to sign in without typing. Shown once: only a hash is stored. */
+/** The link (and QR code) that opens a cashier's sign-in page. Shown once: only a hash is stored. */
 export function CashierInviteDialog({ invite, onClose }: { invite: CashierInvite | null; onClose: () => void }) {
   const { tenants } = usePos();
   const [image, setImage] = useState("");
@@ -47,9 +47,9 @@ export function CashierInviteDialog({ invite, onClose }: { invite: CashierInvite
           <DialogTitle>Sign-in link for {invite?.username}</DialogTitle>
         </DialogHeader>
         <p className="text-sm text-muted-foreground">
-          Send them this link or let them scan the code to sign in{store ? ` to the Register of ${store}` : ""} without typing.
+          Send them this link or let them scan the code. They sign in{store ? ` to ${store}` : ""} with the password you set.
           It works on {invite?.linkMaxUses === 1 ? "one device" : `${invite?.linkMaxUses} devices`}: the first to open it {invite?.linkMaxUses === 1 ? "is" : "are"} remembered
-          and can use it again; other devices can&apos;t. They still sign in with the password you set. You won&apos;t be able to see this link again,
+          and can use it again; other devices can&apos;t. You won&apos;t be able to see this link again,
           but you can make a new one or reset its usage any time.
         </p>
         <div className="mx-auto w-full max-w-56 rounded-xl bg-white p-3">

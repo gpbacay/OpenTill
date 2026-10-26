@@ -62,6 +62,7 @@ export default function OrdersPage() {
               handleAddToCart(product);
               setSaleOpen(true);
             }}
+            onScanned={() => setMobileRegisterTab("cart")}
           />
         </div>
         {saleOpen || mobileRegisterTab === "cart" ? (

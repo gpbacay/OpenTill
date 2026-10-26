@@ -9,6 +9,7 @@ import { money } from "@/lib/money";
 import { useSearchParams } from "next/navigation";
 import { inPeriod, inRange, presetRange } from "@/lib/periods";
 import { Expense } from "@/lib/types";
+import { countsTowardSales } from "@/lib/void-sale";
 import { Button } from "@/components/ui/button";
 import { DeleteButton, ExportButton } from "@/components/data-table/bulk";
 import { DataTable, type Column } from "@/components/data-table/DataTable";
@@ -68,7 +69,7 @@ export function ExpensesView() {
 
   const month = useMemo(() => {
     const spent = expenses.filter((e) => inPeriod(e.date, "month"));
-    const sales = tenantSyncedOrders.filter((o) => o.status !== "FAILED" && inPeriod(o.date, "month"));
+    const sales = tenantSyncedOrders.filter((o) => countsTowardSales(o) && inPeriod(o.date, "month"));
     const byCategory = new Map<string, number>();
     spent.forEach((e) => byCategory.set(e.category, (byCategory.get(e.category) ?? 0) + e.amount));
     const top = [...byCategory.entries()].sort((a, b) => b[1] - a[1])[0];

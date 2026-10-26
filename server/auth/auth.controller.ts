@@ -53,7 +53,7 @@ export class AuthController {
   @Public()
   @Post("join")
   @HttpCode(200)
-  async join(@Body() body: { token?: string }, @Req() req: AuthedRequest, @Res({ passthrough: true }) res: Response) {
+  async join(@Body() body: { token?: string; password?: string }, @Req() req: AuthedRequest, @Res({ passthrough: true }) res: Response) {
     const { user, token, device } = await this.authService.join(body, req.headers.cookie);
     res.setHeader("Set-Cookie", [sessionCookie(token, SESSION_MAX_AGE), deviceCookie(device)]);
     return user;

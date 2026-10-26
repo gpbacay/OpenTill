@@ -1,4 +1,5 @@
 import type { Expense, Order, StockMovement, Supplier } from "@/lib/types";
+import { countsTowardSales } from "@/lib/void-sale";
 import { downloadCsv } from "@/lib/csv";
 import { money } from "@/lib/money";
 import { toDateInput } from "@/lib/periods";
@@ -105,7 +106,7 @@ function group<T>(rows: T[], key: (row: T) => string) {
   return map;
 }
 
-const counted = (orders: Order[]) => orders.filter((o) => o.status !== "FAILED");
+const counted = (orders: Order[]) => orders.filter(countsTowardSales);
 const restocks = (movements: StockMovement[]) => movements.filter((m) => m.type === "RESTOCK");
 
 export function buildReport(type: ReportType, period: string, data: ReportData, store: { name: string; currency: string }): Report {

@@ -80,7 +80,7 @@ export interface Expense {
   createdAt: string;
 }
 
-export type MovementType = "OPENING" | "RESTOCK" | "ADJUSTMENT" | "SALE";
+export type MovementType = "OPENING" | "RESTOCK" | "ADJUSTMENT" | "SALE" | "VOID";
 
 export interface StockMovement {
   id: string;
@@ -119,7 +119,7 @@ export type PaymentMethod = "CASH" | "CARD" | "MOBILE_WALLET";
 export interface Order {
   id: string;
   tenantId: string;
-  status: "COMPLETED" | "PENDING_SYNC" | "FAILED";
+  status: "COMPLETED" | "PENDING_SYNC" | "FAILED" | "VOIDED";
   subtotal: number;
   tax: number;
   total: number;
@@ -128,7 +128,12 @@ export interface Order {
   date: string;
   syncedAt?: string;
   cashierName?: string;
+  /** Set for a cashier's sale so they can void only their own. Null for an admin's sale. */
+  cashierId?: string | null;
   customerName?: string;
+  voidedAt?: string | null;
+  voidReason?: string | null;
+  voidedByName?: string | null;
   discountAmount?: number;
   discountPercent?: number;
   cashReceived?: number;

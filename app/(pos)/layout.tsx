@@ -22,7 +22,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 
 const TABS = ["home", "orders", "inventory", "records"].map((id) => MENU_ITEMS.find((item) => item.id === id)!);
 // Cashiers can't open Suppliers or Inventory, so their bar holds the pages they use instead.
-const CASHIER_TABS = MENU_ITEMS.filter((item) => ["home", "records", "reports", "activity"].includes(item.id));
+const CASHIER_TABS = ["home", "orders", "records", "reports", "activity"].map((id) => MENU_ITEMS.find((item) => item.id === id)!);
 
 // Leave sideways gestures to fields, charts and anything that scrolls sideways (tables).
 function usesSideways(el: HTMLElement | null, root: HTMLElement) {

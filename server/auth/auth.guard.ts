@@ -33,6 +33,7 @@ const CASHIER_ROUTES: Route[] = [
   ["GET", /^\/api\/(auth\/me|tenants|products|events|changes|orders|columns)$/],
   ["PATCH", /^\/api\/auth\/account$/],
   ["POST", /^\/api\/orders\/sync$/],
+  ["POST", /^\/api\/orders\/[^/]+\/void$/],
 ];
 
 const PAGE_ROUTES: Record<string, Route[]> = {
@@ -75,7 +76,10 @@ export class AuthGuard implements CanActivate {
       if (!cashierRoutes(user.pages).some(([method, pattern]) => method === req.method && pattern.test(path))) {
         throw new ForbiddenException("Cashier accounts can't change this. Ask your admin.");
       }
-      if (req.method === "GET" && path === "/api/orders" && !user.pages?.some((page) => SALES_PAGES.includes(page))) {
+      const salesApi =
+        (req.method === "GET" && path === "/api/orders") ||
+        (req.method === "POST" && /^\/api\/orders\/[^/]+\/void$/.test(path));
+      if (salesApi && !user.pages?.some((page) => SALES_PAGES.includes(page))) {
         throw new ForbiddenException("Your admin hasn't given you a page that shows sales.");
       }
     }

@@ -37,11 +37,12 @@ const TYPE_OPTIONS = [
   { value: "all", label: "All changes" },
   { value: "RESTOCK", label: "Restocks" },
   { value: "SALE", label: "Sales" },
+  { value: "VOID", label: "Voids" },
   { value: "ADJUSTMENT", label: "Adjustments" },
   { value: "OPENING", label: "Opening" },
 ];
 
-const TYPE_LABEL: Record<string, string> = { RESTOCK: "Restock", SALE: "Sale", ADJUSTMENT: "Adjustment", OPENING: "Opening" };
+const TYPE_LABEL: Record<string, string> = { RESTOCK: "Restock", SALE: "Sale", VOID: "Void", ADJUSTMENT: "Adjustment", OPENING: "Opening" };
 
 export function InventoryView() {
   const { products, activeTenant, handleDeleteProduct } = usePos();

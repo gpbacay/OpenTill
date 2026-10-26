@@ -3,7 +3,9 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/auth-context";
+import { PasswordInput } from "@/components/PasswordInput";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 
 interface Invite {
   username: string;
@@ -11,8 +13,8 @@ interface Invite {
 }
 
 /**
- * Where a cashier lands from the sign-in link or QR code their admin shared. Signing in takes a tap, not a page load,
- * so link previews and scanners can't use up the one-time link.
+ * Where a cashier lands from the sign-in link or QR code their admin shared. Signing in takes the password their
+ * admin set, not a page load, so link previews and scanners can't use up the link.
  */
 export default function JoinPage() {
   const router = useRouter();
@@ -20,6 +22,7 @@ export default function JoinPage() {
   const { join } = useAuth();
   const [invite, setInvite] = useState<Invite | null | undefined>(undefined);
   const [problem, setProblem] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
 
@@ -43,10 +46,15 @@ export default function JoinPage() {
     };
   }, [token]);
 
-  const signIn = async () => {
+  const signIn = async (event: React.FormEvent) => {
+    event.preventDefault();
     setError("");
+    if (!password) {
+      setError("Enter your password.");
+      return;
+    }
     setPending(true);
-    const message = await join(token);
+    const message = await join(token, password);
     setPending(false);
     if (message) setError(message);
     else router.replace("/orders");
@@ -66,12 +74,23 @@ export default function JoinPage() {
         ) : (
           <div className="flex flex-col gap-4">
             <p className="mt-1 text-sm text-muted-foreground">
-              Hi {invite.username}! Sign in to start working{invite.store ? ` at ${invite.store}` : ""}.
+              Hi {invite.username}! Enter the password from your admin to start working{invite.store ? ` at ${invite.store}` : ""}.
             </p>
-            {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
-            <Button onClick={() => void signIn()} disabled={pending}>
-              {pending ? "Please wait" : `Sign in as ${invite.username}`}
-            </Button>
+            <form className="flex flex-col gap-4" onSubmit={(event) => void signIn(event)} noValidate>
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="password" required>Password</Label>
+                <PasswordInput
+                  id="password"
+                  autoComplete="current-password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                />
+              </div>
+              {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
+              <Button type="submit" disabled={pending}>
+                {pending ? "Please wait" : `Sign in as ${invite.username}`}
+              </Button>
+            </form>
           </div>
         )}
       </div>

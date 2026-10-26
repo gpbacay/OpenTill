@@ -1,10 +1,11 @@
-import { ForbiddenException, Inject, Injectable } from "@nestjs/common";
+import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { DatabaseService } from "../database/database.service";
 import { InventoryService } from "../inventory/inventory.service";
 import { ProductsService } from "../products/products.service";
 import { RealtimeService } from "../realtime/realtime.service";
 import { TenantsService } from "../tenants/tenants.service";
 import type { AuthUser } from "../auth/auth.service";
+import { voidDenial, voidReason } from "../../lib/void-sale";
 
 export interface Order {
   id: string;
@@ -21,6 +22,9 @@ export interface Order {
   /** The cashier account that rang it up; null for admins. */
   cashierId?: string | null;
   customerName?: string | null;
+  voidedAt?: string | null;
+  voidReason?: string | null;
+  voidedByName?: string | null;
   discountAmount?: number | null;
   discountPercent?: number | null;
   cashReceived?: number | null;
@@ -220,6 +224,63 @@ export class OrdersService {
 
     this.announce(orders);
     return { success: true, count: results.length, mode: "memory" };
+  }
+
+  /** Void stays on the sale. Stock goes back once; a second void is refused. */
+  async voidSale(user: AuthUser, id: string, reasonInput: unknown) {
+    const reason = voidReason(reasonInput);
+    if (!reason) throw new BadRequestException("Enter a reason.");
+
+    if (this.dbService.client) {
+      let row: { id: string; tenantId: string; status: string; cashierId?: string | null; date: Date | string; items: OrderItem[] } | null = null;
+      try {
+        row = await this.dbService.client.order.findUnique({ where: { id }, include: { items: true } });
+      } catch (err: any) {
+        console.error("Failed to load the sale, falling back:", err.message);
+      }
+      if (row) {
+        await this.applyVoid(user, row, row.items, reason);
+        const updated = await this.dbService.client.order.update({
+          where: { id },
+          data: { status: "VOIDED", voidedAt: new Date(), voidReason: reason, voidedByName: user.name },
+          include: { items: true },
+        });
+        this.announce([{ tenantId: row.tenantId }]);
+        return updated;
+      }
+    }
+
+    const order = this.memoryOrders.find((existing) => existing.id === id);
+    if (!order) throw new NotFoundException("Sale not found.");
+    const items = this.memoryOrderItems.filter((item) => item.orderId === id);
+    await this.applyVoid(user, order, items, reason);
+    order.status = "VOIDED";
+    order.voidedAt = new Date().toISOString();
+    order.voidReason = reason;
+    order.voidedByName = user.name;
+    this.announce([{ tenantId: order.tenantId }]);
+    return { ...order, items };
+  }
+
+  private async applyVoid(
+    user: AuthUser,
+    order: { id: string; tenantId: string; status: string; cashierId?: string | null; date: Date | string },
+    items: { id: string; productId: string; name: string; quantity: number }[],
+    reason: string
+  ) {
+    if (!(await this.tenantsService.owns(user.id, order.tenantId))) {
+      throw new ForbiddenException("You do not have access to this store.");
+    }
+    const date = order.date instanceof Date ? order.date : new Date(order.date);
+    const denial = voidDenial(user, { status: order.status, cashierId: order.cashierId, date: date.toISOString() });
+    if (denial?.status === 400) throw new BadRequestException(denial.message);
+    if (denial) throw new ForbiddenException(denial.message);
+    for (const item of items) {
+      await this.inventory.restoreSale(
+        { id: item.id, productId: item.productId, name: item.name, quantity: item.quantity },
+        { tenantId: order.tenantId, date, reason }
+      );
+    }
   }
 
   private announce(orders: any[]) {

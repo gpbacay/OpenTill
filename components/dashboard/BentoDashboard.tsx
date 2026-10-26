@@ -11,6 +11,7 @@ import { useOps } from "@/contexts/ops-context";
 import { isCashier } from "@/lib/local-auth";
 import { inRange, presetRange, rangeQuery, toDateInput } from "@/lib/periods";
 import { money } from "@/lib/money";
+import { countsTowardSales } from "@/lib/void-sale";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DateRangeFilter, useRangeFilter } from "@/components/data-table/DateRangeFilter";
@@ -97,7 +98,7 @@ export default function BentoDashboard({
     [products, activeTenant.id]
   );
   const allSales = useMemo(
-    () => orders.filter((order) => order.tenantId === activeTenant.id && order.status !== "FAILED"),
+    () => orders.filter((order) => order.tenantId === activeTenant.id && countsTowardSales(order)),
     [orders, activeTenant.id]
   );
   const sales = useMemo(() => allSales.filter((order) => inRange(order.date, range)), [allSales, range]);

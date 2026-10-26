@@ -25,12 +25,14 @@ export function buildActivity({ orders, expenses, movements, suppliers, currency
     id: `sale-${order.id}`,
     kind: "sale",
     title:
-      order.status === "PENDING_SYNC"
-        ? "Sale queued for sync"
-        : order.status === "FAILED"
-          ? "Sale needs attention"
-          : "Sale completed",
-    description: `${order.customerName || "Walk-in customer"} · ${money(currency, order.total)}`,
+      order.status === "VOIDED"
+        ? "Sale voided"
+        : order.status === "PENDING_SYNC"
+          ? "Sale queued for sync"
+          : order.status === "FAILED"
+            ? "Sale needs attention"
+            : "Sale completed",
+    description: `${order.customerName || "Walk-in customer"} · ${money(currency, order.total)}${order.status === "VOIDED" && order.voidReason ? ` · ${order.voidReason}` : ""}`,
     date: order.date,
     href: `/records?preset=all&sale=${encodeURIComponent(order.id)}`,
   }));
@@ -45,7 +47,7 @@ export function buildActivity({ orders, expenses, movements, suppliers, currency
   }));
 
   const stock: ActivityItem[] = movements
-    .filter((movement) => movement.type !== "SALE")
+    .filter((movement) => movement.type !== "SALE" && movement.type !== "VOID")
     .map((movement) => ({
       id: `stock-${movement.id}`,
       kind: "stock",

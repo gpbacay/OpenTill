@@ -19,9 +19,11 @@ interface RegisterCatalogProps {
   products: Product[];
   activeTenant: Tenant;
   onAddToSale: (product: Product) => void;
+  /** A scan that added a product: the sale is where the cashier pays. */
+  onScanned: () => void;
 }
 
-export function RegisterCatalog({ products, activeTenant, onAddToSale }: RegisterCatalogProps) {
+export function RegisterCatalog({ products, activeTenant, onAddToSale, onScanned }: RegisterCatalogProps) {
   const [search, setSearch] = useFilter("register_query", "");
   const [selectedCategory, setSelectedCategory] = useFilter("register_category", "all");
   const [view, setView] = useViewMode("register", "cards");
@@ -85,18 +87,18 @@ export function RegisterCatalog({ products, activeTenant, onAddToSale }: Registe
   const addProduct = (product: Product | undefined, missing: string) => {
     if (!product) {
       setMessage(missing);
-      return missing;
+      return { status: missing, close: false };
     }
     if (product.stock <= 0) {
       const out = `${product.name} is out of stock.`;
       setMessage(out);
-      return out;
+      return { status: out, close: false };
     }
     onAddToSale(product);
     setSearch("");
     const added = `Added ${product.name} to the sale.`;
     setMessage(added);
-    return added;
+    return { status: added, close: true };
   };
 
   const addFromScan = (raw: string) => {
@@ -104,12 +106,18 @@ export function RegisterCatalog({ products, activeTenant, onAddToSale }: Registe
     if (!id) {
       const bad = "That code isn't a product QR.";
       setMessage(bad);
-      return bad;
+      return { status: bad, close: false };
     }
-    return addProduct(
+    const result = addProduct(
       tenantProducts.find((product) => product.id === id),
       "No product matches that code."
     );
+    // One scan, one unit, then the sale. The camera stops so a held QR can't add it again.
+    if (result.close) {
+      setScanning(false);
+      onScanned();
+    }
+    return result;
   };
 
   const addMatch = (event: React.FormEvent) => {

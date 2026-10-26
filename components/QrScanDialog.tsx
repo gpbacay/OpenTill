@@ -8,8 +8,14 @@ type BarcodeDetectorCtor = new (options?: { formats?: string[] }) => {
   detect: (source: CanvasImageSource) => Promise<DetectedCode[]>;
 };
 
-/** Camera reader for a product QR. Calls `onCode` once per code until it leaves the frame. */
-export function QrScanDialog({ onClose, onCode }: { onClose: () => void; onCode: (raw: string) => string }) {
+/** Camera reader for a product QR. One read per code; `close` stops the camera after a product is added. */
+export function QrScanDialog({
+  onClose,
+  onCode,
+}: {
+  onClose: () => void;
+  onCode: (raw: string) => { status: string; close: boolean };
+}) {
   const onCodeRef = useRef(onCode);
   onCodeRef.current = onCode;
   const stopRef = useRef<(() => void) | null>(null);
@@ -35,7 +41,7 @@ export function QrScanDialog({ onClose, onCode }: { onClose: () => void; onCode:
     };
     stopRef.current = stop;
 
-    // ponytail: BarcodeDetector (Chrome/Edge). Same code ignored for 1.2s so a held QR adds once.
+    // ponytail: BarcodeDetector (Chrome/Edge). A code adds once until it leaves the frame, so holding it doesn't raise the quantity.
     const Detector = (window as Window & { BarcodeDetector?: BarcodeDetectorCtor }).BarcodeDetector;
     if (!Detector || !navigator.mediaDevices?.getUserMedia) {
       setStatus("This browser can't scan with the camera. Use Chrome or Edge, or search for the product.");
@@ -61,11 +67,14 @@ export function QrScanDialog({ onClose, onCode }: { onClose: () => void; onCode:
           detector
             .detect(video)
             .then((codes) => {
-              const value = codes[0]?.rawValue?.trim();
-              const now = Date.now();
-              if (value && (value !== last.value || now - last.at > 1200)) {
-                last = { value, at: now };
-                setStatus(onCodeRef.current(value));
+              const value = codes[0]?.rawValue?.trim() ?? "";
+              if (value && value !== last.value) {
+                last = { value, at: Date.now() };
+                const result = onCodeRef.current(value);
+                setStatus(result.status);
+                if (result.close) stop();
+              } else if (!value) {
+                last = { value: "", at: 0 };
               }
               if (!stopped) timer = window.setTimeout(tick, 200);
             })

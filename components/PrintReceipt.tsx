@@ -36,6 +36,7 @@ export function PrintReceipt({ order, items, tenant, showPrint = true }: PrintRe
       `}</style>
       <div className="printable-receipt-area w-full max-w-[320px] bg-white p-4 text-black">
         <p className="text-center text-sm font-bold">{tenant.name}</p>
+        {order.status === "VOIDED" ? <p className="text-center text-sm font-bold">VOIDED</p> : null}
         <p className="mb-3 text-center text-xs">{tenant.businessType}</p>
         <p className="text-xs">{new Date(order.date).toLocaleString()}</p>
         <p className="mb-3 text-xs">{order.id}</p>

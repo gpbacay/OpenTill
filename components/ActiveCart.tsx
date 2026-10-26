@@ -140,6 +140,7 @@ export function ActiveCart({
       date: new Date().toISOString(),
       syncedAt: isOnline ? new Date().toISOString() : undefined,
       cashierName: cashier,
+      cashierId: user && isCashier(user) ? user.id : undefined,
       customerName: customerName.trim() || undefined,
       discountAmount,
       discountPercent,

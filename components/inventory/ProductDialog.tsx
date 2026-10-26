@@ -40,11 +40,13 @@ export function ProductDialog({ target, onClose }: Props) {
   const [custom, setCustom] = useState<Record<string, string>>({});
   const [image, setImage] = useState("");
   const [errors, setErrors] = useState<FieldErrors>({});
+  const [categoryOpen, setCategoryOpen] = useState(false);
   const editing = target && target !== "new" ? target : null;
 
   useEffect(() => {
     if (!target) return;
     setErrors({});
+    setCategoryOpen(false);
     if (target === "new") {
       setForm(blank);
       setCustom({});
@@ -72,8 +74,15 @@ export function ProductDialog({ target, onClose }: Props) {
     clearError(setErrors, event.target.id);
     setForm((prev) => ({ ...prev, [field]: event.target.value }));
   };
-  // Pick from the categories set up in Settings. A product whose category was since removed keeps it as an option.
-  const categories = [...new Set([...setUp.map((c) => c.name), ...(editing?.category ? [editing.category] : [])])];
+  // Settings list plus names already used on products, so a typed category can be picked next time.
+  const categories = [
+    ...new Set(
+      [...setUp.map((c) => c.name), ...products.filter((p) => p.tenantId === activeTenant.id).map((p) => p.category)]
+        .map((name) => name.trim())
+        .filter(Boolean)
+    ),
+  ].sort((a, b) => a.localeCompare(b));
+  const categoryChoices = categories.filter((category) => category.toLowerCase().includes(form.category.trim().toLowerCase()));
 
   const submit = (event: React.FormEvent) => {
     event.preventDefault();
@@ -87,7 +96,7 @@ export function ProductDialog({ target, onClose }: Props) {
         "p-name": required(form.name, "Enter the product name.") ?? maxLength(form.name, 80, "Name"),
         "p-brand": maxLength(form.brand, 60, "Brand"),
         "p-sku": /\s/.test(sku) ? "A SKU can't contain spaces." : clash ? `${sku.toUpperCase()} is already used by ${clash.name}.` : undefined,
-        "p-category": required(form.category, setUp.length ? "Pick a category." : "Enter a category.") ?? maxLength(form.category, 40, "Category"),
+        "p-category": required(form.category, "Enter a category.") ?? maxLength(form.category, 40, "Category"),
         "p-cost": numberError(form.costPrice, "the cost", { min: 0 }),
         "p-price": numberError(form.price, "the selling price", { required: true, min: 0 }),
         "p-stock": editing ? undefined : numberError(form.stock, "starting stock", { min: 0, integer: true }),
@@ -191,36 +200,50 @@ export function ProductDialog({ target, onClose }: Props) {
             </div>
             <div className="space-y-1">
               <Label htmlFor="p-category" required>Category</Label>
-              {setUp.length > 0 ? (
-                <select
-                  id="p-category"
-                  {...invalid(errors, "p-category")}
-                  value={form.category}
-                  onChange={set("category")}
-                  className="h-8 w-full rounded-lg bg-input px-2 text-sm aria-invalid:ring-3 aria-invalid:ring-destructive/20"
-                >
-                  <option value="">Pick a category</option>
-                  {categories.map((category) => (
-                    <option key={category} value={category}>
-                      {category}
-                    </option>
+              <Input
+                id="p-category"
+                {...invalid(errors, "p-category")}
+                role="combobox"
+                aria-expanded={categoryOpen && categoryChoices.length > 0}
+                aria-controls="product-categories"
+                aria-autocomplete="list"
+                autoComplete="off"
+                value={form.category}
+                onChange={set("category")}
+                onFocus={() => setCategoryOpen(true)}
+                onBlur={() => setCategoryOpen(false)}
+                placeholder="Type or pick a category"
+              />
+              {categoryOpen && categoryChoices.length > 0 ? (
+                <ul id="product-categories" role="listbox" className="max-h-32 overflow-auto rounded-lg border bg-popover">
+                  {categoryChoices.map((category) => (
+                    <li key={category} role="none">
+                      <button
+                        type="button"
+                        role="option"
+                        className="w-full rounded-md px-2 py-1 text-left text-sm hover:bg-muted"
+                        onMouseDown={(event) => {
+                          event.preventDefault();
+                          clearError(setErrors, "p-category");
+                          setForm((prev) => ({ ...prev, category }));
+                          setCategoryOpen(false);
+                        }}
+                      >
+                        {category}
+                      </button>
+                    </li>
                   ))}
-                </select>
-              ) : (
-                <>
-                  {/* Nothing set up yet: type one, and point to Settings where the list is managed. */}
-                  <Input id="p-category" {...invalid(errors, "p-category")} value={form.category} onChange={set("category")} />
-                  {settingsOpen ? (
-                    <p className="text-xs text-muted-foreground">
-                      Tip: set up your categories in{" "}
-                      <Link href="/settings" className="underline underline-offset-2" onClick={onClose}>
-                        Settings
-                      </Link>{" "}
-                      to pick from a list.
-                    </p>
-                  ) : null}
-                </>
-              )}
+                </ul>
+              ) : null}
+              {categories.length === 0 && settingsOpen ? (
+                <p className="text-xs text-muted-foreground">
+                  Tip: set up your categories in{" "}
+                  <Link href="/settings" className="underline underline-offset-2" onClick={onClose}>
+                    Settings
+                  </Link>{" "}
+                  to reuse them here.
+                </p>
+              ) : null}
               <FieldError errors={errors} id="p-category" />
             </div>
           </div>

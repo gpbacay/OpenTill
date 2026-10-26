@@ -17,6 +17,7 @@ import { ProductQrCode } from "./ProductQrCode";
 const MOVEMENT_LABEL: Record<string, string> = {
   RESTOCK: "Restock",
   SALE: "Sale",
+  VOID: "Void",
   ADJUSTMENT: "Adjustment",
   OPENING: "Opening stock",
 };

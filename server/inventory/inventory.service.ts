@@ -4,7 +4,7 @@ import { ProductsService } from "../products/products.service";
 import { RealtimeService } from "../realtime/realtime.service";
 import { TenantsService } from "../tenants/tenants.service";
 
-export type MovementType = "OPENING" | "RESTOCK" | "ADJUSTMENT" | "SALE";
+export type MovementType = "OPENING" | "RESTOCK" | "ADJUSTMENT" | "SALE" | "VOID";
 
 export interface StockMovement {
   id: string;
@@ -113,6 +113,49 @@ export class InventoryService {
     this.realtime.emit(movement.tenantId, "stock");
     this.realtime.emit(movement.tenantId, "products");
     return movement;
+  }
+
+  /**
+   * Put sale stock back. The movement id is the lock: a retry after a crash skips stock that already returned.
+   * The movement row and the stock increment commit together, so one can't land without the other.
+   */
+  async restoreSale(
+    item: { id: string; productId: string; name: string; quantity: number },
+    order: { tenantId: string; date: Date; reason: string }
+  ) {
+    const id = `mov-void-${item.id}`;
+    if (await this.find(id)) return;
+    const product = await this.products.getById(item.productId);
+    if (!product) return;
+    const movement: StockMovement = {
+      id,
+      tenantId: order.tenantId,
+      productId: product.id,
+      productName: item.name || product.name,
+      type: "VOID",
+      quantity: item.quantity,
+      unitCost: null,
+      supplierId: null,
+      note: order.reason,
+      date: order.date,
+    };
+    if (this.dbService.client) {
+      try {
+        await this.dbService.client.$transaction([
+          this.dbService.client.stockMovement.create({ data: movement as any }),
+          this.dbService.client.product.update({
+            where: { id: product.id },
+            data: { stock: { increment: item.quantity } },
+          }),
+        ]);
+        return;
+      } catch (err: any) {
+        if (await this.find(id)) return;
+        console.error("Failed to restore sale stock, falling back to memory:", err.message);
+      }
+    }
+    this.memoryMovements.push(movement);
+    await this.products.adjustStock(product.id, item.quantity);
   }
 
   /** Ledger entry for a sale. Stock was already deducted by the order sync, so this only records it. Never throws. */

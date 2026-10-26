@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { Area, AreaChart, CartesianGrid, XAxis } from "recharts";
 import { Order, Tenant } from "@/lib/types";
+import { countsTowardSales } from "@/lib/void-sale";
 import { money } from "@/lib/money";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -27,7 +28,7 @@ function hourLabel(date: Date) {
 }
 
 export function AnalyticsPanel({ orders, activeTenant }: AnalyticsPanelProps) {
-  const completed = orders.filter((order) => order.status !== "FAILED");
+  const completed = orders.filter(countsTowardSales);
   const totalSales = completed.reduce((sum, order) => sum + order.total, 0);
   const avgTicket = completed.length > 0 ? totalSales / completed.length : 0;
   const discounts = completed.reduce((sum, order) => sum + (order.discountAmount || 0), 0);

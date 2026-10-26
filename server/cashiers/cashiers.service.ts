@@ -132,7 +132,7 @@ export class CashiersService {
     return rows.map(toCashier);
   }
 
-  /** The admin sets the password. The cashier also gets a sign-in link so they can start without typing it. */
+  /** The admin sets the password. The cashier also gets a sign-in link that opens their account; they still enter that password. */
   async create(adminId: string, body: CashierInput): Promise<CashierInvite> {
     const email = requireUsername(body.username);
     const name = body.name?.trim() ? requireName(body.name) : email;

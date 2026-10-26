@@ -97,7 +97,7 @@ model Product {
 model Order {
   id              String      @id
   tenantId        String
-  status          String // "COMPLETED" | "PENDING_SYNC" | "FAILED"
+  status          String // "COMPLETED" | "PENDING_SYNC" | "FAILED" | "VOIDED"
   subtotal        Float
   tax             Float
   total           Float
@@ -112,6 +112,9 @@ model Order {
   discountPercent Float?
   cashReceived    Float?
   changeDue       Float?
+  voidedAt        DateTime?
+  voidReason      String?
+  voidedByName    String?
   tenant          Tenant      @relation(fields: [tenantId], references: [id])
   items           OrderItem[]
 
@@ -165,7 +168,7 @@ model StockMovement {
   tenantId    String
   productId   String
   productName String
-  type        String // "OPENING" | "RESTOCK" | "ADJUSTMENT" | "SALE"
+  type        String // "OPENING" | "RESTOCK" | "ADJUSTMENT" | "SALE" | "VOID"
   quantity    Int
   unitCost    Float?
   supplierId  String?
