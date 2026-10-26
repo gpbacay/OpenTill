@@ -22,6 +22,8 @@ export interface Column<T> {
   header: string;
   cell: (row: T) => ReactNode;
   align?: "right";
+  /** Shown beside the name in the columns dialog. Right-aligned columns are numbers when this is left unset. */
+  type?: "text" | "number" | "date";
   className?: string;
   /** Group label when rows are grouped by this column. Defaults to the cell's text, with groups sorted A–Z; when given, groups keep the rows' order (e.g. newest day first). */
   group?: (row: T) => string;

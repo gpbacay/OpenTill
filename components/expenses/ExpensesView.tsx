@@ -15,7 +15,7 @@ import { DataTable, type Column } from "@/components/data-table/DataTable";
 import { DateRangeFilter, useRangeFilter } from "@/components/data-table/DateRangeFilter";
 import { PlusSignIcon } from "@hugeicons/core-free-icons";
 import { ToolbarButton, FilterSelects, passesFilters, type RowFilter, ResetFiltersButton, SearchBox, StatTile, FilterBar, ViewBySelect, GroupBySelect, useGroupBy, useFilter, matches, useViewMode } from "@/components/data-table/controls";
-import { ColumnManager, customColumnDefs, customFieldRows, customText } from "@/components/data-table/custom-columns";
+import { ColumnManager, applyColumnPrefs, columnField, customColumnDefs, customFieldRows, customText, useColumnPrefs } from "@/components/data-table/custom-columns";
 import { DetailPanel, Fields, SplitView } from "@/components/data-table/DetailPanel";
 import { ExpenseDialog } from "./ExpenseDialog";
 import { TablePageSkeleton } from "@/components/loading/PageSkeletons";
@@ -26,6 +26,7 @@ export function ExpensesView() {
   // A cashier's sales list holds only their own sales, and profit stays with the admin.
   const cashier = isCashier(useAuth().user);
   const { activeTenant, tenantSyncedOrders } = usePos();
+  const columnPrefs = useColumnPrefs(activeTenant?.id, "expenses");
   const { expenses, suppliers, columnsFor, deleteExpense, ready } = useOps();
   const [query, setQuery] = useFilter("expenses_query", "");
   const [category, setCategory] = useFilter("expenses_category", "all");
@@ -75,15 +76,15 @@ export function ExpensesView() {
     return { spentTotal, salesTotal: sales.reduce((sum, o) => sum + o.total, 0), top };
   }, [expenses, tenantSyncedOrders]);
 
-  const columns: Column<Expense>[] = [
+  const columns: Column<Expense>[] = applyColumnPrefs([
     { id: "category", header: "Category", cell: (e) => e.category },
-    { id: "date", header: "Date", cell: (e) => <span className="whitespace-nowrap">{new Date(e.date).toLocaleDateString()}</span>, group: (e) => new Date(e.date).toLocaleDateString() },
+    { id: "date", header: "Date", type: "date", cell: (e) => <span className="whitespace-nowrap">{new Date(e.date).toLocaleDateString()}</span>, group: (e) => new Date(e.date).toLocaleDateString() },
     { id: "description", header: "Description", cell: (e) => <span className="block min-w-40">{e.description || "—"}</span> },
     { id: "supplier", header: "Supplier", cell: (e) => supplierName(e.supplierId) },
     { id: "pay", header: "Paid with", cell: (e) => PAY_LABEL[e.paymentMethod] ?? e.paymentMethod },
     { id: "amount", header: "Amount", align: "right", cell: (e) => money(currency, e.amount) },
     ...customColumnDefs<Expense>(columnsFor("expenses")),
-  ];
+  ], columnPrefs.raw);
 
   if (!activeTenant) return null;
   if (!ready.expenses || !ready.suppliers || !ready.columns) return <TablePageSkeleton stats={4} />;
@@ -110,9 +111,9 @@ export function ExpensesView() {
       <Fields
         rows={[
           ["ID", <span key="expense-id" className="break-all font-mono text-xs">{selected.id}</span>],
-          ["Category", selected.category],
-          ["Paid with", PAY_LABEL[selected.paymentMethod] ?? selected.paymentMethod],
-          ["Supplier", supplierName(selected.supplierId)],
+          ...columnField(columns, "category", selected.category),
+          ...columnField(columns, "pay", PAY_LABEL[selected.paymentMethod] ?? selected.paymentMethod),
+          ...columnField(columns, "supplier", supplierName(selected.supplierId)),
           ["Added", new Date(selected.createdAt).toLocaleString()],
           ...customFieldRows(columnsFor("expenses"), selected.custom),
         ]}
@@ -141,7 +142,7 @@ export function ExpensesView() {
         active={filtersActive}
         actions={
           <>
-            <ColumnManager table="expenses" />
+            <ColumnManager table="expenses" columns={columns} />
             <ToolbarButton icon={PlusSignIcon} label="Add expense" short="Add" onClick={() => setTarget("new")} />
           </>
         }

@@ -11,7 +11,7 @@ import { DeleteButton, ExportButton } from "@/components/data-table/bulk";
 import { DataTable, type Column } from "@/components/data-table/DataTable";
 import { PlusSignIcon } from "@hugeicons/core-free-icons";
 import { ToolbarButton, FilterSelects, passesFilters, type RowFilter, ResetFiltersButton, SearchBox, StatTile, FilterBar, ViewBySelect, GroupBySelect, useGroupBy, useFilter, matches, useViewMode } from "@/components/data-table/controls";
-import { ColumnManager, customColumnDefs, customFieldRows, customText } from "@/components/data-table/custom-columns";
+import { ColumnManager, applyColumnPrefs, columnField, customColumnDefs, customFieldRows, customText, useColumnPrefs } from "@/components/data-table/custom-columns";
 import { DetailPanel, Fields, PanelSection, SplitView } from "@/components/data-table/DetailPanel";
 import { SupplierDialog } from "./SupplierDialog";
 import { TablePageSkeleton } from "@/components/loading/PageSkeletons";
@@ -24,6 +24,7 @@ const STATUS = [
 
 export function SuppliersView() {
   const { products, activeTenant } = usePos();
+  const columnPrefs = useColumnPrefs(activeTenant?.id, "suppliers");
   const { suppliers, movements, expenses, columnsFor, deleteSupplier, ready } = useOps();
   const [query, setQuery] = useFilter("suppliers_query", "");
   const [status, setStatus] = useFilter("suppliers_status", "all");
@@ -72,7 +73,7 @@ export function SuppliersView() {
     setSelectedId(null);
   };
 
-  const columns: Column<Supplier>[] = [
+  const columns: Column<Supplier>[] = applyColumnPrefs([
     {
       id: "name",
       header: "Supplier",
@@ -90,6 +91,7 @@ export function SuppliersView() {
     {
       id: "last",
       header: "Last delivery",
+      type: "date",
       cell: (s) => {
         const last = stats.get(s.id)?.last;
         return last ? new Date(last).toLocaleDateString() : "—";
@@ -101,7 +103,7 @@ export function SuppliersView() {
       cell: (s) => (s.active ? <Badge variant="secondary">Active</Badge> : <Badge variant="outline">Inactive</Badge>),
     },
     ...customColumnDefs<Supplier>(columnsFor("suppliers")),
-  ];
+  ], columnPrefs.raw);
 
   if (!activeTenant) return null;
   const now = new Date();
@@ -125,10 +127,10 @@ export function SuppliersView() {
         rows={[
           ["ID", <span key="supplier-id" className="break-all font-mono text-xs">{selected.id}</span>],
           ["Contact", selected.contactPerson || "—"],
-          ["Phone", selected.phone ? <a className="underline-offset-4 hover:underline" href={`tel:${selected.phone}`}>{selected.phone}</a> : "—"],
-          ["Email", selected.email ? <a className="underline-offset-4 hover:underline" href={`mailto:${selected.email}`}>{selected.email}</a> : "—"],
+          ...columnField(columns, "phone", selected.phone ? <a className="underline-offset-4 hover:underline" href={`tel:${selected.phone}`}>{selected.phone}</a> : "—"),
+          ...columnField(columns, "email", selected.email ? <a className="underline-offset-4 hover:underline" href={`mailto:${selected.email}`}>{selected.email}</a> : "—"),
           ["Address", selected.address || "—"],
-          ["Bought (restocks)", money(currency, stats.get(selected.id)?.spent ?? 0)],
+          ...columnField(columns, "spent", money(currency, stats.get(selected.id)?.spent ?? 0)),
           ...customFieldRows(columnsFor("suppliers"), selected.custom),
         ]}
       />
@@ -179,7 +181,7 @@ export function SuppliersView() {
         active={filtersActive}
         actions={
           <>
-            <ColumnManager table="suppliers" />
+            <ColumnManager table="suppliers" columns={columns} />
             <ToolbarButton icon={PlusSignIcon} label="Add supplier" short="Add" onClick={() => setTarget("new")} />
           </>
         }

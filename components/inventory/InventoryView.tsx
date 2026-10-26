@@ -15,7 +15,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DeleteButton, ExportButton } from "@/components/data-table/bulk";
 import { DataTable, type Column } from "@/components/data-table/DataTable";
 import { ToolbarButton, FilterSelects, brandFilter, passesFilters, type RowFilter, ResetFiltersButton, SearchBox, StatTile, FilterBar, ViewBySelect, GroupBySelect, useGroupBy, useFilter, matches, useViewMode } from "@/components/data-table/controls";
-import { ColumnManager, customColumnDefs, customFieldRows, customText } from "@/components/data-table/custom-columns";
+import { ColumnManager, applyColumnPrefs, columnField, customColumnDefs, customFieldRows, customText, useColumnPrefs } from "@/components/data-table/custom-columns";
 import { DetailPanel, Fields, PanelSection, SplitView } from "@/components/data-table/DetailPanel";
 import { ProductDialog } from "./ProductDialog";
 import { StockDialog, type StockAction } from "./StockDialog";
@@ -45,6 +45,7 @@ const TYPE_LABEL: Record<string, string> = { RESTOCK: "Restock", SALE: "Sale", A
 
 export function InventoryView() {
   const { products, activeTenant, handleDeleteProduct } = usePos();
+  const columnPrefs = useColumnPrefs(activeTenant?.id, "products");
   const { suppliers, movements, columnsFor, ready } = useOps();
   const params = useSearchParams();
   const [tab, setTab] = useFilter<"stock" | "history">("inventory_tab", "stock");
@@ -118,7 +119,7 @@ export function InventoryView() {
     [movements, type, query, suppliers]
   );
 
-  const stockColumns: Column<Product>[] = [
+  const stockColumns: Column<Product>[] = applyColumnPrefs([
     { id: "category", header: "Category", cell: (p) => p.category },
     {
       id: "name",
@@ -150,7 +151,7 @@ export function InventoryView() {
       },
     },
     ...customColumnDefs<Product>(customColumns),
-  ];
+  ], columnPrefs.raw);
 
   const historyColumns: Column<StockMovement>[] = [
     { id: "date", header: "Date", cell: (m) => <span className="whitespace-nowrap">{new Date(m.date).toLocaleString()}</span>, group: (m) => new Date(m.date).toLocaleDateString() },
@@ -209,11 +210,11 @@ export function InventoryView() {
       <Fields
         rows={[
           ["ID", <span key="product-id" className="break-all font-mono text-xs">{selected.id}</span>],
-          ["Category", selected.category],
-          ["Brand", selected.brand || "—"],
-          ["Supplier", supplierName(selected.supplierId)],
-          ["Cost", money(currency, selected.costPrice ?? 0)],
-          ["Price", `${money(currency, selected.price)} (${margin}% margin)`],
+          ...columnField(stockColumns, "category", selected.category),
+          ...columnField(stockColumns, "brand", selected.brand || "—"),
+          ...columnField(stockColumns, "supplier", supplierName(selected.supplierId)),
+          ...columnField(stockColumns, "cost", money(currency, selected.costPrice ?? 0)),
+          ...columnField(stockColumns, "price", `${money(currency, selected.price)} (${margin}% margin)`),
           ["Stock value", money(currency, Math.max(0, selected.stock) * (selected.costPrice ?? 0))],
           ["Warn me at", reorderLevel(selected)],
           ...customFieldRows(customColumns, selected.custom),
@@ -286,7 +287,7 @@ export function InventoryView() {
         actions={
           tab === "stock" ? (
             <>
-              <ColumnManager table="products" />
+              <ColumnManager table="products" columns={stockColumns} />
               <ToolbarButton icon={PlusSignIcon} label="Add product" short="Add" onClick={() => setProductTarget("new")} />
             </>
           ) : null
