@@ -222,10 +222,8 @@ export function DataTable<T>({
   useEffect(() => setOpened(new Set()), [groupBy]);
 
   const groupColumn = ordered.find((column) => column.id === groupBy && column.groupable !== false);
-  // The grouped column's value is already in each group header, so its cells are not repeated.
+  // Cards and in-group filters skip the grouped column; its value is the group. The table still shows it, so its title lines up with the others.
   const columns = ordered.filter((column) => column !== groupColumn);
-  // Caption row is one header tall (py-2.5 + text-xs); the column names stick just under it.
-  const headTop = groupColumn ? "top-9" : "top-0";
   const [groupFilters, setGroupFilters] = useFilter<Record<string, GroupFilter>>(`${stateKey ?? columnOrderKey ?? "table"}_${groupBy}_groups`, {});
   // `filters ?? {}`: older saves held a single column filter instead.
   const filterOf = (key: string): GroupFilter => ({ query: groupFilters[key]?.query ?? "", filters: groupFilters[key]?.filters ?? {} });
@@ -300,7 +298,7 @@ export function DataTable<T>({
           className="flex min-w-0 items-center gap-2 py-2.5 pl-3 text-left text-sm font-semibold"
         >
           <HugeiconsIcon icon={ArrowDown01Icon} size={16} className={`shrink-0 text-muted-foreground transition-transform ${open ? "" : "-rotate-90"}`} />
-          <span className="shrink-0 text-muted-foreground">{groupColumn.header}</span>
+          <span className="sr-only">{groupColumn.header}</span>
           <span className="truncate text-foreground">{key}</span>
           <span className="shrink-0 rounded-full bg-muted px-2 text-xs font-medium tabular-nums text-muted-foreground">
             {section.count < all.length ? `${section.count}/${all.length}` : all.length}
@@ -575,32 +573,19 @@ export function DataTable<T>({
       <div className="min-h-0 flex-1 overflow-auto">
         <table className="w-full min-w-max border-separate border-spacing-0 text-sm">
           <thead>
-            {groupColumn ? (
-              <tr>
-                <th
-                  scope="col"
-                  colSpan={Math.max(1, columns.length + (selectable ? 1 : 0) + (image ? 1 : 0))}
-                  className="sticky top-0 z-20 bg-card px-3 py-2.5 text-left text-xs font-medium text-muted-foreground shadow-[0_1px_0_var(--input)]"
-                >
-                  {groupColumn.header}
-                </th>
-              </tr>
-            ) : null}
             <tr>
               {selectable ? (
-                <th scope="col" className={`sticky ${headTop} z-10 w-10 bg-card py-2.5 pl-3 text-left align-middle shadow-[0_1px_0_var(--input)]`}>
+                <th scope="col" className="sticky top-0 z-10 w-10 bg-card py-2.5 pl-3 text-left align-middle shadow-[0_1px_0_var(--input)]">
                   {pageCheckbox}
                 </th>
               ) : null}
               {image ? (
-                <th scope="col" className={`sticky ${headTop} z-10 w-12 bg-card py-2.5 pl-3 shadow-[0_1px_0_var(--input)]`}>
+                <th scope="col" className="sticky top-0 z-10 w-12 bg-card py-2.5 pl-3 shadow-[0_1px_0_var(--input)]">
                   <span className="sr-only">Photo</span>
                 </th>
               ) : null}
-              {columns.map((column, shownIndex) => {
-                // Moves are positions in the full order, which still includes the hidden grouped column.
-                const index = ordered.indexOf(column);
-                const neighbor = (key: string) => columns[shownIndex + (key === "ArrowLeft" ? -1 : 1)];
+              {ordered.map((column, index) => {
+                const neighbor = (key: string) => ordered[index + (key === "ArrowLeft" ? -1 : 1)];
                 return (
                 <th
                   key={column.id}
@@ -620,7 +605,7 @@ export function DataTable<T>({
                         },
                         onDrop: (event: DragEvent) => {
                           event.preventDefault();
-                          if (dragging && dragging !== column.id) moveColumn(dragging, index);
+                          if (dragging && dragging !== column.id) moveColumn(dragging, ordered.indexOf(column));
                           setDragging(null);
                         },
                         onKeyDown: (event: KeyboardEvent) => {
@@ -636,7 +621,7 @@ export function DataTable<T>({
                       }
                     : {})}
                   data-column={column.id}
-                  className={`sticky ${headTop} z-10 whitespace-nowrap bg-card px-3 py-2.5 text-xs font-medium text-muted-foreground shadow-[0_1px_0_var(--input)] ${
+                  className={`sticky top-0 z-10 whitespace-nowrap bg-card px-3 py-2.5 text-xs font-medium text-muted-foreground shadow-[0_1px_0_var(--input)] ${
                     column.align === "right" ? "text-right" : "text-left"
                   } ${columnOrderKey ? "cursor-grab outline-none select-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset active:cursor-grabbing" : ""} ${
                     dragging === column.id ? "opacity-50" : ""
@@ -651,7 +636,7 @@ export function DataTable<T>({
           <tbody>
             {rows.length === 0 ? (
               <tr>
-                <td colSpan={columns.length + (selectable ? 1 : 0) + (image ? 1 : 0)} className="px-3 py-16 text-center text-sm text-muted-foreground">
+                <td colSpan={ordered.length + (selectable ? 1 : 0) + (image ? 1 : 0)} className="px-3 py-16 text-center text-sm text-muted-foreground">
                   {empty}
                 </td>
               </tr>
@@ -660,14 +645,14 @@ export function DataTable<T>({
               <Fragment key={section.key ?? ""}>
               {section.key !== null ? (
                 <tr>
-                  <td colSpan={columns.length + (selectable ? 1 : 0) + (image ? 1 : 0)} className="bg-muted/30 p-0 shadow-[0_1px_0_var(--input)]">
+                  <td colSpan={ordered.length + (selectable ? 1 : 0) + (image ? 1 : 0)} className="bg-muted/30 p-0 shadow-[0_1px_0_var(--input)]">
                     {groupHeader(section)}
                   </td>
                 </tr>
               ) : null}
               {noGroupMatch(section) ? (
                 <tr>
-                  <td colSpan={columns.length + (selectable ? 1 : 0) + (image ? 1 : 0)}>{noGroupMatch(section)}</td>
+                  <td colSpan={ordered.length + (selectable ? 1 : 0) + (image ? 1 : 0)}>{noGroupMatch(section)}</td>
                 </tr>
               ) : null}
               {section.rows.map((row) => {
@@ -686,7 +671,7 @@ export function DataTable<T>({
                         )}
                       </td>
                     ) : null}
-                    {columns.map((column) => (
+                    {ordered.map((column) => (
                       <td
                         key={column.id}
                         className={`px-3 py-2.5 align-middle ${column.align === "right" ? "text-right tabular-nums" : ""} ${column.className ?? ""}`}

@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useHistoryLayer } from "@/lib/history-layer";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Cancel01Icon } from "@hugeicons/core-free-icons";
 import { Button } from "@/components/ui/button";
@@ -31,6 +32,16 @@ export function DetailPanel({
   children: ReactNode;
   actions?: ReactNode;
 }) {
+  // Full screen below lg, so on a phone it is a page of its own: back should close it, not the screen under it.
+  const [phone, setPhone] = useState(false);
+  useEffect(() => {
+    const query = window.matchMedia("(max-width: 1023px)");
+    const update = () => setPhone(query.matches);
+    update();
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
+  }, []);
+  useHistoryLayer(phone, onClose);
   // Keep one stable listener; onClose changes identity on every parent render.
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
